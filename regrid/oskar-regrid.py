@@ -1,0 +1,301 @@
+import numpy as np
+import astropy.units as u 
+import astropy.constants as c 
+from astropy.cosmology import FlatLambdaCDM as fmodel, z_at_value as getz
+from matplotlib import pyplot as plt
+from scipy.interpolate import make_interp_spline as misp
+from astropy.coordinates import SkyCoord
+import copy
+import os
+
+class Regrid(object):
+    """
+    The regridding class contains functions relating to translating simulation data to OSKAR output data.
+    """
+
+    @staticmethod
+    def mock_values(random_not_uniform, scale = 3, d = (100, 100, 100)):
+        """
+        Create an array of mock simulation values.
+
+        :param random_not_uniform: If true, then generate a random brightness temperature array, if false generate a uniform brightness temperature array.
+        :param scale: Define the Kelvin scale of the array (e.g. default value will create a uniform array of 3 K or a random array of 0 - 3 K).
+        :return: Mock brightness temperature values.
+        """
+        print("Creating mock brightness temperatures ...")
+
+        values = None
+
+        # Set values array
+        if random_not_uniform:
+            values = np.random.rand(*d) * scale
+        else:
+            values = np.ones(d) * scale
+
+        return values.astype(np.float64)
+
+
+    @staticmethod
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, v = (1, 1, 1), output_master_osm=True):
+        """
+        Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
+
+        :param values: The simulation datacube, must have shape d.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube element.
+        :param d: Number of voxels in simulation in dimensions (x, y, t).
+        :param z_ref: Refrence redshift, the ending redshift of the simulation.
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
+        :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
+        :param uniform_spaxels: If true then each voxel has the same physical dimensions, the dimensions are given by v. The voxel array is automatically generated.
+        :param v: If uniform spaxels = True, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
+        :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
+        """
+        print("Initialising ...")
+
+        # Constant values
+        H0 = 100 * u.km / u.s / u.Mpc# Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
+
+        # Define cosmology
+        cosmo = fmodel(H0=H0, Om0=0.31, Ob0=0.048) # Flat ΛCDM means Dark Energy density is 0.69
+
+        # Redshift to comoving distance
+        def z_to_Dz(z): return cosmo.comoving_distance(z)
+
+        # Comoving distance to redshift
+        def Dz_to_z(Dz): return getz(cosmo.comoving_distance, Dz)
+
+        # Redshift to frequency in GHz
+        def z_to_f(z): return 1.42e9 * u.Hz / (z + 1)
+
+        # Calculate refrence comoving dist.
+        Dz_ref = z_to_Dz(z_ref)
+        f_ref = z_to_f(z_ref)
+        Dz_CMB = z_to_Dz(1100)
+
+        # Set voxels array
+        if uniform_spaxels:
+            print("Creating mock voxels ...")
+            
+            voxels = np.full((*d, 3), v, dtype=np.float64)
+
+        # Set regrid flag
+        regrid_flag = require_regrid
+
+        print("Transforming coordinates ...")
+        # Main loop of creation
+        for x in range(d[0]):
+            for y in range(d[1]):
+
+                Dz = Dz_ref
+                Dz_val = Dz_ref.to_value(u.Mpc)
+                z_prev = z_ref
+                fq = f_ref.to_value(u.Hz)
+
+                for t in range(d[2]):
+
+                    # If each spaxel is uniform
+                    if uniform_spaxels and not (x == 0 and y == 0):
+                        voxels[x, y, t, 0] = voxels[0, 0, t, 0]
+                        voxels[x, y, t, 1] = voxels[0, 0, t, 1]
+                        voxels[x, y, t, 2] = voxels[0, 0, t, 2]
+                        values[x, y, t] = values[0, 0, t]
+                        continue
+
+                    # Retreive voxel values
+                    dx = voxels[x, y, t, 0]
+                    dy = voxels[x, y, t, 1]
+                    dt = voxels[x, y, t, 2] 
+                    Tb = values[x, y, t]
+
+                    # STEP 1 - Convert transverse comoving distances to flat angular resolution
+                    Dz_pix = Dz_val+dt/2 # Alter it by the CENTRAL pixel value
+
+                    # Calculate transformed dimensions
+                    dθ = dx/Dz_pix
+                    dφ = dy/Dz_pix
+
+                    Dz_val = Dz_val + dt # Increment the value of Dz by voxel dimension
+
+                    # STEPS 2 & 3 - Convert line-of-sight comoving distance to frequency
+
+                    # Determine corresponding redshifts
+                    z_bot = z_prev
+                    z_top = Dz_to_z(Dz+dt*u.Mpc)
+
+                    # Convert to frequency
+                    f_bot = z_to_f(z_bot)
+                    f_top = z_to_f(z_top)
+
+                    # Store altered frequency bandwidth
+                    df = np.abs((f_bot-f_top).to_value(u.Hz))
+
+                    Dz = Dz + dt*u.Mpc # Increment the value of Dz by voxel dimension
+                    z_prev = z_top # Top z in current box = bottom z in next box
+
+                    # STEP 4 - Convert brightness temperature to pixel flux
+                    fxy = fq + df/2
+            
+                    # Calculate pixelated luminosity
+                    Fv = 2 * c.k_B.value * fxy**2 * Tb * (dθ * dφ) / c.c.value ** 2
+                    Fv = Fv * 1e26 # Converts to Jansky
+
+                    # Increment cumulative frequency
+                    fq = fq + df
+
+                    # STEPS 5 & 6 - Convert flat angular resolution to RA, Dec deviation
+                    # Convert to l, m coordinates
+                    dl = dθ / (2 * np.pi)
+                    dm = dφ / (2 * np.pi)
+
+                    # Convert l, m coordinates to spherical coords
+                    dRA = np.arcsin(dl)
+                    dDc = np.arcsin(dm/np.cos(np.arcsin(dm)))
+
+                    # STEP 7.1 - Check if regridding is needed
+                    if df > max_freq_res:
+                        regrid_flag = regrid_flag or True
+
+                    # Save values
+                    voxels[x, y, t, 0] = dRA
+                    voxels[x, y, t, 1] = dDc
+                    voxels[x, y, t, 2] = df
+                    values[x, y, t] = Fv
+
+                print("\rSpaxel # (", x, ",", y, ")", end="")
+
+        print("\nTransforming complete.")
+
+        # STEP 7 - Regrid frequency-dimension data if needed
+        if regrid_flag:
+            print("Performing regrid ...")
+
+            for x in range(d[0]):
+                for y in range(d[1]):
+
+                    print("\rSpaxel # (", x, ",", y, ")", end="")
+
+                    # Create interpolation B-spline
+                    bspline = misp(np.cumsum(voxels[x, y, :, 2]), values[x, y, :])
+
+                    # Perform regridding
+                    new_freq = np.linspace(0, np.sum(voxels[x, y, :, 2]), d[2])
+                    new_flux = np.clip(bspline(new_freq), 0, None)
+
+                    # Create array of uniform bin sizes
+                    freq_bins = np.ones(d[2]) * np.abs(new_freq[0]-new_freq[1])
+
+                    # Save variables
+                    voxels[x, y, :, 2] = freq_bins
+                    values[x, y, :] = new_flux
+
+            print("\nRegrid complete.")
+
+        else:
+            print("No regrid required!")
+        
+        # STEP 8 - Write data to OSM file
+        print("Configuring datacube for OSKAR file format ...")
+
+        # RA, Dec centering function
+        centering = (lambda x: (x - np.max(x)/2))
+
+        # Cumulative sums are more important than voxel bins now, add half the mean to approximate centre
+        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0)) + np.mean(voxels[:,:,:,0], axis=0)/2
+        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + np.mean(voxels[:,:,:,0], axis=1)/2
+        freqsum = f_ref.to_value(u.Hz) - np.cumsum(voxels[:,:,:,2], axis=2) - np.mean(voxels[:,:,:,0], axis=2)/2
+
+        # Use Skycoords to calculate spherical RA, Dec offsets
+        source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
+        RAs = source_pos.ra.to_value(u.deg)
+        Dcs = source_pos.dec.to_value(u.deg)
+
+        # Record data to file
+        if output_master_osm:
+            print("Recording data to .osm file")
+            with open('reformatted.osm', 'w') as osm:
+
+                # Clear file contents
+                osm.truncate(0)
+
+                # Add header lines
+                osm.write("# Entries Key:\n")
+                osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6\n")
+                osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0\n")
+
+                # Write OSM lines
+                for x in range(d[0]):
+                    for y in range(d[1]):
+                        for t in range(d[2]):
+
+                            # Format data
+                            RAscn = np.char.zfill(np.format_float_positional(RAs[x, y, t], 6, False), 10)
+                            Decln = np.char.zfill(np.format_float_positional(np.abs(Dcs[x, y, t]), 6, False), 9)
+                            value = np.format_float_scientific(values[x, y, t], 4, False)
+                            freq0 = np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False)
+
+                            # Add +/- value to Declinations
+                            if Dcs[x, y, y] >= 0: Decln = "+" + str(Decln)
+                            else:                 Decln = "-" + str(Decln)
+
+                            # Write to OSM
+                            osm.write(
+                                str(RAscn)    + " " + # Right Ascension
+                                Decln         + " " + # Declination
+                                str(value)    + " " + # Intensity
+                                "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
+                                str(freq0)  + "e6 " + # Point source frequency
+                                "\n"
+                            )
+
+                        print("\rSpaxel # (", x, ",", y, ")", end="")
+
+            print("\nProcess complete, data saved to ./reformatted.osm")
+        else:
+            print("Recording data to .osm files")
+
+            if not os.path.isdir('osm_output'):
+                os.mkdir('osm_output')
+
+            for t in range(d[2]):
+                file_freq = np.format_float_positional(freqsum[0, 0, t] / 1e6, 3, False)
+                print("\rGenerating OSM for freq0 =", file_freq, "MHz ( file #", t+1, "of", d[2], ")", end="")
+
+                with open('osm_output/reformatted_no.'+str(t+1)+'_'+str(file_freq)+'MHz.osm', 'w') as osm:
+                    # Clear file contents
+                    osm.truncate(0)
+
+                    # Add header lines
+                    osm.write("# Entries Key:\n")
+                    osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6\n")
+                    osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0\n")
+
+                    # Write OSM lines
+                    for x in range(d[0]):
+                        for y in range(d[1]):
+                            # Format data
+                            RAscn = np.char.zfill(np.format_float_positional(RAs[x, y, t], 6, False), 10)
+                            Decln = np.char.zfill(np.format_float_positional(np.abs(Dcs[x, y, t]), 6, False), 9)
+                            value = np.format_float_scientific(values[x, y, t], 4, False)
+                            freq0 = np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False)
+
+                            # Add +/- value to Declinations
+                            if Dcs[x, y, y] >= 0: Decln = "+" + str(Decln)
+                            else:                 Decln = "-" + str(Decln)
+
+                            # Write to OSM
+                            osm.write(
+                                str(RAscn)    + " " + # Right Ascension
+                                Decln         + " " + # Declination
+                                str(value)    + " " + # Intensity
+                                "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
+                                str(freq0)  + "e6 " + # Point source frequency
+                                "\n"
+                            )
+                
+
+            print("\nProcess complete, data saved to ./osm-output/")
+
+
+
+Regrid.generate_osm_from_simulation(Regrid.mock_values(False, 10), output_master_osm=False)
