@@ -1,11 +1,13 @@
+# pylint: disable=E1101
+
 import numpy as np
-import astropy.units as u 
-import astropy.constants as c 
+import astropy.units as u
+import astropy.constants as c
 from astropy.cosmology import FlatLambdaCDM as fmodel, z_at_value as getz
-from matplotlib import pyplot as plt
+#from matplotlib import pyplot as plt
 from scipy.interpolate import make_interp_spline as misp
 from astropy.coordinates import SkyCoord
-import copy
+#import copy
 import os
 
 class Regrid(object):
@@ -14,11 +16,11 @@ class Regrid(object):
     """
 
     @staticmethod
-    def mock_values(random_not_uniform, scale = 3, d = (100, 100, 100)):
+    def mock_values(preset, scale = 3, d = (100, 100, 100)):
         """
         Create an array of mock simulation values.
 
-        :param random_not_uniform: If true, then generate a random brightness temperature array, if false generate a uniform brightness temperature array.
+        :param preset: Mock brightness temperature array format. Options are {"flat", "random", "gaussian", "sinusoid"}
         :param scale: Define the Kelvin scale of the array (e.g. default value will create a uniform array of 3 K or a random array of 0 - 3 K).
         :return: Mock brightness temperature values.
         """
@@ -26,11 +28,18 @@ class Regrid(object):
 
         values = None
 
+        normal = lambda x, mean=0, var=1: np.exp(-(x-mean)**2/(2*var))/np.sqrt(2*np.pi*var)
+        sinusoid = lambda x, f=1, ph=0: np.sin(2*np.pi*f*x+ph)
+
         # Set values array
-        if random_not_uniform:
+        if preset == "random":
             values = np.random.rand(*d) * scale
-        else:
+        elif preset == "flat":
             values = np.ones(d) * scale
+        elif preset == "gaussian":
+            values = normal(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=2, dtype=np.int32).astype(np.float64), var=d[2])
+        elif preset == "sinusoid":
+            values = sinusoid(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=2, dtype=np.int32).astype(np.float64), f=5/d[2])
 
         return values.astype(np.float64)
 
@@ -71,7 +80,6 @@ class Regrid(object):
         # Calculate refrence comoving dist.
         Dz_ref = z_to_Dz(z_ref)
         f_ref = z_to_f(z_ref)
-        Dz_CMB = z_to_Dz(1100)
 
         # Set voxels array
         if uniform_spaxels:
@@ -135,7 +143,7 @@ class Regrid(object):
 
                     # STEP 4 - Convert brightness temperature to pixel flux
                     fxy = fq + df/2
-            
+                      
                     # Calculate pixelated luminosity
                     Fv = 2 * c.k_B.value * fxy**2 * Tb * (dθ * dφ) / c.c.value ** 2
                     Fv = Fv * 1e26 # Converts to Jansky
@@ -213,7 +221,7 @@ class Regrid(object):
         # Record data to file
         if output_master_osm:
             print("Recording data to .osm file")
-            with open('reformatted.osm', 'w') as osm:
+            with open('reformatted.osm', 'w', encoding='utf8') as osm:
 
                 # Clear file contents
                 osm.truncate(0)
@@ -261,7 +269,7 @@ class Regrid(object):
                 file_freq = np.format_float_positional(freqsum[0, 0, t] / 1e6, 3, False)
                 print("\rGenerating OSM for freq0 =", file_freq, "MHz ( file #", t+1, "of", d[2], ")", end="")
 
-                with open('osm_output/reformatted_no.'+str(t+1)+'_'+str(file_freq)+'MHz.osm', 'w') as osm:
+                with open('osm_output/reformatted_no.'+str(t+1)+'_'+str(file_freq)+'MHz.osm', 'w', encoding='utf8') as osm:
                     # Clear file contents
                     osm.truncate(0)
 
@@ -298,4 +306,4 @@ class Regrid(object):
 
 
 
-Regrid.generate_osm_from_simulation(Regrid.mock_values(False, 10), output_master_osm=False)
+Regrid.generate_osm_from_simulation(Regrid.mock_values("gaussian", 10), output_master_osm=False)
