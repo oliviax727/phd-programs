@@ -4,7 +4,7 @@ import numpy as np
 import astropy.units as u
 import astropy.constants as c
 from astropy.cosmology import FlatLambdaCDM as fmodel, z_at_value as getz
-#from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
 from scipy.interpolate import make_interp_spline as misp
 from astropy.coordinates import SkyCoord
 #import copy
@@ -37,11 +37,20 @@ class Regrid(object):
         elif preset == "flat":
             values = np.ones(d) * scale
         elif preset == "gaussian":
-            values = normal(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=2, dtype=np.int32).astype(np.float64), var=d[2])
+            values = normal(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), var=d[2])
         elif preset == "sinusoid":
-            values = sinusoid(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=2, dtype=np.int32).astype(np.float64), f=5/d[2])
+            values = sinusoid(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), f=5/d[2])
+
+        plt.plot(values[:, 0, 0])
+        plt.show()
 
         return values.astype(np.float64)
+    
+    @staticmethod
+    def brightness_temperature_to_flux(Tb, fxy, dθ, dφ):
+        # Calculate pixelated luminosity
+        Fv = 2 * c.k_B.value * fxy**2 * Tb * (dθ * dφ) / c.c.value ** 2
+        Fv = Fv * 1e26 # Converts to Jansky
 
 
     @staticmethod
@@ -102,14 +111,6 @@ class Regrid(object):
 
                 for t in range(d[2]):
 
-                    # If each spaxel is uniform
-                    if uniform_spaxels and not (x == 0 and y == 0):
-                        voxels[x, y, t, 0] = voxels[0, 0, t, 0]
-                        voxels[x, y, t, 1] = voxels[0, 0, t, 1]
-                        voxels[x, y, t, 2] = voxels[0, 0, t, 2]
-                        values[x, y, t] = values[0, 0, t]
-                        continue
-
                     # Retreive voxel values
                     dx = voxels[x, y, t, 0]
                     dy = voxels[x, y, t, 1]
@@ -127,19 +128,24 @@ class Regrid(object):
 
                     # STEPS 2 & 3 - Convert line-of-sight comoving distance to frequency
 
-                    # Determine corresponding redshifts
-                    z_bot = z_prev
-                    z_top = Dz_to_z(Dz+dt*u.Mpc)
+                    df = 0
 
-                    # Convert to frequency
-                    f_bot = z_to_f(z_bot)
-                    f_top = z_to_f(z_top)
+                    if uniform_spaxels and not (x == 0 and y == 0):
+                        # Determine corresponding redshifts
+                        z_bot = z_prev
+                        z_top = Dz_to_z(Dz+dt*u.Mpc)
 
-                    # Store altered frequency bandwidth
-                    df = np.abs((f_bot-f_top).to_value(u.Hz))
+                        # Convert to frequency
+                        f_bot = z_to_f(z_bot)
+                        f_top = z_to_f(z_top)
 
-                    Dz = Dz + dt*u.Mpc # Increment the value of Dz by voxel dimension
-                    z_prev = z_top # Top z in current box = bottom z in next box
+                        # Store altered frequency bandwidth
+                        df = np.abs((f_bot-f_top).to_value(u.Hz))
+
+                        Dz = Dz + dt*u.Mpc # Increment the value of Dz by voxel dimension
+                        z_prev = z_top # Top z in current box = bottom z in next box
+                    else:
+                        df = voxels[0, 0, t, 2]
 
                     # STEP 4 - Convert brightness temperature to pixel flux
                     fxy = fq + df/2
@@ -173,6 +179,9 @@ class Regrid(object):
                 print("\rSpaxel # (", x, ",", y, ")", end="")
 
         print("\nTransforming complete.")
+
+        plt.plot(values[:, 0, 0])
+        plt.show()
 
         # STEP 7 - Regrid frequency-dimension data if needed
         if regrid_flag:
