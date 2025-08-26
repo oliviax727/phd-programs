@@ -315,7 +315,7 @@ class Regrid(object):
 
 
 
-Regrid.generate_osm_from_simulation(Regrid.mock_values("gaussian", 10), output_master_osm=False, osm_output='test_gaussian_osm')
-Regrid.generate_osm_from_simulation(Regrid.mock_values("flat", 10), output_master_osm=False, osm_output='test_flat_osm')
+#Regrid.generate_osm_from_simulation(Regrid.mock_values("gaussian", 10), output_master_osm=False, osm_output='test_gaussian_osm')
+#Regrid.generate_osm_from_simulation(Regrid.mock_values("flat", 10), output_master_osm=False, osm_output='test_flat_osm')
 Regrid.generate_osm_from_simulation(Regrid.mock_values("sinusoid", 10), output_master_osm=False, osm_output='test_sinusoid_osm')
 Regrid.generate_osm_from_simulation(Regrid.mock_values("point", 10), output_master_osm=False, osm_output='test_point_osm')
