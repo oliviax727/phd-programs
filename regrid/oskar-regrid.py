@@ -4,7 +4,6 @@ import numpy as np
 import astropy.units as u
 import astropy.constants as c
 from astropy.cosmology import FlatLambdaCDM as fmodel, z_at_value as getz
-from matplotlib import pyplot as plt
 from scipy.interpolate import make_interp_spline as misp
 from astropy.coordinates import SkyCoord
 #import copy
@@ -33,16 +32,20 @@ class Regrid(object):
 
         # Set values array
         if preset == "random":
+            # Completely random values
             values = np.random.rand(*d) * scale
         elif preset == "flat":
+            # Completely uniform values
             values = np.ones(d) * scale
         elif preset == "gaussian":
+            # Simple gaussian over sky in y-direction
             values = normal(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), var=d[2])
         elif preset == "sinusoid":
+            # Simple sine wave over sky in x-direction
             values = sinusoid(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), f=5/d[2])
-
-        plt.plot(values[:, 0, 0])
-        plt.show()
+        elif preset == "point":
+            # Point source with diffusion of 2-Sigma
+            values = normal(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), var=2)
 
         return values.astype(np.float64)
     
@@ -54,7 +57,7 @@ class Regrid(object):
 
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, v = (1, 1, 1), output_master_osm=True):
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, v = (1, 1, 1), output_master_osm=True, osm_output="osm_output"):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -180,9 +183,6 @@ class Regrid(object):
 
         print("\nTransforming complete.")
 
-        plt.plot(values[:, 0, 0])
-        plt.show()
-
         # STEP 7 - Regrid frequency-dimension data if needed
         if regrid_flag:
             print("Performing regrid ...")
@@ -271,14 +271,14 @@ class Regrid(object):
         else:
             print("Recording data to .osm files")
 
-            if not os.path.isdir('osm_output'):
-                os.mkdir('osm_output')
+            if not os.path.isdir(osm_output):
+                os.mkdir(osm_output)
 
             for t in range(d[2]):
                 file_freq = np.format_float_positional(freqsum[0, 0, t] / 1e6, 3, False)
                 print("\rGenerating OSM for freq0 =", file_freq, "MHz ( file #", t+1, "of", d[2], ")", end="")
 
-                with open('osm_output/reformatted_no.'+str(t+1)+'_'+str(file_freq)+'MHz.osm', 'w', encoding='utf8') as osm:
+                with open(osm_output+'/reformatted_no.'+str(t+1)+'_'+str(file_freq)+'MHz.osm', 'w', encoding='utf8') as osm:
                     # Clear file contents
                     osm.truncate(0)
 
@@ -315,4 +315,7 @@ class Regrid(object):
 
 
 
-Regrid.generate_osm_from_simulation(Regrid.mock_values("gaussian", 10), output_master_osm=False)
+Regrid.generate_osm_from_simulation(Regrid.mock_values("gaussian", 10), output_master_osm=False, osm_output='test_gaussian_osm')
+Regrid.generate_osm_from_simulation(Regrid.mock_values("flat", 10), output_master_osm=False, osm_output='test_flat_osm')
+Regrid.generate_osm_from_simulation(Regrid.mock_values("sinusoid", 10), output_master_osm=False, osm_output='test_sinusoid_osm')
+Regrid.generate_osm_from_simulation(Regrid.mock_values("point", 10), output_master_osm=False, osm_output='test_point_osm')
