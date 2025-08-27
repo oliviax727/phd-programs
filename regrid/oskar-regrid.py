@@ -196,11 +196,11 @@ class Regrid(object):
                     bspline = misp(np.cumsum(voxels[x, y, :, 2]), values[x, y, :])
 
                     # Perform regridding
-                    new_freq = np.linspace(0, np.sum(voxels[x, y, :, 2]), d[2])
+                    new_freq, freq_bandw = np.linspace(0, np.sum(voxels[x, y, :, 2]), d[2], retstep=True)
                     new_flux = np.clip(bspline(new_freq), 0, None)
 
                     # Create array of uniform bin sizes
-                    freq_bins = np.ones(d[2]) * np.abs(new_freq[0]-new_freq[1])
+                    freq_bins = np.ones(d[2]) * freq_bandw
 
                     # Save variables
                     voxels[x, y, :, 2] = freq_bins
@@ -219,8 +219,9 @@ class Regrid(object):
 
         # Cumulative sums are more important than voxel bins now, add half the mean to approximate centre
         rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0)) + np.mean(voxels[:,:,:,0], axis=0)/2
-        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + np.mean(voxels[:,:,:,0], axis=1)/2
-        freqsum = f_ref.to_value(u.Hz) - np.cumsum(voxels[:,:,:,2], axis=2) - np.mean(voxels[:,:,:,0], axis=2)/2
+        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + np.mean(voxels[:,:,:,1], axis=1)/2
+        freqsum = f_ref.to_value(u.Hz) - np.cumsum(voxels[:,:,:,2], axis=2) - np.mean(voxels[:,:,:,2], axis=2)/2
+        
 
         # Use Skycoords to calculate spherical RA, Dec offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
@@ -315,7 +316,7 @@ class Regrid(object):
 
 
 
-#Regrid.generate_osm_from_simulation(Regrid.mock_values("gaussian", 10), output_master_osm=False, osm_output='test_gaussian_osm')
-#Regrid.generate_osm_from_simulation(Regrid.mock_values("flat", 10), output_master_osm=False, osm_output='test_flat_osm')
+Regrid.generate_osm_from_simulation(Regrid.mock_values("gaussian", 10), output_master_osm=False, osm_output='test_gaussian_osm')
+Regrid.generate_osm_from_simulation(Regrid.mock_values("flat", 10), output_master_osm=False, osm_output='test_flat_osm')
 Regrid.generate_osm_from_simulation(Regrid.mock_values("sinusoid", 10), output_master_osm=False, osm_output='test_sinusoid_osm')
 Regrid.generate_osm_from_simulation(Regrid.mock_values("point", 10), output_master_osm=False, osm_output='test_point_osm')
