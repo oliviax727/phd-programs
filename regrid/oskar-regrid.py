@@ -8,11 +8,33 @@ from scipy.interpolate import make_interp_spline as misp
 from astropy.coordinates import SkyCoord
 #import copy
 import os
+import h5py
 
 class Regrid(object):
     """
     The regridding class contains functions relating to translating simulation data to OSKAR output data.
     """
+
+    @staticmethod
+    def convert_H5_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
+        """
+        Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
+
+        :param h5_location: The file location of the h5 data.
+        :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
+        :param outdir: The directory to output both CSV and text information.
+        :param name: The file name template to be saved to.
+        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the phase refrence point, the voxel size in Mpc.
+        """
+
+        file = h5py.File(h5_location, 'r')
+        bt_data = np.array(file.get('BrightnessTemp')['brightness_temp'])
+
+        if save_data:
+            np.savetxt(outdir+'/'+name, bt_data, delimiter=", ")
+
+        return bt_data, bt_data.shape
+
 
     @staticmethod
     def mock_values(preset, scale = 3, d = (100, 100, 100)):
@@ -310,7 +332,6 @@ class Regrid(object):
                                 str(freq0)  + "e6 " + # Point source frequency
                                 "\n"
                             )
-                
 
             print("\nProcess complete, data saved to ./osm-output/")
 
