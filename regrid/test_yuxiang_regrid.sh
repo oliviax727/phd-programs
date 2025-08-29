@@ -1,6 +1,10 @@
 #!/bin/bash
+# Regrd yuxiang's data
+cd ./regrid
+python3 oskar-regrid.py
+
 # Run a test of the OSKAR regridder
-cd ./regrid/test_intifs
+cd ./test_intifs
 
 # OSKAR Basic Command - add to .bashrc
 function oskar() {
@@ -70,14 +74,22 @@ test_presets=("yuxiang1" "yuxiang2")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
+    # Get first OSM file name
+    cd "../$preset_osm"
+    files=(*)
+    file=${files[0]}
+    cd "../test_intfs"
+
     # Then, run the interferometry simulation
     cp test_intf_gen.ini "test_intf_$preset.ini"
-    ofname="oskar_sky_model\/file=..\/test_${preset}_osm\/reformatted_no.1_177.500MHz.osm"
+    ofname="oskar_sky_model\/file=..\/${preset}_osm\/${file}"
     sed -i "s/^preset.*/${ofname}/" "test_intf_$preset.ini"
+
     oskar -l -i -f "test_intf_$preset.ini"
     oskar -l -I -f test_image.ini
+    
     cp -r output/sim.ms "test_output/sim_$preset.ms"
-    cp output/sim_image_I.fits "test_output/sim_image_$preset_I.fits"
+    cp output/sim_image_I.fits "test_output/sim_image_${preset}_I.fits"
     rm "test_intf_$preset.ini"
     rm -r output
 done

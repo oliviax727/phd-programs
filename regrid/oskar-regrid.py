@@ -10,31 +10,37 @@ from astropy.coordinates import SkyCoord
 import os
 import h5py
 
+class Cosmo(object):
+    """
+    Define a static cosmology method for other classes to use.
+    """
+
+    def __init__(self, H0=100, Om0=0.31, Ob0=0.048):
+        self.H0    = H0 * u.km / u.s / u.Mpc # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
+        self.Om0   = Om0
+        self.Ob0   = Ob0
+        self.cosmo = fmodel(H0=H0, Om0=Om0, Ob0=Ob0) # Flat ΛCDM means Dark Energy density is 0.69
+
+    # Redshift to comoving distance
+    def z_to_Dz(self, z): return self.cosmo.comoving_distance(z)
+
+    # Comoving distance to redshift
+    def Dz_to_z(self, Dz): return getz(self.cosmo.comoving_distance, Dz)
+
+    # Redshift to frequency in GHz
+    @staticmethod
+    def z_to_f(z): return 1.42e9 * u.Hz / (z + 1)
+
 class Regrid(object):
     """
     The regridding class contains functions relating to translating simulation data to OSKAR output data.
     """
 
     @staticmethod
-    def convert_H5_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
-        """
-        Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
-
-        :param h5_location: The file location of the h5 data.
-        :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
-        :param outdir: The directory to output both CSV and text information.
-        :param name: The file name template to be saved to.
-        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, and the voxel size in Mpc.
-        """
-
-        file = h5py.File(h5_location, 'r')
-        bt_data = np.array(file.get('BrightnessTemp')['brightness_temp'])
-
-        if save_data:
-            np.savetxt(outdir+'/'+name, bt_data, delimiter=", ")
-
-        return bt_data, bt_data.shape
-
+    def brightness_temperature_to_flux(Tb, fxy, dθ, dφ):
+        # Calculate pixelated luminosity
+        Fv = 2 * c.k_B.value * fxy**2 * Tb * (dθ * dφ) / c.c.value ** 2
+        Fv = Fv * 1e26 # Converts to Jansky
 
     @staticmethod
     def mock_values(preset, scale = 3, d = (100, 100, 100)):
@@ -70,16 +76,49 @@ class Regrid(object):
             values = normal(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), var=2)
 
         return values.astype(np.float64)
-    
+
     @staticmethod
-    def brightness_temperature_to_flux(Tb, fxy, dθ, dφ):
-        # Calculate pixelated luminosity
-        Fv = 2 * c.k_B.value * fxy**2 * Tb * (dθ * dφ) / c.c.value ** 2
-        Fv = Fv * 1e26 # Converts to Jansky
+    def convert_H5_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
+        """
+        Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
+
+        :param h5_location: The file location of the h5 data.
+        :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
+        :param outdir: The directory to output both CSV and text information.
+        :param name: The file name template to be saved to.
+        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        """
+
+        file = h5py.File(h5_location, 'r')
+
+        # Get BT data
+        bt_data = np.array(file.get('BrightnessTemp')['brightness_temp'])
+
+        # Get Box and Voxel dimensions
+        box_len = file.get('user_params').attrs['BOX_LEN']
+        vox = np.ones(3) * box_len / bt_data.shape[0]
+
+        # Define cosmology
+        cosmology = Cosmo(
+            Om0 = file.get('cosmo_params').attrs['OMm'],
+            Ob0 = file.get('cosmo_params').attrs['OMb']
+        )
+
+        # Transform intitial redshift
+        z_max_ref = file.get('global_params').attrs['INITIAL_REDSHIFT']
+        max_Dz = cosmology.z_to_Dz(z_max_ref).to_value(u.Mpc)
+        min_Dz = max_Dz - box_len
+        z_ref = cosmology.Dz_to_z(min_Dz * u.Mpc).value
+
+        if save_data:
+            np.savetxt(outdir+'/'+name+'.csv', bt_data, delimiter=", ")
+            np.savetxt(outdir+'/'+name+'.txt', np.array([bt_data.shape, z_ref, vox, cosmology]), delimiter=", ")
+
+        return bt_data, bt_data.shape, z_ref, vox, cosmology
 
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, v = (1, 1, 1), output_master_osm=True, osm_output="osm_output"):
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, v = (1, 1, 1), output_master_osm=True, osm_output="osm_output", cosmology=Cosmo()):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -93,27 +132,14 @@ class Regrid(object):
         :param uniform_spaxels: If true then each voxel has the same physical dimensions, the dimensions are given by v. The voxel array is automatically generated.
         :param v: If uniform spaxels = True, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
+        :param osm_output: The directory to output the osm file(s) if output_master_osm is false.
+        :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
         """
         print("Initialising ...")
 
-        # Constant values
-        H0 = 100 * u.km / u.s / u.Mpc# Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
-
-        # Define cosmology
-        cosmo = fmodel(H0=H0, Om0=0.31, Ob0=0.048) # Flat ΛCDM means Dark Energy density is 0.69
-
-        # Redshift to comoving distance
-        def z_to_Dz(z): return cosmo.comoving_distance(z)
-
-        # Comoving distance to redshift
-        def Dz_to_z(Dz): return getz(cosmo.comoving_distance, Dz)
-
-        # Redshift to frequency in GHz
-        def z_to_f(z): return 1.42e9 * u.Hz / (z + 1)
-
         # Calculate refrence comoving dist.
-        Dz_ref = z_to_Dz(z_ref)
-        f_ref = z_to_f(z_ref)
+        Dz_ref = cosmology.z_to_Dz(z_ref)
+        f_ref = cosmology.z_to_f(z_ref)
 
         # Set voxels array
         if uniform_spaxels:
@@ -158,11 +184,11 @@ class Regrid(object):
                     if uniform_spaxels and not (x == 0 and y == 0):
                         # Determine corresponding redshifts
                         z_bot = z_prev
-                        z_top = Dz_to_z(Dz+dt*u.Mpc)
+                        z_top = cosmology.Dz_to_z(Dz+dt*u.Mpc)
 
                         # Convert to frequency
-                        f_bot = z_to_f(z_bot)
-                        f_top = z_to_f(z_top)
+                        f_bot = cosmology.z_to_f(z_bot)
+                        f_top = cosmology.z_to_f(z_top)
 
                         # Store altered frequency bandwidth
                         df = np.abs((f_bot-f_top).to_value(u.Hz))
@@ -334,10 +360,27 @@ class Regrid(object):
                             )
 
             print("\nProcess complete, data saved to ./osm-output/")
+    
+    @staticmethod
+    def generate_osm_from_H5(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, output_master_osm=False):
+        """
+        Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
+        :param file: Location of the H5 file.
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
+        :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
+        :param uniform_spaxels: If true then each voxel has the same physical dimensions, the dimensions are given by v. The voxel array is automatically generated.
+        :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
+        """
 
+        values, dim, z_ref, vox, cosmology = Regrid.convert_H5_to_csv(file)
 
-Regrid.generate_osm_from_simulation(Regrid.mock_values("gaussian", 10), output_master_osm=False, osm_output='test_gaussian_osm')
-Regrid.generate_osm_from_simulation(Regrid.mock_values("flat", 10), output_master_osm=False, osm_output='test_flat_osm')
-Regrid.generate_osm_from_simulation(Regrid.mock_values("sinusoid", 10), output_master_osm=False, osm_output='test_sinusoid_osm')
-Regrid.generate_osm_from_simulation(Regrid.mock_values("point", 10), output_master_osm=False, osm_output='test_point_osm')
+        osm_output = file.split('/')[-1][:-3] + "_osm"
+
+        Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, uniform_spaxels=uniform_spaxels, v=vox, output_master_osm=output_master_osm, osm_output=osm_output, cosmology=cosmology)
+
+# Testing stage
+
+Regrid.generate_osm_from_H5('yuxiang_bts/yuxiang1.h5')
+Regrid.generate_osm_from_H5('yuxiang_bts/yuxiang2.h5')
