@@ -24,7 +24,7 @@ class Regrid(object):
         :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
         :param outdir: The directory to output both CSV and text information.
         :param name: The file name template to be saved to.
-        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the phase refrence point, the voxel size in Mpc.
+        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, and the voxel size in Mpc.
         """
 
         file = h5py.File(h5_location, 'r')
