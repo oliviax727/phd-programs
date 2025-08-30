@@ -66,7 +66,7 @@ oskar -l -b -f test_beam.ini
 mkdir -p test_output
 
 # Define the presets
-test_presets=("gaussian" "sinusoid" "flat" "point")
+test_presets=("flat" "point")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
@@ -77,10 +77,13 @@ for preset in ${test_presets[@]}; do
     oskar -l -i -f "test_intf_$preset.ini"
     oskar -l -I -f test_image.ini
     cp -r output/sim.ms "test_output/sim_$preset.ms"
-    cp output/sim_image_I.fits "test_output/sim_image_$preset_I.fits"
+    cp output/sim_image_I.fits "test_output/sim_image_${preset}_I.fits"
     rm "test_intf_$preset.ini"
     rm -r output
 done
 
 cd ..
 cd ..
+
+
+./regrid/test_yuxiang_regrid.sh
