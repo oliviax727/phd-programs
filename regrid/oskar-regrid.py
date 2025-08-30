@@ -378,7 +378,7 @@ class Regrid(object):
 
         osm_output = file.split('/')[-1][:-3] + "_osm"
 
-        Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, uniform_spaxels=uniform_spaxels, v=vox, output_master_osm=output_master_osm, osm_output=osm_output, cosmology=cosmology)
+        Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, uniform_spaxels=uniform_spaxels, v=vox, output_master_osm=output_master_osm, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
 
 # Testing stage
 
