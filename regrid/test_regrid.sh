@@ -62,32 +62,39 @@ function oskar() {
 }
 
 # First, run the beamformer
-oskar -g -b
-
-# Create output directory
-mkdir -p test_output
+oskar -l -b oskar_sim_beam_pattern.ini
 
 # Define the presets
 test_presets=("flat" "point")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
-    # Then, run the interferometry simulation
-    cp test_intf_gen.ini "test_intf_$preset.ini"
-    mv 
+    # Move OSM folder to directory
+    cp -r "../regrid/test_${preset}_osm" "oskar_run_stage/test_${preset}_osm"
 
-    ofname="oskar_sky_model\/file=..\/test_${preset}_osm\/reformatted_no.1_177.500MHz.osm"
+    # Get first OSM file name
+    cd "../test_${preset}_osm"
+    files=(*)
+    file=${files[0]}
+    cd "../test_intfs"
+
+    # Generate the INI files
+    cp ../regrid/test_intif_inis/test_intf_gen.ini "test_intf_$preset.ini"
+
+    # Replace sky model location in INI file
+    ofname="oskar_sky_model\/file=..\/test_${preset}_osm\/${file}"
     sed -i "s/^preset.*/${ofname}/" "test_intf_$preset.ini"
-    oskar -l -i -f "test.ini" #"test_intf_$preset.ini"
-    oskar -l -I -f test_image.ini
-    cp -r output/sim.ms "test_output/sim_$preset.ms"
-    cp output/sim_image_I.fits "test_output/sim_image_${preset}_I.fits"
+
+    # Then, run the interferometry and imager simulations
+    oskar -l -i -f "test_intf_${preset}.ini"
+    oskar -l -I -f oskar_imager.ini
+
+    # Copy output data to regrid folder
+    cp -r output/sim.ms "../regrid/test_output/sim_$preset.ms"
+
+    # Clear OSM folder and INI from directory
     rm "test_intf_$preset.ini"
-    rm -r output
+    rm -r "oskar_run_stage/test_${preset}_osm"
 done
 
 cd ..
-cd ..
-
-
-./regrid/test_yuxiang_regrid.sh

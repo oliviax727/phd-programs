@@ -95,20 +95,17 @@ class Regrid(object):
         bt_data = np.array(file.get('BrightnessTemp')['brightness_temp'])
 
         # Get Box and Voxel dimensions
-        box_len = file.get('user_params').attrs['BOX_LEN']
+        box_len = file.get('user_params').attrs['BOX_LEN'] * file.get('cosmo_params').attrs['hlittle']
         vox = np.ones(3) * box_len / bt_data.shape[0]
 
-        # Define cosmology
+        # Define cosmology with H0=100h
         cosmology = Cosmo(
             Om0 = file.get('cosmo_params').attrs['OMm'],
             Ob0 = file.get('cosmo_params').attrs['OMb']
         )
 
         # Transform intitial redshift
-        z_max_ref = file.get('global_params').attrs['INITIAL_REDSHIFT']
-        max_Dz = cosmology.z_to_Dz(z_max_ref).to_value(u.Mpc)
-        min_Dz = max_Dz - box_len
-        z_ref = cosmology.Dz_to_z(min_Dz * u.Mpc).value
+        z_ref = file.attrs['redshift']
 
         if save_data:
             np.savetxt(outdir+'/'+name+'.csv', bt_data, delimiter=", ")
