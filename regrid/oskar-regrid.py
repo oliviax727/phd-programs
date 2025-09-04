@@ -1,3 +1,4 @@
+#!/bin/python3
 # pylint: disable=E1101
 
 import numpy as np
@@ -105,7 +106,8 @@ class Regrid(object):
         )
 
         # Transform intitial redshift
-        z_ref = file.attrs['redshift']
+        z_mid = file.attrs['redshift']
+        z_ref = cosmology.Dz_to_z(cosmology.z_to_Dz(z_mid) - u.Mpc*box_len/2)
 
         if save_data:
             np.savetxt(outdir+'/'+name+'.csv', bt_data, delimiter=", ")
@@ -379,5 +381,4 @@ class Regrid(object):
 
 # Testing stage
 
-Regrid.generate_osm_from_H5('yuxiang_bts/yuxiang1.h5')
-Regrid.generate_osm_from_H5('yuxiang_bts/yuxiang2.h5')
+print(Regrid.convert_H5_to_csv('yuxiang_bts/yuxiang1.h5'))
