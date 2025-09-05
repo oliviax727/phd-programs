@@ -5,9 +5,10 @@ cd ./oskar_run_stage
 # OSKAR Basic Command - add to .bashrc
 function oskar() {
 
+    cflag=0
     gflag=0
     prog=""
-    file=""
+    ofile=""
     outf="./"
     prevd=$PWD
     
@@ -29,7 +30,7 @@ function oskar() {
                 prog="oskar_imager"
             ;;
             -f | --file)
-                file=$2
+                ofile=$2
                 shift
             ;;
             -o | --output)
@@ -37,8 +38,7 @@ function oskar() {
                 shift
             ;;
             -c | --clean)
-                find ~/.oskar -name '*.log' -type f -delete
-                return 0
+                cflag=1
             ;;
             \?)
                 
@@ -47,18 +47,24 @@ function oskar() {
         shift
     done
 
+    if [ $cflag -eq 1 ]; then
+        if [ $gflag -eq 1 ]; then
+            find ~/.oskar -name '*.log' -type f -delete
+        else
+            find . -name '*.log' -type f -delete
+        fi
+        return 0
+    fi
+
     if [ $gflag -eq 1 ]; then
-        file="$prog.ini"
+        ofile="$prog.ini"
 
         cd ~/.oskar
     fi
 
-    echo $file
-
-    singularity exec --nv --bind $PWD --cleanenv --home $PWD ~/.oskar/OSKAR-2.8.3-Python3.sif $prog $file
+    singularity exec --nv --bind $PWD --cleanenv --home $PWD ~/.oskar/OSKAR-2.8.3-Python3.sif $prog $ofile
 
     cd $prevd
-    cp -rf ~/.oskar/output $outf
 }
 
 # Run beamformer
@@ -77,6 +83,9 @@ for preset in ${test_presets[@]}; do
     files=(*)
     cd ..
 
+    # Create output fits directory
+    mkdir -p "../regrid/test_output/${preset}_fits"
+
     for file in ${files[@]}; do
         # Generate the INI files
         cp ../regrid/test_intif_inis/test_intif_gen.ini "test_intif_${preset}.ini"
@@ -86,7 +95,7 @@ for preset in ${test_presets[@]}; do
         sed -i "s/^preset.*/${ofname}/" "test_intif_${preset}.ini"
 
         # Replace frequency bin
-        word=$(sed '5!d' "test_${preset}_osm/$file")
+        word=$(sed '5!d' "test_${preset}_osm/${file}")
         ofname="start_frequency_hz=${word:45:9}"
         sed -i "s/^fset.*/${ofname}/" "test_intif_${preset}.ini"
 
@@ -95,10 +104,11 @@ for preset in ${test_presets[@]}; do
         oskar -l -I -f oskar_imager.ini
 
         # Copy output data to regrid folder
-        cp -rf output/sim_image_I.fits "../regrid/test_output/${preset}_fits/${file}.fits"
+        cp output/sim_image_I.fits "../regrid/test_output/${preset}_fits/${file}.fits"
 
         # Clear OSM folder and INI from directory
         rm "test_intif_$preset.ini"
+        oskar -l -c
     done
 
     rm -r "test_${preset}_osm"
