@@ -61,40 +61,47 @@ function oskar() {
     cp -rf ~/.oskar/output $outf
 }
 
-# First, run the beamformer
-oskar -l -b oskar_sim_beam_pattern.ini
+# Run beamformer
+oskar -l -b -f oskar_beam.ini
 
 # Define the presets
-test_presets=("flat" "point")
+test_presets=("yuxiang1" "yuxiang2")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
     # Move OSM folder to directory
-    cp -r "../regrid/test_${preset}_osm" "oskar_run_stage/test_${preset}_osm"
+    cp -r "../regrid/${preset}_osm" "test_${preset}_osm"
 
     # Get first OSM file name
-    cd "../test_${preset}_osm"
+    cd "test_${preset}_osm"
     files=(*)
-    file=${files[0]}
-    cd "../test_intfs"
+    cd ..
 
-    # Generate the INI files
-    cp ../regrid/test_intif_inis/test_intf_gen.ini "test_intf_$preset.ini"
+    for file in ${files[@]}; do
+        # Generate the INI files
+        cp ../regrid/test_intif_inis/test_intif_gen.ini "test_intif_${preset}.ini"
 
-    # Replace sky model location in INI file
-    ofname="oskar_sky_model\/file=..\/test_${preset}_osm\/${file}"
-    sed -i "s/^preset.*/${ofname}/" "test_intf_$preset.ini"
+        # Replace sky model location in INI file
+        ofname="oskar_sky_model\/file=test_${preset}_osm\/${file}"
+        sed -i "s/^preset.*/${ofname}/" "test_intif_${preset}.ini"
 
-    # Then, run the interferometry and imager simulations
-    oskar -l -i -f "test_intf_${preset}.ini"
-    oskar -l -I -f oskar_imager.ini
+        # Replace frequency bin
+        word=$(sed '5!d' "test_${preset}_osm/$file")
+        ofname="start_frequency_hz=${word:45:9}"
+        sed -i "s/^fset.*/${ofname}/" "test_intif_${preset}.ini"
 
-    # Copy output data to regrid folder
-    cp -r output/sim.ms "../regrid/test_output/sim_$preset.ms"
+        # Then, run the interferometry and imager simulations
+        oskar -l -i -f "test_intif_${preset}.ini"
+        oskar -l -I -f oskar_imager.ini
 
-    # Clear OSM folder and INI from directory
-    rm "test_intf_$preset.ini"
-    rm -r "oskar_run_stage/test_${preset}_osm"
+        # Copy output data to regrid folder
+        cp -rf output/sim_image_I.fits "../regrid/test_output/${preset}_fits/${file}.fits"
+
+        # Clear OSM folder and INI from directory
+        rm "test_intif_$preset.ini"
+    done
+
+    rm -r "test_${preset}_osm"
 done
 
 cd ..
