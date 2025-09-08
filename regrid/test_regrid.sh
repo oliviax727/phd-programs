@@ -109,9 +109,11 @@ for preset in ${test_presets[@]}; do
         # Clear OSM folder and INI from directory
         rm "test_intif_$preset.ini"
         oskar -l -c
+        break
     done
 
     rm -r "test_${preset}_osm"
+    break
 done
 
 cd ..
