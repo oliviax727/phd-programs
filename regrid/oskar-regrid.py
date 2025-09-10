@@ -156,15 +156,14 @@ class Regrid(object):
 
         print("Transforming coordinates ...")
         # Main loop of creation
-        for x in range(d[0]):
-            for y in range(d[1]):
+        for t in range(d[2]):
+            for x in range(d[0]):
+                for y in range(d[1]):
 
-                Dz = Dz_ref
-                Dz_val = Dz_ref.to_value(u.Mpc)
-                z_prev = z_ref
-                fq = f_ref.to_value(u.Hz)
-
-                for t in range(d[2]):
+                    Dz = Dz_ref
+                    Dz_val = Dz_ref.to_value(u.Mpc)
+                    z_prev = z_ref
+                    fq = f_ref.to_value(u.Hz)
 
                     # Retreive voxel values
                     dx = voxels[x, y, t, 0]
@@ -185,7 +184,7 @@ class Regrid(object):
 
                     df = 0
 
-                    if uniform_spaxels and not (x == 0 and y == 0):
+                    if (not uniform_spaxels) or (x == 0 and y == 0):
                         # Determine corresponding redshifts
                         z_bot = z_prev
                         z_top = cosmology.Dz_to_z(Dz+dt*u.Mpc)
@@ -231,7 +230,7 @@ class Regrid(object):
                     voxels[x, y, t, 2] = df
                     values[x, y, t] = Fv
 
-                print("\rSpaxel # (", x, ",", y, ")", end="")
+            print("\rTime step #", t, end="")
 
         print("\nTransforming complete.")
 
@@ -273,7 +272,6 @@ class Regrid(object):
         rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0)) + np.mean(voxels[:,:,:,0], axis=0)/2
         decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + np.mean(voxels[:,:,:,1], axis=1)/2
         freqsum = f_ref.to_value(u.Hz) - np.cumsum(voxels[:,:,:,2], axis=2) - np.mean(voxels[:,:,:,2], axis=2)/2
-        
 
         # Use Skycoords to calculate spherical RA, Dec offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
@@ -386,6 +384,10 @@ class Regrid(object):
 
 # Testing stage
 
-for preset in ("point", "gaussian", "sinusoid"):
-    print(preset)
-    Regrid.generate_osm_from_simulation(Regrid.mock_values(preset, scale=10), osm_output=preset+"_osm")
+for opt in ("point", "gaussian"):
+    print(opt)
+    Regrid.generate_osm_from_simulation(Regrid.mock_values(preset=opt, scale=10), osm_output=opt+"_osm")
+
+for opt in ("yuxiang1", "yuxiang2"):
+    print(opt)
+    Regrid.generate_osm_from_H5("./yuxiang_bts/"+opt+".h5")
