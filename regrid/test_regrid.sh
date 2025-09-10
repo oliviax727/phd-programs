@@ -71,7 +71,7 @@ function oskar() {
 oskar -l -b -f oskar_beam.ini
 
 # Define the presets
-test_presets=("yuxiang1" "yuxiang2")
+test_presets=("point" "gaussian" "yuxiang1" "yuxiang2")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
