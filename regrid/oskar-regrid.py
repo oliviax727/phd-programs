@@ -54,7 +54,12 @@ class Regrid(object):
         """
         print("Creating mock brightness temperatures ...")
 
-        values = None
+        values = np.zeros(d).astype(np.float64)
+
+        for x in range(d[0]):
+            for y in range(d[1]):
+                for t in range(d[2]):
+                    values[x, y, t] = np.sqrt((x-d[0]/2)**2 + (y-d[1]/2)**2)
 
         normal = lambda x, mean=0, var=1: np.exp(-(x-mean)**2/(2*var))/np.sqrt(2*np.pi*var)
         sinusoid = lambda x, f=1, ph=0: np.sin(2*np.pi*f*x+ph)
@@ -68,13 +73,13 @@ class Regrid(object):
             values = np.ones(d) * scale
         elif preset == "gaussian":
             # Simple gaussian over sky in y-direction
-            values = normal(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), var=d[2])
+            values = normal(values, var=d[2])
         elif preset == "sinusoid":
             # Simple sine wave over sky in x-direction
-            values = sinusoid(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), f=5/d[2])
+            values = sinusoid(values, f=5/d[2])
         elif preset == "point":
             # Point source with diffusion of 2-Sigma
-            values = normal(np.linspace(np.ones(d[0:2])*-d[2]/2, np.ones(d[0:2])*d[2]/2, num=d[2], endpoint=True, axis=0, dtype=np.int32).astype(np.float64), var=2)
+            values = normal(values, var=2)
 
         return values.astype(np.float64)
 
@@ -117,7 +122,7 @@ class Regrid(object):
 
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, v = (1, 1, 1), output_master_osm=True, osm_output="osm_output", cosmology=Cosmo()):
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, v = (1, 1, 1), output_master_osm=False, osm_output="osm_output", cosmology=Cosmo()):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -381,4 +386,6 @@ class Regrid(object):
 
 # Testing stage
 
-print(Regrid.convert_H5_to_csv('yuxiang_bts/yuxiang1.h5'))
+for preset in ("point", "gaussian", "sinusoid"):
+    print(preset)
+    Regrid.generate_osm_from_simulation(Regrid.mock_values(preset, scale=10), osm_output=preset+"_osm")
