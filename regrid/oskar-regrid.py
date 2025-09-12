@@ -4,6 +4,7 @@
 import numpy as np
 import astropy.units as u
 import astropy.constants as c
+from astropy.io import fits
 from astropy.cosmology import FlatLambdaCDM as fmodel, z_at_value as getz
 from scipy.interpolate import make_interp_spline as misp
 from astropy.coordinates import SkyCoord
@@ -382,12 +383,115 @@ class Regrid(object):
 
         Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, uniform_spaxels=uniform_spaxels, v=vox, output_master_osm=output_master_osm, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
 
+class Collator(object):
+    """
+    The Collator class contains methods pertaining to the collation of output FITS file images into a spectral datacube.
+    """
+
+    @staticmethod
+    def collate_fits(fits_dir, outdir="."):
+        """
+        Collates a directory of FITS images into a single FITS datacube. Adds a header to the file that corresponds to useful information about the simulation box.
+
+        :param fits_dir: Directory containing the FITS files to be collated.
+        :return: The file name of the FITS datacube.
+        """
+
+        fits_files = os.listdir(fits_dir)
+        img_list = []
+
+        for file in fits_files:
+            img_list.append(fits.getdata(file))
+        
+        img_arr = np.array(img_list)
+
+        outname = outdir+"/"+fits_dir.split("/")[-1].split(".")[0] + "_cube.fits"
+        hdu_new = fits.PrimaryHDU(img_arr)
+        hdu_new.writeto(outname)
+
+        # FIXME Add a header modification for outname.
+
+        return outname
+
+class BTAnalysisPipeline(object):
+    """
+    A broader class that combines all components of the individual components of the simulated IGM to simulated observation pipeline together.
+    """
+
+    @staticmethod
+    def run_oskar_on_osms(osm_dir, imager_ini = "../oskar_run_stage/oskar_imager.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini"):
+        """
+        Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
+
+        :param osm_dir: Directory containing the OSM files to be imaged.
+        :param imager_ini: The file location of the OSKAR imager settings file.
+        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
+        """
+
+    @staticmethod
+    def setup_BTA_dir(h5_file, cd_in=True):
+        """
+        Sets up the operating directory from which all anaysis will be done.
+
+        :param h5_file: The location of the H5 file.
+        :param cd_in: Whether to cd into the directory once finished or not.
+        :param imager_ini: The file location of the OSKAR imager settings file.
+        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
+        :return: The new location of the H5, imager ini, and interterometer template ini files. Also returns the PWD if cd_in is True.
+        """
+
+        # 1. create directory
+        # 2. Move H5 file to directory
+        # 3. CD into directory
+
+        return "", "", "", ""
+
+    @staticmethod
+    def clean_BTA_dir(pwd, outdir, fits_cube, clean=True):
+        """
+        Finishes and cleans up the mess created by the BTA class.
+
+        :param pwd: The directory to cd to once cleaning is complete.
+        :param outdir: The directory to save the finalised fits image, relative to pwd.
+        :param fits_cube: The name of the FITS output file.
+        :param clean: Whether or not to remove the BTA directory. 
+        """
+
+    @staticmethod
+    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, imager_ini = "../oskar_run_stage/oskar_imager.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True):
+        """
+        Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
+
+        :param file: Location of the H5 file.
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
+        :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
+        :param uniform_spaxels: If true then each voxel has the same physical dimensions, the dimensions are given by v. The voxel array is automatically generated.
+        :param imager_ini: The file location of the OSKAR imager settings file.
+        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
+        :param outdir: The output location of the final FITS file.
+        """
+
+        print("Setting up BTA directory ...")
+        h5_file, img_ini, intif_temp_ini, pwd = BTAnalysisPipeline.setup_BTA_dir(file)
+        osm_output = file.split('/')[-1][:-3] + "_osm"
+        fits_output = file.split('/')[-1][:-3] + "_fits"
+        
+        print("Generating OSM files from H5 ...")
+        Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, uniform_spaxels=uniform_spaxels)
+
+        print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
+        BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_ini=img_ini, interferometer_template_ini=intif_temp_ini)
+
+        print("Collating fits images ...")
+        fits_cube = Collator.collate_fits(fits_output)
+
+        # If clean is true remove all data relating to execution
+        print("Cleaning up ...")
+        BTAnalysisPipeline.clean_BTA_dir(pwd=pwd, outdir=outdir, fits_cube=fits_cube, clean=clean)
+
+
 # Testing stage
 
-for opt in ("point", "gaussian"):
-    print(opt)
-    Regrid.generate_osm_from_simulation(Regrid.mock_values(preset=opt, scale=10), osm_output=opt+"_osm")
-
-for opt in ("yuxiang1", "yuxiang2"):
-    print(opt)
-    Regrid.generate_osm_from_H5("./yuxiang_bts/"+opt+".h5")
+for preset in ("point", "gaussian", "yuxiang1", "yuxiang2"):
+    Collator.collate_fits("./regrid/test_output/"+preset+"_fits", outdir="./regrid/test_output")
