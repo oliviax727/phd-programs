@@ -1,6 +1,8 @@
 # Outfiles
 *.out
 *.osm.fits
+*.f5_TSM0 filter=lfs diff=lfs merge=lfs -text
+*.h5
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
