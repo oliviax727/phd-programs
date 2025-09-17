@@ -398,8 +398,13 @@ class Collator(object):
         """
         print("Collating")
 
-        fits_files = os.listdir(fits_dir)
+        fits_files = np.array(os.listdir(fits_dir))
         img_list = []
+
+        sort_type = [('file', 'O'), ('num', int)]
+        sort_prep = lambda x: (x, int(x.split('.')[1].split("_")[0]))
+
+        fits_files, _ = zip(*np.sort(np.array(list(map(sort_prep, fits_files)), dtype=sort_type), order="num"))
 
         for file in fits_files:
             img_list.append(fits.getdata(fits_dir+"/"+file))
