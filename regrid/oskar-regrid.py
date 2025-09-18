@@ -123,7 +123,7 @@ class Regrid(object):
 
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, v = (1, 1, 1), output_master_osm=False, osm_output="osm_output", cosmology=Cosmo()):
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, v = (1, 1, 1), output_master_osm=False, osm_output="osm_output", cosmology=Cosmo()):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -134,7 +134,6 @@ class Regrid(object):
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
-        :param uniform_spaxels: If true then each voxel has the same physical dimensions, the dimensions are given by v. The voxel array is automatically generated.
         :param v: If uniform spaxels = True, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
         :param osm_output: The directory to output the osm file(s) if output_master_osm is false.
@@ -147,24 +146,23 @@ class Regrid(object):
         f_ref = cosmology.z_to_f(z_ref)
 
         # Set voxels array
-        if uniform_spaxels:
-            print("Creating mock voxels ...")
-            
-            voxels = np.full((*d, 3), v, dtype=np.float64)
+        print("Creating mock voxels ...")
+        voxels = np.full((*d, 3), v, dtype=np.float64)
 
         # Set regrid flag
         regrid_flag = require_regrid
+
+        # Set cosmological redshift parameters
+        Dz = Dz_ref
+        Dz_val = Dz_ref.to_value(u.Mpc)
+        z_prev = z_ref
+        fq = f_ref.to_value(u.Hz)
 
         print("Transforming coordinates ...")
         # Main loop of creation
         for t in range(d[2]):
             for x in range(d[0]):
                 for y in range(d[1]):
-
-                    Dz = Dz_ref
-                    Dz_val = Dz_ref.to_value(u.Mpc)
-                    z_prev = z_ref
-                    fq = f_ref.to_value(u.Hz)
 
                     # Retreive voxel values
                     dx = voxels[x, y, t, 0]
@@ -185,7 +183,7 @@ class Regrid(object):
 
                     df = 0
 
-                    if (not uniform_spaxels) or (x == 0 and y == 0):
+                    if x == 0 and y == 0:
                         # Determine corresponding redshifts
                         z_bot = z_prev
                         z_top = cosmology.Dz_to_z(Dz+dt*u.Mpc)
@@ -365,7 +363,7 @@ class Regrid(object):
             print("\nProcess complete, data saved to ./osm-output/")
     
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, output_master_osm=False):
+    def generate_osm_from_H5(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, output_master_osm=False):
         """
         Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
@@ -373,7 +371,6 @@ class Regrid(object):
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
-        :param uniform_spaxels: If true then each voxel has the same physical dimensions, the dimensions are given by v. The voxel array is automatically generated.
         :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
         """
 
@@ -381,7 +378,7 @@ class Regrid(object):
 
         osm_output = file.split('/')[-1][:-3] + "_osm"
 
-        Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, uniform_spaxels=uniform_spaxels, v=vox, output_master_osm=output_master_osm, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
+        Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=vox, output_master_osm=output_master_osm, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
 
 class Collator(object):
     """
@@ -469,7 +466,7 @@ class BTAnalysisPipeline(object):
         """
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, uniform_spaxels = True, imager_ini = "../oskar_run_stage/oskar_imager.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True):
+    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_ini = "../oskar_run_stage/oskar_imager.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -477,7 +474,6 @@ class BTAnalysisPipeline(object):
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
-        :param uniform_spaxels: If true then each voxel has the same physical dimensions, the dimensions are given by v. The voxel array is automatically generated.
         :param imager_ini: The file location of the OSKAR imager settings file.
         :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
         :param outdir: The output location of the final FITS file.
@@ -489,7 +485,7 @@ class BTAnalysisPipeline(object):
         fits_output = file.split('/')[-1][:-3] + "_fits"
         
         print("Generating OSM files from H5 ...")
-        Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, uniform_spaxels=uniform_spaxels)
+        Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res)
 
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
         BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_ini=img_ini, interferometer_template_ini=intif_temp_ini)
