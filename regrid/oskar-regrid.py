@@ -487,10 +487,10 @@ class BTAnalysisPipeline(object):
         df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
 
         # Calculate RA dimension
-        RAc = np.abs(df['RA'][-1] - df['RA'][0]) % 360
+        RAc = np.abs(np.array(df['RA'])[-1] - df['RA'][0]) % 360
 
         # Calculate Dec dimension
-        Decc = np.abs(df['RDec'][-1] - df['Dec'][0] + 360) % 360
+        Decc = np.abs(np.array(df['Dec'])[-1] - df['Dec'][0] + 360) % 360
 
         # Get number of voxels on a side
         n = np.sqrt(len(np.array(df['RA'])))
@@ -513,43 +513,43 @@ class BTAnalysisPipeline(object):
         """
 
         # Create the output file
-        os.system("mkdir -p output")
+        os.system("mkdir -p BTA/output")
 
         # Get files to iterate over
-        osm_list = Collator.dir_list_sorted(dir_=osm_dir)
+        osm_list = Collator.dir_list_sorted(dir_="BTA/"+osm_dir)
 
         for osm in osm_list:
             # Setup the interferometer ini file
             # Duplicate the generator file
-            os.system("cp "+interferometer_template_ini+" test_intif.ini")
+            os.system("cp "+interferometer_template_ini+" BTA/test_intif.ini")
 
             # Set sky model location
-            ofname = r"oskar_sky_model\/file="+osm_dir+r"\/"+osm
-            os.system(r'sed -i "s/^preset.*/'+ofname+r'/" "test_intif.ini"')
+            ofname = r"oskar_sky_model\/file=BTA\/"+osm_dir+r"\/"+osm
+            os.system(r'sed -i "s/^preset.*/'+ofname+r'/" "BTA/test_intif.ini"')
 
             # Set frequency bin
             freq = osm.split("_")[-1][:-7]+"e6"
             ofname = r"start_frequency_hz="+freq
-            os.system(r'sed -i "s/^fset.*/'+ofname+r'/" "test_intif.ini"')
+            os.system(r'sed -i "s/^fset.*/'+ofname+r'/" "BTA/test_intif.ini"')
 
             # Run OSKAR's interferometer simulation
-            os.system("singularity exec --nv --bind $PWD --cleanenv --home $PWD "+oskar_sif+" oskar_sim_interferometer " + "test_intif.ini")
+            os.system("singularity exec --nv --bind $PWD --cleanenv --home $PWD "+oskar_sif+" oskar_sim_interferometer BTA/test_intif.ini")
 
             # Setup the imager ini file
             # Duplicate the generator file
-            os.system("cp "+imager_template_ini+" test_img.ini")
+            os.system("cp "+imager_template_ini+" BTA/test_img.ini")
 
             # Set the pixel resolution
-            size = BTAnalysisPipeline.get_osm_sky_coverage(osm_dir+"/"+osm, fov=fov)
+            size = BTAnalysisPipeline.get_osm_sky_dpi("BTA/"+osm_dir+"/"+osm, fov=fov)
             ofname = "size="+str(size) 
-            os.system(r'sed -i "s/^sizeset.*/'+ofname+r'/" "test_img.ini"')
+            os.system(r'sed -i "s/^sizeset.*/'+ofname+r'/" "BTA/test_img.ini"')
 
             # Set the FOV
             ofname = "fov_deg="+str(fov)
-            os.system(r'sed -i "s/^fovset.*/'+ofname+r'/" "test_img.ini"')
+            os.system(r'sed -i "s/^fovset.*/'+ofname+r'/" "BTA/test_img.ini"')
 
             # Run OSKAR's imager simulation
-            os.system("singularity exec --nv --bind $PWD --cleanenv --home $PWD "+oskar_sif+" oskar_sim_interferometer " + "test_intif.ini")
+            os.system("singularity exec --nv --bind $PWD --cleanenv --home $PWD "+oskar_sif+" oskar_sim_interferometer BTA/test_intif.ini")
 
 
     @staticmethod
@@ -580,8 +580,6 @@ class BTAnalysisPipeline(object):
         # 3. CD into directory
         if cd_in:
             os.system("cd BTA")
-            return ("analysis.h5" if not template else ""), "imager_template.ini", "interferometer_template.ini", "telescope_model", cwd
-        else:
             return ("BTA/analysis.h5" if not template else ""), "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
 
     @staticmethod
@@ -624,20 +622,20 @@ class BTAnalysisPipeline(object):
         """
 
         template_flag = (template_preset != "")
-        file = template_preset
 
         print("Setting up BTA directory ...")
-        h5_file, img_temp_ini, intif_temp_ini, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini, template=template_flag)
+        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini, template=template_flag)
 
-        osm_output = file.split('/')[-1][:-3] + "_osm"
-        fits_output = file.split('/')[-1][:-3] + "_fits"
+        osm_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_osm"
+        fits_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_fits"
         
-        print("Generating OSM files from H5 ...")
         if template_flag:
+            print("Generating OSM files from template ...")
             template_value = Regrid.mock_values(template_preset)
-            Regrid.generate_osm_from_simulation(template_value, )
+            Regrid.generate_osm_from_simulation(template_value, osm_output="BTA/"+osm_output)
         else:
-            Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output=osm_output)
+            print("Generating OSM files from H5 ...")
+            Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output)
 
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
         BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif, fov=fov)
