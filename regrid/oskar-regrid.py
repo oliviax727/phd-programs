@@ -553,7 +553,7 @@ class BTAnalysisPipeline(object):
 
 
     @staticmethod
-    def setup_BTA_dir(h5_file, cd_in=True, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="~/.oskar/telescope_model_AAstar"):
+    def setup_BTA_dir(h5_file, cd_in=True, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="~/.oskar/telescope_model_AAstar", template=False):
         """
         Sets up the operating directory from which all anaysis will be done.
 
@@ -562,6 +562,7 @@ class BTAnalysisPipeline(object):
         :param imager_template_ini: The file location of the OSKAR imager settings file.
         :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
+        :param template: If true, handle and return no h5 data.
         :return: The new location of the H5, imager ini, and interterometer template ini files, as well as the telescope model location. Also returns the PWD if cd_in is True.
         """
 
@@ -571,7 +572,7 @@ class BTAnalysisPipeline(object):
         os.system("mkdir -p BTA")
 
         # 2. Move H5 file and INIs to directory
-        os.system("cp "+h5_file+" BTA/analysis.h5")
+        if not template: os.system("cp "+h5_file+" BTA/analysis.h5")
         os.system("cp "+imager_template_ini+" BTA/imager_template.ini")
         os.system("cp "+interferometer_template_ini+" BTA/interferometer_template.ini")
         os.system("cp -r "+oskar_telescope_model+" BTA/telescope_model")
@@ -579,9 +580,9 @@ class BTAnalysisPipeline(object):
         # 3. CD into directory
         if cd_in:
             os.system("cd BTA")
-            return "analysis.h5", "imager_template.ini", "interferometer_template.ini", "telescope_model", cwd
+            return ("analysis.h5" if not template else ""), "imager_template.ini", "interferometer_template.ini", "telescope_model", cwd
         else:
-            return "BTA/analysis.h5", "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
+            return ("BTA/analysis.h5" if not template else ""), "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
 
     @staticmethod
     def clean_BTA_dir(outdir, fits_cube, cd_out=True, clean=True):
@@ -605,7 +606,7 @@ class BTAnalysisPipeline(object):
                 os.system("rm -rf BTA")
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", oskar_telescope_model="~/.oskar/telescope_model_AAstar", fov=5.0):
+    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", oskar_telescope_model="~/.oskar/telescope_model_AAstar", fov=5.0, template_preset=""):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -619,15 +620,24 @@ class BTAnalysisPipeline(object):
         :param oskar_sif: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param fov: The field of view of imaging/observation
+        :param template_preset: Use a mock values array instead of a h5 file. Ignores any provided h5 file.
         """
 
+        template_flag = (template_preset != "")
+        file = template_preset
+
         print("Setting up BTA directory ...")
-        h5_file, img_temp_ini, intif_temp_ini, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini)
+        h5_file, img_temp_ini, intif_temp_ini, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini, template=template_flag)
+
         osm_output = file.split('/')[-1][:-3] + "_osm"
         fits_output = file.split('/')[-1][:-3] + "_fits"
         
         print("Generating OSM files from H5 ...")
-        Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output=osm_output)
+        if template_flag:
+            template_value = Regrid.mock_values(template_preset)
+            Regrid.generate_osm_from_simulation(template_value, )
+        else:
+            Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output=osm_output)
 
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
         BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif, fov=fov)
@@ -642,7 +652,4 @@ class BTAnalysisPipeline(object):
 
 # Testing stage
 
-f_mock = Regrid.mock_values("flat")
-r_mock = Regrid.mock_values("random")
-Regrid.generate_osm_from_simulation(f_mock, osm_output="regrid/flat_osm")
-Regrid.generate_osm_from_simulation(r_mock, osm_output="regrid/random_osm")
+BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
