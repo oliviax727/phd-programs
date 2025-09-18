@@ -1,5 +1,6 @@
 #!/bin/python3
 # pylint: disable=E1101
+# pylint: disable=W0102
 
 import numpy as np
 import astropy.units as u
@@ -11,6 +12,7 @@ from astropy.coordinates import SkyCoord
 #import copy
 import os
 import h5py
+import pandas as pd
 
 class Cosmo(object):
     """
@@ -217,7 +219,7 @@ class Regrid(object):
 
                     # Convert l, m coordinates to spherical coords
                     dRA = np.arcsin(dl)
-                    dDc = np.arcsin(dm/np.cos(np.arcsin(dm)))
+                    dDc = np.arcsin(dm/np.cos(np.arcsin(dm))) # FIXME Contact Jack Line over correctness of formula
 
                     # STEP 7.1 - Check if regridding is needed
                     if df > max_freq_res:
@@ -234,6 +236,7 @@ class Regrid(object):
         print("\nTransforming complete.")
 
         # STEP 7 - Regrid frequency-dimension data if needed
+        # FIXME Fix spline boundary conditions
         if regrid_flag:
             print("Performing regrid ...")
 
@@ -473,7 +476,32 @@ class BTAnalysisPipeline(object):
     """
 
     @staticmethod
-    def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output=""):
+    def get_osm_sky_dpi(osm_file, fov=5):
+        """
+        Get the pixel count for a FITS file with it's corresponding OSKAR sky model.
+
+        :param osm_file: The OSM file to analyse.
+        :return: The amount of pixels in per FOV.
+        """
+
+        df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
+
+        # Calculate RA dimension
+        RAc = np.abs(df['RA'][-1] - df['RA'][0]) % 360
+
+        # Calculate Dec dimension
+        Decc = np.abs(df['RDec'][-1] - df['Dec'][0] + 360) % 360
+
+        # Get number of voxels on a side
+        n = np.sqrt(len(np.array(df['RA'])))
+
+        # Calculate pixel length of FOV image
+        dpi = n * fov / max(RAc, Decc)
+
+        return dpi
+
+    @staticmethod
+    def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="", oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", fov=5.0):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
 
@@ -481,6 +509,7 @@ class BTAnalysisPipeline(object):
         :param imager_template_ini: The file location of the OSKAR imager settings file.
         :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
         :param fits_output: The directory to output the resultant FITS files.
+        :param oskar_sif: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
         """
 
         # Create the output file
@@ -491,15 +520,40 @@ class BTAnalysisPipeline(object):
 
         for osm in osm_list:
             # Setup the interferometer ini file
+            # Duplicate the generator file
+            os.system("cp "+interferometer_template_ini+" test_intif.ini")
+
+            # Set sky model location
+            ofname = r"oskar_sky_model\/file="+osm_dir+r"\/"+osm
+            os.system(r'sed -i "s/^preset.*/'+ofname+r'/" "test_intif.ini"')
+
+            # Set frequency bin
+            freq = osm.split("_")[-1][:-7]+"e6"
+            ofname = r"start_frequency_hz="+freq
+            os.system(r'sed -i "s/^fset.*/'+ofname+r'/" "test_intif.ini"')
 
             # Run OSKAR's interferometer simulation
+            os.system("singularity exec --nv --bind $PWD --cleanenv --home $PWD "+oskar_sif+" oskar_sim_interferometer " + "test_intif.ini")
 
             # Setup the imager ini file
+            # Duplicate the generator file
+            os.system("cp "+imager_template_ini+" test_img.ini")
+
+            # Set the pixel resolution
+            size = BTAnalysisPipeline.get_osm_sky_coverage(osm_dir+"/"+osm, fov=fov)
+            ofname = "size="+str(size) 
+            os.system(r'sed -i "s/^sizeset.*/'+ofname+r'/" "test_img.ini"')
+
+            # Set the FOV
+            ofname = "fov_deg="+str(fov)
+            os.system(r'sed -i "s/^fovset.*/'+ofname+r'/" "test_img.ini"')
 
             # Run OSKAR's imager simulation
+            os.system("singularity exec --nv --bind $PWD --cleanenv --home $PWD "+oskar_sif+" oskar_sim_interferometer " + "test_intif.ini")
+
 
     @staticmethod
-    def setup_BTA_dir(h5_file, cd_in=True, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini"):
+    def setup_BTA_dir(h5_file, cd_in=True, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="~/.oskar/telescope_model_AAstar"):
         """
         Sets up the operating directory from which all anaysis will be done.
 
@@ -507,7 +561,8 @@ class BTAnalysisPipeline(object):
         :param cd_in: Whether to cd into the directory once finished or not.
         :param imager_template_ini: The file location of the OSKAR imager settings file.
         :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
-        :return: The new location of the H5, imager ini, and interterometer template ini files. Also returns the PWD if cd_in is True.
+        :param oskar_telescope_model: The telescope model for OSKAR to use.
+        :return: The new location of the H5, imager ini, and interterometer template ini files, as well as the telescope model location. Also returns the PWD if cd_in is True.
         """
 
         cwd = os.getcwd()
@@ -519,13 +574,14 @@ class BTAnalysisPipeline(object):
         os.system("cp "+h5_file+" BTA/analysis.h5")
         os.system("cp "+imager_template_ini+" BTA/imager_template.ini")
         os.system("cp "+interferometer_template_ini+" BTA/interferometer_template.ini")
+        os.system("cp -r "+oskar_telescope_model+" BTA/telescope_model")
 
         # 3. CD into directory
         if cd_in:
             os.system("cd BTA")
-            return "analysis.h5", "imager_template.ini", "interferometer_template.ini", cwd
+            return "analysis.h5", "imager_template.ini", "interferometer_template.ini", "telescope_model", cwd
         else:
-            return "BTA/analysis.h5", "BTA/imager_template.ini", "BTA/interferometer_template.ini", cwd
+            return "BTA/analysis.h5", "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
 
     @staticmethod
     def clean_BTA_dir(outdir, fits_cube, cd_out=True, clean=True):
@@ -549,7 +605,7 @@ class BTAnalysisPipeline(object):
                 os.system("rm -rf BTA")
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True):
+    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", oskar_telescope_model="~/.oskar/telescope_model_AAstar", fov=5.0):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -560,10 +616,13 @@ class BTAnalysisPipeline(object):
         :param imager_template_ini: The file location of the OSKAR imager settings file.
         :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
         :param outdir: The output location of the final FITS file.
+        :param oskar_sif: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
+        :param oskar_telescope_model: The telescope model for OSKAR to use.
+        :param fov: The field of view of imaging/observation
         """
 
         print("Setting up BTA directory ...")
-        h5_file, img_temp_ini, intif_temp_ini, _ = BTAnalysisPipeline.setup_BTA_dir(file)
+        h5_file, img_temp_ini, intif_temp_ini, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini)
         osm_output = file.split('/')[-1][:-3] + "_osm"
         fits_output = file.split('/')[-1][:-3] + "_fits"
         
@@ -571,7 +630,7 @@ class BTAnalysisPipeline(object):
         Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output=osm_output)
 
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
-        BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output)
+        BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif, fov=fov)
 
         print("Collating fits images ...")
         fits_cube = Collator.collate_fits(fits_output, headers=[h5_file, osm_output, fits_output])
