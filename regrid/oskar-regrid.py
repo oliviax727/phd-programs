@@ -511,6 +511,7 @@ class BTAnalysisPipeline(object):
         :param fits_output: The directory to output the resultant FITS files.
         :param oskar_sif: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
         """
+        # FIXME: Run OSKAR Python Interface
 
         # Create the output file
         os.system("mkdir -p BTA/output")
