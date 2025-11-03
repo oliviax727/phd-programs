@@ -400,6 +400,10 @@ class Collator(object):
 
         files = np.array(os.listdir(dir_))
 
+        for file in files:
+            if "_osm.fits" in file:
+                files = files[files != file]
+
         sort_type = [('file', 'O'), ('num', int)]
         sort_prep = lambda x: (x, int(x.split('.')[1].split("_")[0]))
 
@@ -651,4 +655,6 @@ class BTAnalysisPipeline(object):
 
 # Testing stage
 
-BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
+Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
+
+#BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")

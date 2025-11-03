@@ -1,3 +1,7 @@
+# OSKAR run output
+oskar_run_stage/output
+oskar_run_stage/.nv
+
 # Outfiles
 *.out
 *.fits

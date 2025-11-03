@@ -67,11 +67,8 @@ function oskar() {
     cd $prevd
 }
 
-# Run beamformer
-#oskar -l -b -f oskar_beam.ini
-
 # Define the presets
-test_presets=("yuxiang1" "yuxiang2")
+test_presets=("yuxiang1")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
@@ -89,6 +86,10 @@ for preset in ${test_presets[@]}; do
     for file in ${files[@]}; do
         # Generate the INI files
         cp ../regrid/test_intif_inis/test_intif_gen.ini "test_intif_${preset}.ini"
+        cp ../regrid/test_intif_inis/test_img_gen.ini "test_img_${preset}.ini"
+
+        # Run beamformer
+        oskar -l -b -f oskar_beam.ini
 
         # Replace sky model location in INI file
         ofname="oskar_sky_model\/file=test_${preset}_osm\/${file}"
@@ -101,7 +102,7 @@ for preset in ${test_presets[@]}; do
 
         # Then, run the interferometry and imager simulations
         oskar -l -i -f "test_intif_${preset}.ini"
-        oskar -l -I -f oskar_imager.ini
+        oskar -l -I -f "test_img_${preset}.ini"
 
         # Copy output data to regrid folder
         cp output/sim_image_I.fits "../regrid/test_output/${preset}_fits/${file}.fits"
