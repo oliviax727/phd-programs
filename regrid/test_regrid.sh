@@ -81,15 +81,14 @@ for preset in ${test_presets[@]}; do
     cd ..
 
     # Create output fits directory
+    if [ -d "../regrid/test_output/${preset}_fits" ]; then rm -rf "../regrid/test_output/${preset}_fits"; fi
     mkdir -p "../regrid/test_output/${preset}_fits"
 
     for file in ${files[@]}; do
         # Generate the INI files
+        cp ../regrid/test_intif_inis/test_beam_gen.ini "test_beam_${preset}.ini"
         cp ../regrid/test_intif_inis/test_intif_gen.ini "test_intif_${preset}.ini"
         cp ../regrid/test_intif_inis/test_img_gen.ini "test_img_${preset}.ini"
-
-        # Run beamformer
-        oskar -l -b -f oskar_beam.ini
 
         # Replace sky model location in INI file
         ofname="oskar_sky_model\/file=test_${preset}_osm\/${file}"
@@ -98,9 +97,11 @@ for preset in ${test_presets[@]}; do
         # Replace frequency bin
         word=$(sed '5!d' "test_${preset}_osm/${file}")
         ofname="start_frequency_hz=${word:45:9}"
+        sed -i "s/^fset.*/${ofname}/" "test_beam_${preset}.ini"
         sed -i "s/^fset.*/${ofname}/" "test_intif_${preset}.ini"
 
         # Then, run the interferometry and imager simulations
+        oskar -l -b -f "test_beam_${preset}.ini"
         oskar -l -i -f "test_intif_${preset}.ini"
         oskar -l -I -f "test_img_${preset}.ini"
 
@@ -108,7 +109,9 @@ for preset in ${test_presets[@]}; do
         cp output/sim_image_I.fits "../regrid/test_output/${preset}_fits/${file}.fits"
 
         # Clear OSM folder and INI from directory
-        rm "test_intif_$preset.ini"
+        rm "test_beam_${preset}.ini"
+        rm "test_intif_${preset}.ini"
+        rm "test_img_${preset}.ini"
         oskar -l -c
     done
 
