@@ -88,7 +88,7 @@ class Regrid(object):
         return values.astype(np.float64)
 
     @staticmethod
-    def convert_H5_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
+    def convert_H5_coeval_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
         """
         Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
 
@@ -123,6 +123,61 @@ class Regrid(object):
             np.savetxt(outdir+'/'+name+'.txt', np.array([bt_data.shape, z_ref, vox, cosmology]), delimiter=", ")
 
         return bt_data, bt_data.shape, z_ref, vox, cosmology
+    
+    @staticmethod
+    def convert_H5_lightcone_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
+        """
+        Extract h5 data from Yuxiang Qin's lightcone simulations and either return the data objects or save to a seperate CSV.
+
+        :param h5_location: The file location of the h5 data.
+        :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
+        :param outdir: The directory to output both CSV and text information.
+        :param name: The file name template to be saved to.
+        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        """
+
+        file = h5py.File(h5_location, 'r')
+
+        # Get BT data
+        bt_data = np.array(file.get('lightcones/brightness_temp'))
+
+        # Define cosmology with H0=100h
+        cosmology = Cosmo(
+            Om0 = file.get('cosmo_params').attrs['OMm'],
+            Ob0 = file.get('cosmo_params').attrs['OMb']
+        )
+
+        # Get Box and Voxel dimensions
+        box_len = file.get('user_params').attrs['BOX_LEN'] * file.get('cosmo_params').attrs['hlittle']
+        rs = np.array(list(file.get('node_redshifts')))
+        vox = np.array([box_len, box_len, abs(cosmology.z_to_Dz(rs[0])-cosmology.z_to_Dz(rs[-1])).to_value(u.Mpc)]) / bt_data.shape
+        
+        # Transform intitial redshift
+        z_ref = np.min(rs)
+
+        if save_data:
+            np.savetxt(outdir+'/'+name+'.csv', bt_data, delimiter=", ")
+            np.savetxt(outdir+'/'+name+'.txt', np.array([bt_data.shape, z_ref, vox, cosmology]), delimiter=", ")
+
+        return bt_data, bt_data.shape, z_ref, vox, cosmology
+    
+    @staticmethod
+    def convert_H5_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data", coeval=True):
+        """
+        Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
+
+        :param h5_location: The file location of the h5 data.
+        :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
+        :param outdir: The directory to output both CSV and text information.
+        :param name: The file name template to be saved to.
+        :param coeval: whether or not the box is coeval or lightcone.
+        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        """
+
+        if coeval:
+            return Regrid.convert_H5_coeval_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
+        else:
+            return Regrid.convert_H5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
 
 
     @staticmethod
@@ -271,9 +326,9 @@ class Regrid(object):
         centering = (lambda x: (x - np.max(x)/2))
 
         # Cumulative sums are more important than voxel bins now, add half the mean to approximate centre
-        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0)) + np.mean(voxels[:,:,:,0], axis=0)/2
-        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + np.mean(voxels[:,:,:,1], axis=1)/2
-        freqsum = f_ref.to_value(u.Hz) - np.cumsum(voxels[:,:,:,2], axis=2) - np.mean(voxels[:,:,:,2], axis=2)/2
+        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0)) + voxels[:,:,:,0]/2
+        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + voxels[:,:,:,1]/2
+        freqsum = f_ref.to_value(u.Hz) - np.cumsum(voxels[:,:,:,2], axis=2) - voxels[:,:,:,2]/2
 
         # Use Skycoords to calculate spherical RA, Dec offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
@@ -366,7 +421,7 @@ class Regrid(object):
             print("\nProcess complete, data saved to "+osm_output)
     
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, output_master_osm=False, osm_output=""):
+    def generate_osm_from_H5(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, output_master_osm=False, osm_output="", coeval=True):
         """
         Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
@@ -378,7 +433,7 @@ class Regrid(object):
         :param osm_output: The directory to output the osm file(s) if output_master_osm is false.
         """
 
-        values, dim, z_ref, vox, cosmology = Regrid.convert_H5_to_csv(file)
+        values, dim, z_ref, vox, cosmology = Regrid.convert_H5_to_csv(file, coeval=coeval)
 
         if osm_output == "": osm_output = file.split('/')[-1][:-3] + "_osm"
 
@@ -609,7 +664,7 @@ class BTAnalysisPipeline(object):
                 os.system("rm -rf BTA")
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", oskar_telescope_model="~/.oskar/telescope_model_AAstar", fov=5.0, template_preset=""):
+    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", oskar_telescope_model="~/.oskar/telescope_model_AAstar", fov=5.0, template_preset="", coeval=True):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -640,7 +695,7 @@ class BTAnalysisPipeline(object):
             Regrid.generate_osm_from_simulation(template_value, osm_output="BTA/"+osm_output)
         else:
             print("Generating OSM files from H5 ...")
-            Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output)
+            Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output, coeval=coeval)
 
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
         BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif, fov=fov)
@@ -655,6 +710,8 @@ class BTAnalysisPipeline(object):
 
 # Testing stage
 
-Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
+Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_osm", coeval=True)
+
+#Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
 
 #BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
