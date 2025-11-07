@@ -301,7 +301,7 @@ class Regrid(object):
                     print("\rSpaxel # (", x, ",", y, ")", end="")
 
                     # Create interpolation B-spline
-                    bspline = misp(np.cumsum(voxels[x, y, :, 2]), values[x, y, :])
+                    bspline = misp(np.cumsum(voxels[x, y, :, 2]), values[x, y, :], bc_type="natural")
 
                     # Perform regridding
                     new_freq, freq_bandw = np.linspace(0, np.sum(voxels[x, y, :, 2]), d[2], retstep=True)
