@@ -8,6 +8,7 @@ oskar_run_stage/.nv
 *.fits
 *.f5_TSM0
 *.h5
+*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
