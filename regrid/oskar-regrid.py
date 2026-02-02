@@ -301,7 +301,7 @@ class Regrid(object):
                     print("\rSpaxel # (", x, ",", y, ")", end="")
 
                     # Create interpolation B-spline
-                    bspline = misp(np.cumsum(voxels[x, y, :, 2]), values[x, y, :], bc_type="natural")
+                    bspline = misp(np.cumsum(voxels[x, y, :, 2]), values[x, y, :])
 
                     # Perform regridding
                     new_freq, freq_bandw = np.linspace(0, np.sum(voxels[x, y, :, 2]), d[2], retstep=True)
@@ -710,8 +710,9 @@ class BTAnalysisPipeline(object):
 
 # Testing stage
 
-Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_osm", coeval=True)
+Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_test_osm", coeval=True)
 
 #Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
+#Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
 
 #BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
