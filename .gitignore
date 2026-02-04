@@ -1,6 +1,7 @@
 # OSKAR run output
 oskar_run_stage/output
 oskar_run_stage/.nv
+oskar_run_stage/test_*
 ./nohup.txt
 
 # Outfiles
