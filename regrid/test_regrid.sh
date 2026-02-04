@@ -68,7 +68,7 @@ function oskar() {
 }
 
 # Define the presets
-test_presets=("yuxiang1_test")
+test_presets=("yuxiang2")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do

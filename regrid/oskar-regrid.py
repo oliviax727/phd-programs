@@ -326,9 +326,9 @@ class Regrid(object):
         centering = (lambda x: (x - np.max(x)/2))
 
         # Cumulative sums are more important than voxel bins now, add half the mean to approximate centre
-        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0)) + np.mean(voxels[:,:,:,0])/2
-        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + np.mean(voxels[:,:,:,1])/2
-        freqsum = f_ref.to_value(u.Hz) - (np.cumsum(voxels[:,:,:,2], axis=2) + np.mean(voxels[:,:,:,2])/2)
+        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0)) + np.mean(voxels[:,:,:,0], axis=0)/2
+        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + np.mean(voxels[:,:,:,1], axis=1)/2
+        freqsum = f_ref.to_value(u.Hz) - (np.cumsum(voxels[:,:,:,2], axis=2) + np.mean(voxels[:,:,:,2], axis=2)/2)
 
         # Use Skycoords to calculate spherical RA, Dec offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
