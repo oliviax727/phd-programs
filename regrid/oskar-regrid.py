@@ -274,7 +274,7 @@ class Regrid(object):
 
                     # Convert l, m coordinates to spherical coords
                     dRA = np.arcsin(dl)
-                    dDc = np.arcsin(dm/np.cos(np.arcsin(dm))) # FIXME Contact Jack Line over correctness of formula
+                    dDc = np.arcsin(dm/np.cos(np.arcsin(dm)))
 
                     # STEP 7.1 - Check if regridding is needed
                     if df > max_freq_res:
@@ -291,7 +291,6 @@ class Regrid(object):
         print("\nTransforming complete.")
 
         # STEP 7 - Regrid frequency-dimension data if needed
-        # FIXME Fix spline boundary conditions
         if regrid_flag:
             print("Performing regrid ...")
 
@@ -391,6 +390,8 @@ class Regrid(object):
                     osm.truncate(0)
 
                     # Add header lines
+                    # FIXME: Add new named-column format
+                    # FIXME: Add spectral width
                     osm.write("# Entries Key:\n")
                     osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6\n")
                     osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0\n")
