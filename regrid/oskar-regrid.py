@@ -13,6 +13,7 @@ from astropy.coordinates import SkyCoord
 import os
 import h5py
 import pandas as pd
+import subprocess
 
 class Cosmo(object):
     """
@@ -536,7 +537,7 @@ class BTAnalysisPipeline(object):
     """
 
     @staticmethod
-    def get_osm_sky_dpi(osm_file, fov=5):
+    def get_osm_sky_dimensions(osm_file):
         """
         Get the pixel count for a FITS file with it's corresponding OSKAR sky model.
 
@@ -552,6 +553,8 @@ class BTAnalysisPipeline(object):
         # Calculate Dec dimension
         Decc = np.abs(np.array(df['Dec'])[-1] - df['Dec'][0] + 360) % 360
 
+        # Calculate FOV
+
         # Get number of voxels on a side
         n = np.sqrt(len(np.array(df['RA'])))
 
@@ -559,6 +562,27 @@ class BTAnalysisPipeline(object):
         dpi = n * fov / max(RAc, Decc)
 
         return dpi
+    
+    @staticmethod
+    def find_replace_line(file_name, find_line, replace_line):
+        """
+        Replace a given line in a settings.ini file given the line is equal to a special string.
+        
+        :param file: The file to perform the find-and-replace.
+        :param find_line: The special keyword to trigger a replace.
+        :param replace_line: The line to replace the preset.
+        """
+
+        with open(file_name, 'r') as file:
+            lines = file.readlines()
+
+        with open(file_name, 'w') as file:
+            for line in lines:
+                if line.startswith(find_line):
+                    file.write(replace_line+"\n")
+                else:
+                    file.write(line)
+
 
     @staticmethod
     def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="", oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", fov=5.0):
@@ -574,7 +598,7 @@ class BTAnalysisPipeline(object):
         # FIXME: Run OSKAR Python Interface
 
         # Create the output file
-        os.system("mkdir -p BTA/output")
+        subprocess.run(["mkdir","-p","BTA/output"], check=True)
 
         # Get files to iterate over
         osm_list = Collator.dir_list_sorted(dir_="BTA/"+osm_dir)
@@ -582,39 +606,41 @@ class BTAnalysisPipeline(object):
         for osm in osm_list:
             # Setup the interferometer ini file
             # Duplicate the generator file
-            os.system("cp "+interferometer_template_ini+" BTA/test_intif.ini")
+            subprocess.run(["cp",interferometer_template_ini,"BTA/test_intif.ini"], check=True)
 
             # Set sky model location
-            ofname = r"oskar_sky_model\/file=BTA\/"+osm_dir+r"\/"+osm
-            os.system(r'sed -i "s/^preset.*/'+ofname+r'/" "BTA/test_intif.ini"')
+            ofname = "oskar_sky_model/file=BTA/"+osm_dir+"/"+osm
+            BTAnalysisPipeline.find_replace_line("BTA/test_intif.ini", "fileset", ofname)
 
             # Set frequency bin
             freq = osm.split("_")[-1][:-7]+"e6"
             ofname = r"start_frequency_hz="+freq
-            os.system(r'sed -i "s/^fset.*/'+ofname+r'/" "BTA/test_intif.ini"')
-
-            # Run OSKAR's interferometer simulation
-            os.system("singularity exec --nv --bind $PWD --cleanenv --home $PWD "+oskar_sif+" oskar_sim_interferometer BTA/test_intif.ini")
+            BTAnalysisPipeline.find_replace_line("BTA/test_intif.ini", "freqset", ofname)
 
             # Setup the imager ini file
             # Duplicate the generator file
-            os.system("cp "+imager_template_ini+" BTA/test_img.ini")
+            subprocess.run(["cp",imager_template_ini,"BTA/test_img.ini"], check=True)
 
             # Set the pixel resolution
             size = BTAnalysisPipeline.get_osm_sky_dpi("BTA/"+osm_dir+"/"+osm, fov=fov)
             ofname = "size="+str(size) 
-            os.system(r'sed -i "s/^sizeset.*/'+ofname+r'/" "BTA/test_img.ini"')
+            BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "sizeset", ofname)
 
             # Set the FOV
             ofname = "fov_deg="+str(fov)
-            os.system(r'sed -i "s/^fovset.*/'+ofname+r'/" "BTA/test_img.ini"')
+            BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "fovset", ofname)
+
+            exit()
+
+            # Run OSKAR's interferometer simulation
+            subprocess.run(["singularity","exec","--nv","--bind","$PWD","--cleanenv","--home","$PWD",oskar_sif,"oskar_sim_interferometer","BTA/test_intif.ini"], check=True)
 
             # Run OSKAR's imager simulation
-            os.system("singularity exec --nv --bind $PWD --cleanenv --home $PWD "+oskar_sif+" oskar_sim_interferometer BTA/test_intif.ini")
+            subprocess.run(["singularity","exec","--nv","--bind","$PWD","--cleanenv","--home","$PWD",oskar_sif,"oskar_imager","BTA/test_img.ini"], check=True)
 
 
     @staticmethod
-    def setup_BTA_dir(h5_file, cd_in=True, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="~/.oskar/telescope_model_AAstar", template=False):
+    def setup_BTA_dir(h5_file, cd_in=True, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
         """
         Sets up the operating directory from which all anaysis will be done.
 
@@ -630,42 +656,34 @@ class BTAnalysisPipeline(object):
         cwd = os.getcwd()
 
         # 1. create directory
-        os.system("mkdir -p BTA")
+        subprocess.run(["mkdir","-p","BTA"], check=True)
 
         # 2. Move H5 file and INIs to directory
-        if not template: os.system("cp "+h5_file+" BTA/analysis.h5")
-        os.system("cp "+imager_template_ini+" BTA/imager_template.ini")
-        os.system("cp "+interferometer_template_ini+" BTA/interferometer_template.ini")
-        os.system("cp -r "+oskar_telescope_model+" BTA/telescope_model")
+        if not template: subprocess.run(["cp",h5_file,"BTA/analysis.h5"], check=True)
+        subprocess.run(["cp",imager_template_ini,"BTA/imager_template.ini"], check=True)
+        subprocess.run(["cp",interferometer_template_ini,"BTA/interferometer_template.ini"], check=True)
+        subprocess.run(["cp","-r",oskar_telescope_model,"BTA/telescope_model"], check=True)
 
-        # 3. CD into directory
-        if cd_in:
-            os.system("cd BTA")
-            return ("BTA/analysis.h5" if not template else ""), "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
+        return ("BTA/analysis.h5" if not template else ""), "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
 
     @staticmethod
-    def clean_BTA_dir(outdir, fits_cube, cd_out=True, clean=True):
+    def clean_BTA_dir(outdir, fits_cube, clean=True):
         """
         Finishes and cleans up the mess created by the BTA class.
 
         :param outdir: The directory to save the finalised fits image, relative to parent dir.
         :param fits_cube: The name of the FITS output file.
-        :param cd_out: Whether to cd out to parent directory once done.
         :param clean: Whether or not to remove the BTA directory. Only works if cd_out is true.
         """
 
         # Move datacube to parent directory
-        os.system("mv "+fits_cube+" ../"+outdir+"/"+fits_cube)
+        subprocess.run(["mv","BTA/"+fits_cube,"./"+outdir+"/"+fits_cube], check=True)
 
-        # CD to parent dir
-        if cd_out:
-            os.system("cd ..")
-
-            if clean:
-                os.system("rm -rf BTA")
+        if clean:
+            subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", oskar_telescope_model="~/.oskar/telescope_model_AAstar", fov=5.0, template_preset="", coeval=True):
+    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="./oskar_run_stage/OSKAR-2.11.1-Python3.sif", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", fov=5.0, template_preset="", coeval=True):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -701,19 +719,19 @@ class BTAnalysisPipeline(object):
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
         BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif, fov=fov)
 
-        print("Collating fits images ...")
-        fits_cube = Collator.collate_fits(fits_output, headers=[h5_file, osm_output, fits_output])
+        #print("Collating fits images ...")
+        #fits_cube = Collator.collate_fits(fits_output, headers=[h5_file, osm_output, fits_output])
 
         # If clean is true remove all data relating to execution
         print("Cleaning up ...")
-        BTAnalysisPipeline.clean_BTA_dir(outdir=outdir, fits_cube=fits_cube, clean=clean)
+        #BTAnalysisPipeline.clean_BTA_dir(outdir=outdir, fits_cube="test_move.txt")#fits_cube, clean=clean)
 
 
 # Testing stage
 
-Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_osm", coeval=True)
+#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_osm", coeval=True)
 
 #Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
 #Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
 
-#BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
+BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")

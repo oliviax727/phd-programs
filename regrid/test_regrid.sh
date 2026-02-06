@@ -90,12 +90,12 @@ for preset in ${test_presets[@]}; do
 
         # Replace sky model location in INI file
         ofname="oskar_sky_model\/file=test_${preset}_osm\/${file}"
-        sed -i "s/^preset.*/${ofname}/" "test_intif_${preset}.ini"
+        sed -i "s/^fileset.*/${ofname}/" "test_intif_${preset}.ini"
 
         # Replace frequency bin
         word=$(sed '5!d' "test_${preset}_osm/${file}")
         ofname="start_frequency_hz=${word:45:9}"
-        sed -i "s/^fset.*/${ofname}/" "test_intif_${preset}.ini"
+        sed -i "s/^freqset.*/${ofname}/" "test_intif_${preset}.ini"
 
         # Then, run the interferometry and imager simulations
         oskar -l -i -f "test_intif_${preset}.ini"

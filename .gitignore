@@ -1,7 +1,6 @@
 # OSKAR run output
-oskar_run_stage/output
-oskar_run_stage/.nv
-oskar_run_stage/test_*
+oskar_run_stage
+BTA
 ./nohup.txt
 
 # Outfiles
@@ -10,6 +9,7 @@ oskar_run_stage/test_*
 *.f5_TSM0
 *.h5
 *.pkl
+*.sif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
