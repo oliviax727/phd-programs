@@ -542,26 +542,27 @@ class BTAnalysisPipeline(object):
         Get the pixel count for a FITS file with it's corresponding OSKAR sky model.
 
         :param osm_file: The OSM file to analyse.
-        :return: The amount of pixels in per FOV.
+        :return: The ideal image size and fov
         """
 
         df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
 
+        norm = lambda t: (t % 360 + 360) % 360
+        diff = lambda a, b: min(abs(norm(a)-norm(b)),360-abs(norm(a)-norm(b)))
+
         # Calculate RA dimension
-        RAc = np.abs(np.array(df['RA'])[-1] - df['RA'][0]) % 360
+        RAc = diff(np.array(df['RA'])[-1], np.array(df['RA'])[0])
 
         # Calculate Dec dimension
-        Decc = np.abs(np.array(df['Dec'])[-1] - df['Dec'][0] + 360) % 360
+        Decc = diff(np.array(df['Dec'])[-1], np.array(df['Dec'])[0])
 
         # Calculate FOV
+        fov = max(RAc, Decc)
 
         # Get number of voxels on a side
         n = np.sqrt(len(np.array(df['RA'])))
 
-        # Calculate pixel length of FOV image
-        dpi = n * fov / max(RAc, Decc)
-
-        return dpi
+        return n, fov
     
     @staticmethod
     def find_replace_line(file_name, find_line, replace_line):
@@ -585,7 +586,7 @@ class BTAnalysisPipeline(object):
 
 
     @staticmethod
-    def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="", oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif", fov=5.0):
+    def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="", oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif"):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
 
@@ -622,7 +623,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["cp",imager_template_ini,"BTA/test_img.ini"], check=True)
 
             # Set the pixel resolution
-            size = BTAnalysisPipeline.get_osm_sky_dpi("BTA/"+osm_dir+"/"+osm, fov=fov)
+            size, fov = BTAnalysisPipeline.get_osm_sky_dimensions("BTA/"+osm_dir+"/"+osm)
             ofname = "size="+str(size) 
             BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "sizeset", ofname)
 
@@ -683,7 +684,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="./oskar_run_stage/OSKAR-2.11.1-Python3.sif", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", fov=5.0, template_preset="", coeval=True):
+    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="./oskar_run_stage/OSKAR-2.11.1-Python3.sif", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template_preset="", coeval=True):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -717,7 +718,7 @@ class BTAnalysisPipeline(object):
             Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output, coeval=coeval)
 
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
-        BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif, fov=fov)
+        BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif)
 
         #print("Collating fits images ...")
         #fits_cube = Collator.collate_fits(fits_output, headers=[h5_file, osm_output, fits_output])
