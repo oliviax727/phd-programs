@@ -475,30 +475,6 @@ class Collator(object):
         sorted_files, _ = zip(*np.sort(np.array(list(map(sort_prep, files)), dtype=sort_type), order="num"))
 
         return sorted_files
-    
-    @staticmethod
-    def collate_header(h5_file="", osm_dir="", fits_dir=""):
-        """
-        Compiles a multiline string containing a functional FITS header for a collated datacube. Any parameter set to none will not have information taken from it.
-
-        :param h5_file: The original simulation H5 file.
-        :param osm_dir: The outputted OSM file directory.
-        :param fits_dir: The outputted FITS file directory.
-        :return: The file header as a dictionary.
-        """
-
-        # FIXME Add a header modification for outname.
-
-        header = {}
-
-        if h5_file == "":
-            print("Retreiving H5 header information ...")
-        if osm_dir == "":
-            print("Retreiving OSM header information ...")
-        if fits_dir == "":
-            print("Retreiving FITS header information ...")
-
-        return header
 
     @staticmethod
     def collate_fits(fits_dir, outdir=".", headers=["", "", ""]):
@@ -527,10 +503,12 @@ class Collator(object):
         hdu_new = fits.PrimaryHDU(img_arr)
 
         print("Retreiving header information ...")
-        header = Collator.collate_header(*headers)
+        header = fits.getdata(fits_dir+"/"+fits_files[0])
 
         for item in header.keys():
             hdu_new.header[item] = header[item]
+        
+        hdu_new,header['NAXIS'] = 3
 
         print("\nSaving to file: " + outname)
         hdu_new.writeto(outname)
