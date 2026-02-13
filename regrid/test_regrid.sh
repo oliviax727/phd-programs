@@ -85,8 +85,8 @@ for preset in ${test_presets[@]}; do
 
     for file in ${files[@]}; do
         # Generate the INI files
-        cp ../regrid/test_intif_inis/test_intif_gen.ini "test_intif_${preset}.ini"
-        cp ../regrid/test_intif_inis/test_img_gen.ini "test_img_${preset}.ini"
+        cp ../regrid/test_intif_inis/test_intif_gen_regrid.ini "test_intif_${preset}.ini"
+        cp ../regrid/test_intif_inis/test_img_gen_regrid.ini "test_img_${preset}.ini"
 
         # Replace sky model location in INI file
         ofname="oskar_sky_model\/file=test_${preset}_osm\/${file}"
