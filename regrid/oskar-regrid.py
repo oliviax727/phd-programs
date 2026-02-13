@@ -507,8 +507,8 @@ class Collator(object):
 
         for item in header.keys():
             hdu_new.header[item] = header[item]
-        
-        hdu_new,header['NAXIS'] = 3
+
+        hdu_new.header['NAXIS'] = 3
 
         print("\nSaving to file: " + outname)
         hdu_new.writeto(outname)
