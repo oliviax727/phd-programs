@@ -600,6 +600,7 @@ class BTAnalysisPipeline(object):
 
         # Create the output file
         subprocess.run(["mkdir","-p","BTA/output"], check=True)
+        subprocess.run(["mkdir","-p","BTA/"+fits_output], check=True)
 
         # Get files to iterate over
         osm_list = Collator.dir_list_sorted(dir_="BTA/"+osm_dir)
@@ -631,17 +632,18 @@ class BTAnalysisPipeline(object):
             ofname = "fov_deg="+str(fov)
             BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "fovset", ofname)
 
-            exit()
-
             # Run OSKAR's interferometer simulation
-            subprocess.run(["singularity","exec","--nv","--bind","$PWD","--cleanenv","--home","$PWD",oskar_sif,"oskar_sim_interferometer","BTA/test_intif.ini"], check=True)
+            subprocess.run(["singularity","exec","--nv","--bind",os.getcwd()+"/BTA","--cleanenv","--home",os.getcwd()+"/BTA",oskar_sif,"oskar_sim_interferometer","BTA/test_intif.ini"], check=True)
 
             # Run OSKAR's imager simulation
-            subprocess.run(["singularity","exec","--nv","--bind","$PWD","--cleanenv","--home","$PWD",oskar_sif,"oskar_imager","BTA/test_img.ini"], check=True)
+            subprocess.run(["singularity","exec","--nv","--bind",os.getcwd()+"/BTA","--cleanenv","--home",os.getcwd()+"/BTA",oskar_sif,"oskar_imager","BTA/test_img.ini"], check=True)
+            
+            # Move FITS image to temp folder
+            subprocess.run(["cp","BTA/output/sim_image_I.fits","BTA"+fits_output+"/"+osm+".fits"], check=True)
 
 
     @staticmethod
-    def setup_BTA_dir(h5_file, cd_in=True, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
+    def setup_BTA_dir(h5_file, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
         """
         Sets up the operating directory from which all anaysis will be done.
 
@@ -663,7 +665,8 @@ class BTAnalysisPipeline(object):
         if not template: subprocess.run(["cp",h5_file,"BTA/analysis.h5"], check=True)
         subprocess.run(["cp",imager_template_ini,"BTA/imager_template.ini"], check=True)
         subprocess.run(["cp",interferometer_template_ini,"BTA/interferometer_template.ini"], check=True)
-        subprocess.run(["cp","-r",oskar_telescope_model,"BTA/telescope_model"], check=True)
+        if not os.path.exists("BTA/telescope_model"):
+            subprocess.run(["cp","-r",oskar_telescope_model,"BTA/telescope_model"], check=True)
 
         return ("BTA/analysis.h5" if not template else ""), "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
 
@@ -709,13 +712,14 @@ class BTAnalysisPipeline(object):
         osm_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_osm"
         fits_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_fits"
         
-        if template_flag:
-            print("Generating OSM files from template ...")
-            template_value = Regrid.mock_values(template_preset)
-            Regrid.generate_osm_from_simulation(template_value, osm_output="BTA/"+osm_output)
-        else:
-            print("Generating OSM files from H5 ...")
-            Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output, coeval=coeval)
+        if not os.path.exists("BTA/"+osm_output):
+            if template_flag:
+                print("Generating OSM files from template ...")
+                template_value = Regrid.mock_values(template_preset)
+                Regrid.generate_osm_from_simulation(template_value, osm_output="BTA/"+osm_output)
+            else:
+                print("Generating OSM files from H5 ...")
+                Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output, coeval=coeval)
 
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
         BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif)
