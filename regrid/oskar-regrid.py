@@ -574,10 +574,10 @@ class BTAnalysisPipeline(object):
         :param replace_line: The line to replace the preset.
         """
 
-        with open(file_name, 'r') as file:
+        with open(file_name, 'r', encoding='utf-8') as file:
             lines = file.readlines()
 
-        with open(file_name, 'w') as file:
+        with open(file_name, 'w', encoding='utf-8') as file:
             for line in lines:
                 if line.startswith(find_line):
                     file.write(replace_line+"\n")
