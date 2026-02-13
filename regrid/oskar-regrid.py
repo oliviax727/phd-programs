@@ -343,11 +343,14 @@ class Regrid(object):
                 # Clear file contents
                 osm.truncate(0)
 
+                # Add formatting line
+                osm.write("Format = Ra Dec I Q U V ReferenceFrequency LineWidth\n")
+
                 # Add header lines
                 osm.write("# Entries Key:\n")
-                osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6\n")
-                osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0\n")
-
+                osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6  000.00000\n")
+                osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0      LineWidth\n")
+            
                 # Write OSM lines
                 for x in range(d[0]):
                     for y in range(d[1]):
@@ -370,6 +373,7 @@ class Regrid(object):
                                 str(value)    + " " + # Intensity
                                 "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
                                 str(freq0)  + "e6 " + # Point source frequency
+                                "000.00001"   + " " + # Spectral line Width
                                 "\n"
                             )
 
@@ -390,12 +394,15 @@ class Regrid(object):
                     # Clear file contents
                     osm.truncate(0)
 
+                    # Add formatting line
+                    osm.write("Format = Ra Dec I Q U V ReferenceFrequency LineWidth\n")
+
                     # Add header lines
                     # FIXME: Add new named-column format
                     # FIXME: Add spectral width
                     osm.write("# Entries Key:\n")
                     osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6\n")
-                    osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0\n")
+                    osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0      LineWidth\n")
 
                     # Write OSM lines
                     for x in range(d[0]):
@@ -417,6 +424,7 @@ class Regrid(object):
                                 str(value)    + " " + # Intensity
                                 "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
                                 str(freq0)  + "e6 " + # Point source frequency
+                                "000.00001"   + " " + # Spectral line Width
                                 "\n"
                             )
 
@@ -721,6 +729,7 @@ class BTAnalysisPipeline(object):
                 print("Generating OSM files from H5 ...")
                 Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output, coeval=coeval)
 
+        exit()
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
         BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif)
 
