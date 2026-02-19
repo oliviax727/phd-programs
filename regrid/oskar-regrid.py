@@ -2,18 +2,21 @@
 # pylint: disable=E1101
 # pylint: disable=W0102
 
-import numpy as np
-import astropy.units as u
-import astropy.constants as c
-from astropy.io import fits
-from astropy.cosmology import FlatLambdaCDM as fmodel, z_at_value as getz
-from scipy.interpolate import make_interp_spline as misp
-from astropy.coordinates import SkyCoord
 #import copy
 import os
-import h5py
-import pandas as pd
 import subprocess
+
+import astropy.constants as c
+import astropy.units as u
+import h5py
+import numpy as np
+import pandas as pd
+from astropy.coordinates import SkyCoord
+from astropy.cosmology import FlatLambdaCDM as fmodel
+from astropy.cosmology import z_at_value as getz
+from astropy.io import fits
+from scipy.interpolate import make_interp_spline as misp
+
 
 class Cosmo(object):
     """
@@ -603,7 +606,10 @@ class BTAnalysisPipeline(object):
 
         # Create the output files
         subprocess.run(["mkdir","-p","BTA/output"], check=True)
+        subprocess.run(["mkdir","-p","BTA/output/sim.ms"], check=True)
         subprocess.run(["mkdir","-p","BTA/"+fits_output], check=True)
+
+        #subprocess.run(["singularity","exec","--nv","--bind",os.getcwd(),"--cleanenv","--home",os.getcwd(),oskar_sif,"oskar_sim_beam_pattern","BTA/test_beam_gen.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         # Get files to iterate over
         osm_list = Collator.dir_list_sorted(dir_="BTA/"+osm_dir)
@@ -619,7 +625,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["cp",interferometer_template_ini,"BTA/test_intif.ini"], check=True)
 
             # Set sky model location
-            ofname = "oskar_sky_model/file=BTA/"+osm_dir+"/"+osm
+            ofname = "oskar_sky_model/file="+osm_dir+"/"+osm
             BTAnalysisPipeline.find_replace_line("BTA/test_intif.ini", "fileset", ofname)
 
             # Set frequency bin
@@ -639,10 +645,12 @@ class BTAnalysisPipeline(object):
             ofname = "fov_deg="+str(fov)
             BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "fovset", ofname)
 
+            cwd = os.getcwd()+'/BTA'
+
             # Run OSKAR's interferometer simulation
             try:
                 print("Running interferometer on "+osm)
-                subprocess.run(["singularity","exec","--nv","--bind",os.getcwd()+"/BTA","--cleanenv","--home",os.getcwd()+"/BTA",oskar_sif,"oskar_sim_interferometer","BTA/test_intif.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_sif,"oskar_sim_interferometer","test_intif.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
             except subprocess.CalledProcessError as e:
                 print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
@@ -650,16 +658,17 @@ class BTAnalysisPipeline(object):
             # Run OSKAR's imager simulation
             try:
                 print("Running imager on "+osm)
-                subprocess.run(["singularity","exec","--nv","--bind",os.getcwd()+"/BTA","--cleanenv","--home",os.getcwd()+"/BTA",oskar_sif,"oskar_imager","BTA/test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_sif,"oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
             except subprocess.CalledProcessError as e:
                 print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
 
-            subprocess.run(["cp","BTA/output/sim_image_I.fits","BTA/"+fits_output+"/"+osm+".fits"])
+            subprocess.run(["find",".","-name","'*.log'","-type","f","-delete"], check=True, cwd=cwd)
+            subprocess.run(["cp","BTA/output/sim_image_I.fits","BTA/"+fits_output+"/"+osm+".fits"], check=True)
 
 
     @staticmethod
-    def setup_BTA_dir(h5_file, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
+    def setup_BTA_dir(h5_file, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False, osm_dir=""):
         """
         Sets up the operating directory from which all anaysis will be done.
 
@@ -670,6 +679,7 @@ class BTAnalysisPipeline(object):
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param template: If true, handle and return no h5 data.
         :return: The new location of the H5, imager ini, and interterometer template ini files, as well as the telescope model location. Also returns the PWD if cd_in is True.
+        :param osm_dir: If a set of osms have already been generated, use the path to the directory specified to find the osms.
         """
 
         cwd = os.getcwd()
@@ -703,7 +713,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="./oskar_run_stage/OSKAR-2.11.1-Python3.sif", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template_preset="", coeval=True):
+    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="./oskar_run_stage/OSKAR-2.11.1-Python3.sif", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template_preset="", coeval=True, osm_dir=""):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -716,26 +726,30 @@ class BTAnalysisPipeline(object):
         :param outdir: The output location of the final FITS file.
         :param oskar_sif: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
-        :param fov: The field of view of imaging/observation
         :param template_preset: Use a mock values array instead of a h5 file. Ignores any provided h5 file.
+        :param coeval: If the H5 box is coeval or lightcone based.
+        :param osm_dir: If a set of osms have already been generated, use the path to the directory specified to find the osms.
         """
 
         template_flag = (template_preset != "")
 
         print("Setting up BTA directory ...")
-        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini, template=template_flag)
+        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini, template=template_flag, osm_dir=osm_dir)
 
         osm_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_osm"
         fits_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_fits"
         
         if not os.path.isdir("BTA/"+osm_output):
-            if template_flag:
-                print("Generating OSM files from template ...")
-                template_value = Regrid.mock_values(template_preset)
-                Regrid.generate_osm_from_simulation(template_value, osm_output="BTA/"+osm_output)
+            if osm_dir == "":
+                if template_flag:
+                    print("Generating OSM files from template ...")
+                    template_value = Regrid.mock_values(template_preset)
+                    Regrid.generate_osm_from_simulation(template_value, osm_output="BTA/"+osm_output)
+                else:
+                    print("Generating OSM files from H5 ...")
+                    Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output, coeval=coeval)
             else:
-                print("Generating OSM files from H5 ...")
-                Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output, coeval=coeval)
+                subprocess.run(["cp","-r",osm_dir,"BTA/"+osm_output], check=True)
 
         print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
         BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif)
@@ -757,4 +771,4 @@ class BTAnalysisPipeline(object):
 
 #BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
 
-BTAnalysisPipeline.H5_box_to_datacube("./regrid/yuxiang_bts/yuxiang1.h5")
+BTAnalysisPipeline.H5_box_to_datacube("./regrid/yuxiang_bts/yuxiang1.h5", oskar_sif="/home/olivia/.oskar/OSKAR-2.8.3-Python3.sif", osm_dir="./regrid/yuxiang1_osm")

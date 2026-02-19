@@ -105,8 +105,8 @@ for preset in ${test_presets[@]}; do
         cp output/sim_image_I.fits "../regrid/test_output/${preset}_fits/${file}.fits"
 
         # Clear OSM folder and INI from directory
-        rm "test_intif_$preset.ini"
-        rm "test_imh_$preset.ini"
+        rm "test_intif_${preset}.ini"
+        rm "test_img_${preset}.ini"
         oskar -l -c
     done
 

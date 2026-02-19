@@ -1,6 +1,7 @@
 # OSKAR run output
 oskar_run_stage
 BTA
+backup
 ./nohup.txt
 
 # Outfiles
