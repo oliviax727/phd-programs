@@ -67,6 +67,9 @@ function oskar() {
     cd $prevd
 }
 
+# Set up beamformer
+oskar -l -b -f "../regrid/test_intif_inis/test_beam_gen.ini"
+
 # Define the presets
 test_presets=("yuxiang1")
 
