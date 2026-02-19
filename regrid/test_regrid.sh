@@ -62,13 +62,19 @@ function oskar() {
         cd ~/.oskar
     fi
 
-    singularity exec --nv --bind $PWD --cleanenv --home $PWD ~/.oskar/OSKAR-2.8.3-Python3.sif $prog $ofile
+    singularity exec --nv --bind $PWD --cleanenv --home $PWD ~/.oskar/OSKAR-2.12.0-Python3.sif $prog $ofile
 
     cd $prevd
 }
 
+# Set up run stage
+find . -mindepth 1 ! -regex '^./telescope_model_AAstar\(/.*\)?' -delete
+mkdir -p output/sim.ms
+
 # Set up beamformer
-oskar -l -b -f "../regrid/test_intif_inis/test_beam_gen.ini"
+cp "../regrid/test_intif_inis/test_beam_gen.ini" "test_beam.ini"
+oskar -l -b -f "test_beam.ini"
+rm "test_beam.ini"
 
 # Define the presets
 test_presets=("yuxiang1")
@@ -76,7 +82,7 @@ test_presets=("yuxiang1")
 # Interferometer and image
 for preset in ${test_presets[@]}; do
     # Move OSM folder to directory
-    cp -r "../regrid/${preset}_osm" "test_${preset}_osm"
+    cp -r "../regrid/${preset}_osm" "./test_${preset}_osm"
 
     # Get first OSM file name
     cd "test_${preset}_osm"
@@ -84,6 +90,7 @@ for preset in ${test_presets[@]}; do
     cd ..
 
     # Create output fits directory
+    rm -r "../regrid/test_output/${preset}_fits"
     mkdir -p "../regrid/test_output/${preset}_fits"
 
     for file in ${files[@]}; do
