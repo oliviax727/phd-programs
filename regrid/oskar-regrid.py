@@ -17,6 +17,9 @@ from astropy.cosmology import z_at_value as getz
 from astropy.io import fits
 from scipy.interpolate import make_interp_spline as misp
 
+# Define Constants
+ZENITH_530 = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # Zenith Object SkyCoord observed at 5:30 am 2025-03-03
+
 
 class Cosmo(object):
     """
@@ -185,7 +188,7 @@ class Regrid(object):
 
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, v = (1, 1, 1), output_master_osm=False, osm_output="osm_output", cosmology=Cosmo()):
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, v = (1, 1, 1), output_master_osm=False, osm_output="osm_output", cosmology=Cosmo()):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -427,7 +430,7 @@ class Regrid(object):
             print("\nProcess complete, data saved to "+osm_output)
     
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, output_master_osm=False, osm_output="", coeval=True):
+    def generate_osm_from_H5(file, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, output_master_osm=False, osm_output="", coeval=True):
         """
         Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
@@ -713,7 +716,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = SkyCoord(ra=0*u.rad, dec=0*u.rad, frame='icrs'), require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="./oskar_run_stage/OSKAR-2.11.1-Python3.sif", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template_preset="", coeval=True, osm_dir=""):
+    def H5_box_to_datacube(file, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="./oskar_run_stage/OSKAR-2.11.1-Python3.sif", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template_preset="", coeval=True, osm_dir=""):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -764,11 +767,11 @@ class BTAnalysisPipeline(object):
 
 # Testing stage
 
-#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_osm", coeval=True)
+Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_osm", coeval=True)
 
 #Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
 #Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
 
 #BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
 
-BTAnalysisPipeline.H5_box_to_datacube("./regrid/yuxiang_bts/yuxiang1.h5", oskar_sif="/home/olivia/.oskar/OSKAR-2.8.3-Python3.sif", osm_dir="./regrid/yuxiang1_osm")
+#BTAnalysisPipeline.H5_box_to_datacube("./regrid/yuxiang_bts/yuxiang1.h5", oskar_sif="/home/olivia/.oskar/OSKAR-2.8.3-Python3.sif", osm_dir="./regrid/yuxiang1_osm")
