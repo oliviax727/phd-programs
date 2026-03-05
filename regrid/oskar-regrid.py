@@ -17,8 +17,29 @@ from astropy.cosmology import z_at_value as getz
 from astropy.io import fits
 from scipy.interpolate import make_interp_spline as misp
 
+
+from matplotlib import pyplot as plt
+
 # Define Constants
-ZENITH_530 = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # Zenith Object SkyCoord observed at 5:30 am 2025-03-03
+ZENITH_530 = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # SKA-Low Zenith at 5:30 am 2025-03-03
+ZERO_RADEC = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/Dec
+
+# Angular distance calculations
+norm = lambda t: (t % 360 + 360) % 360 - 180
+delta = lambda a, b: norm(a)-norm(b)
+diff = lambda a, b: min(abs(delta(a, b)),360-abs(delta(a, b)))
+diff_sgn = lambda a, b: delta(a, b) - 360 if delta(a, b) > 180 else (delta(a, b) + 360 if delta(a, b) < -180 else delta(a, b))
+
+# l, m, n to RA, Dec
+def lm_to_radec(l, m, phase_centre=ZERO_RADEC):
+    d0 = phase_centre.dec.to_value(u.rad)
+    a0 = phase_centre.ra.to_value(u.rad)
+    n = np.sqrt(1-l**2-m**2)-1
+
+    Dec = np.arcsin(m*np.cos(d0)+n*np.sin(d0))
+    Ra = a0 + np.arctan(l/(n*np.cos(d0)-m*np.sin(d0)))
+
+    return [Ra, Dec]
 
 
 class Cosmo(object):
@@ -281,6 +302,7 @@ class Regrid(object):
                     dm = dφ / (2 * np.pi)
 
                     # Convert l, m coordinates to spherical coords
+                    # FIXME check l m to RA Dec conversion
                     dRA = np.arcsin(dl)
                     dDc = np.arcsin(dm/np.cos(np.arcsin(dm)))
 
@@ -330,17 +352,39 @@ class Regrid(object):
         print("Configuring datacube for OSKAR file format ...")
 
         # RA, Dec centering function
-        centering = (lambda x: (x - np.max(x)/2))
+        # Add half the total and half the spaxel widths to centre the main point
+        centering = (lambda x: (x - np.max(x)/2 + np.min(x)/2))
 
-        # Cumulative sums are more important than voxel bins now, add half the mean to approximate centre
-        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0)) + np.mean(voxels[:,:,:,0], axis=0)/2
-        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1)) + np.mean(voxels[:,:,:,1], axis=1)/2
-        freqsum = f_ref.to_value(u.Hz) - (np.cumsum(voxels[:,:,:,2], axis=2) + np.mean(voxels[:,:,:,2], axis=2)/2)
+        # Cumulative sums are more important than voxel bins now
+        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0))
+        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1))
+        freqsum = f_ref.to_value(u.Hz) - (np.cumsum(voxels[:,:,:,2], axis=2))
 
         # Use Skycoords to calculate spherical RA, Dec offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
         RAs = source_pos.ra.to_value(u.deg)
         Dcs = source_pos.dec.to_value(u.deg)
+
+        # FIXME TESTING
+
+        channels = [1, 2, 50, 100]
+        fig, ax = plt.subplots(nrows=len(channels), ncols=3)
+        fig.set_size_inches(6*len(channels), 15)
+        
+        for ci in range(len(channels)):
+            channel = channels[ci]-1
+            ax[ci, 0].scatter(voxels[:,:,channel,0].flatten(), voxels[:,:,channel,1].flatten(), c=values[:, :, channel].flatten(), cmap="plasma")
+            ax[ci, 0].set_title("Voxels for Channel "+str(channel+1))
+
+            ax[ci, 1].scatter(rasum[:,:,channel].flatten(), decsum[:,:,channel].flatten(), c=values[:, :, channel].flatten(), cmap="plasma")
+            ax[ci, 1].set_title("Offsets for Channel "+str(channel+1))
+
+            ax[ci, 2].scatter(rasum[:,:,channel].flatten(), decsum[:,:,channel].flatten(), c=values[:, :, channel].flatten(), cmap="plasma")
+            ax[ci, 2].set_title("RA/Dec for Channel "+str(channel+1))
+        
+        plt.show()
+
+        exit()
 
         # Record data to file
         if output_master_osm:
@@ -553,9 +597,6 @@ class BTAnalysisPipeline(object):
         """
 
         df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
-
-        norm = lambda t: (t % 360 + 360) % 360
-        diff = lambda a, b: min(abs(norm(a)-norm(b)),360-abs(norm(a)-norm(b)))
 
         print(osm_file)
 
