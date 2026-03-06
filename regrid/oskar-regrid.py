@@ -34,7 +34,7 @@ diff_sgn = lambda a, b: delta(a, b) - 360 if delta(a, b) > 180 else (delta(a, b)
 def lm_to_radec(l, m, phase_centre=ZERO_RADEC):
     d0 = phase_centre.dec.to_value(u.rad)
     a0 = phase_centre.ra.to_value(u.rad)
-    n = np.sqrt(1-l**2-m**2)-1
+    n = np.sqrt(1-l**2-m**2)
 
     Dec = np.arcsin(m*np.cos(d0)+n*np.sin(d0))
     Ra = a0 + np.arctan(l/(n*np.cos(d0)-m*np.sin(d0)))
@@ -133,7 +133,7 @@ class Regrid(object):
         bt_data = np.array(file.get('BrightnessTemp')['brightness_temp'])
 
         # Get Box and Voxel dimensions
-        box_len = file.get('user_params').attrs['BOX_LEN'] * file.get('cosmo_params').attrs['hlittle']
+        box_len = file.get('user_params').attrs['BOX_LEN']#* file.get('cosmo_params').attrs['hlittle']
         vox = np.ones(3) * box_len / bt_data.shape[0]
 
         # Define cosmology with H0=100h
@@ -220,7 +220,7 @@ class Regrid(object):
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
-        :param v: If uniform spaxels = True, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
+        :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
         :param osm_output: The directory to output the osm file(s) if output_master_osm is false.
         :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
@@ -241,9 +241,11 @@ class Regrid(object):
 
         # Set cosmological redshift parameters
         Dz = Dz_ref
-        Dz_val = Dz_ref.to_value(u.Mpc)
         z_prev = z_ref
         fq = f_ref.to_value(u.Hz)
+        Dz_val = Dz_ref.to_value(u.Mpc)
+
+        #test_arr = []
 
         print("Transforming coordinates ...")
         # Main loop of creation
@@ -261,16 +263,14 @@ class Regrid(object):
                     Dz_pix = Dz_val+dt/2 # Alter it by the CENTRAL pixel value
 
                     # Calculate transformed dimensions
-                    dθ = dx/Dz_pix
-                    dφ = dy/Dz_pix
-
-                    Dz_val = Dz_val + dt # Increment the value of Dz by voxel dimension
+                    dθ = np.arctan(dx/Dz_pix)
+                    dφ = np.arctan(dy/Dz_pix)
 
                     # STEPS 2 & 3 - Convert line-of-sight comoving distance to frequency
 
                     df = 0
 
-                    if x == 0 and y == 0:
+                    if (x == 0 and y == 0):
                         # Determine corresponding redshifts
                         z_bot = z_prev
                         z_top = cosmology.Dz_to_z(Dz+dt*u.Mpc)
@@ -282,8 +282,10 @@ class Regrid(object):
                         # Store altered frequency bandwidth
                         df = np.abs((f_bot-f_top).to_value(u.Hz))
 
-                        Dz = Dz + dt*u.Mpc # Increment the value of Dz by voxel dimension
-                        z_prev = z_top # Top z in current box = bottom z in next box
+                        # STEP 7.1 - Check if regridding is needed
+                        if df > max_freq_res:
+                            regrid_flag = regrid_flag or True
+
                     else:
                         df = voxels[0, 0, t, 2]
 
@@ -293,28 +295,26 @@ class Regrid(object):
                     # Calculate pixelated luminosity
                     Fv = Regrid.brightness_temperature_to_flux(Tb=Tb, fxy=fxy, dθ=dθ, dφ=dφ)
 
-                    # Increment cumulative frequency
-                    fq = fq + df
+                    #if (x == 0 and y == 35):
+                    #    test_arr.append([Tb, fxy, dθ, dφ, Fv, 0])
 
                     # STEPS 5 & 6 - Convert flat angular resolution to RA, Dec deviation
                     # Convert to l, m coordinates
-                    dl = dθ / (2 * np.pi)
-                    dm = dφ / (2 * np.pi)
-
-                    # Convert l, m coordinates to spherical coords
-                    # FIXME check l m to RA Dec conversion
-                    dRA = np.arcsin(dl)
-                    dDc = np.arcsin(dm/np.cos(np.arcsin(dm)))
-
-                    # STEP 7.1 - Check if regridding is needed
-                    if df > max_freq_res:
-                        regrid_flag = regrid_flag or True
-
+                    #dl = dθ / (2 * np.pi)
+                    #dm = dφ / (2 * np.pi)
+                    # Avoid converting the coordinates entirely!
+                
                     # Save values
-                    voxels[x, y, t, 0] = dRA
-                    voxels[x, y, t, 1] = dDc
+                    voxels[x, y, t, 0] = dθ
+                    voxels[x, y, t, 1] = dφ
                     voxels[x, y, t, 2] = df
                     values[x, y, t] = Fv
+            
+            # Increment distance and frequency parameters
+            Dz = Dz + dt*u.Mpc # Increment the value of Dz by voxel dimension
+            z_prev = z_top # Top z in current box = bottom z in next box
+            Dz_val = Dz_val + dt # Increment the value of Dz by voxel dimension
+            fq = fq + df # Increment cumulative frequency
 
             print("\rTime step #", t, end="")
 
@@ -329,11 +329,14 @@ class Regrid(object):
 
                     print("\rSpaxel # (", x, ",", y, ")", end="")
 
+                    # Set the values as being in the middle of each bin
+                    freq_values = np.cumsum(voxels[x, y, :, 2]) - voxels[x, y, :, 2]/2
+
                     # Create interpolation B-spline
-                    bspline = misp(np.cumsum(voxels[x, y, :, 2]), values[x, y, :])
+                    bspline = misp(freq_values, values[x, y, :])
 
                     # Perform regridding
-                    new_freq, freq_bandw = np.linspace(0, np.sum(voxels[x, y, :, 2]), d[2], retstep=True)
+                    new_freq, freq_bandw = np.linspace(freq_values[0], freq_values[-1], d[2], retstep=True)
                     new_flux = np.clip(bspline(new_freq), 0, None)
 
                     # Create array of uniform bin sizes
@@ -343,48 +346,47 @@ class Regrid(object):
                     voxels[x, y, :, 2] = freq_bins
                     values[x, y, :] = new_flux
 
+                    #if (x == 0 and y == 35):
+                    #    test_arr = np.array(test_arr)
+                    #    test_arr[:, 5] = new_flux
+
             print("\nRegrid complete.")
 
         else:
             print("No regrid required!")
+
+
+        #test_arr = np.array(test_arr)
+        #dpn = test_arr.shape[1]
+
+        #fig, ax = plt.subplots(nrows=1, ncols=dpn)
+        #fig.set_size_inches((dpn*6, 4))
+
+        #dps = ["Tb", "fxy", "dθ", "dφ", "Fv", "I"]
+
+        #for dp in range(dpn):
+        #    ax[dp].plot(test_arr[:, dp])
+        #    ax[dp].set_title(dps[dp])
+        #plt.show()
+
+        #breakpoint()
         
         # STEP 8 - Write data to OSM file
         print("Configuring datacube for OSKAR file format ...")
 
         # RA, Dec centering function
         # Add half the total and half the spaxel widths to centre the main point
-        centering = (lambda x: (x - np.max(x)/2 + np.min(x)/2))
+        centering = (lambda x: (x - np.max(x, axis=(0, 1))/2 + np.min(x, axis=(0, 1))/2))
 
         # Cumulative sums are more important than voxel bins now
         rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0))
         decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1))
         freqsum = f_ref.to_value(u.Hz) - (np.cumsum(voxels[:,:,:,2], axis=2))
 
-        # Use Skycoords to calculate spherical RA, Dec offsets
+        # Calculate phase centre offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
         RAs = source_pos.ra.to_value(u.deg)
         Dcs = source_pos.dec.to_value(u.deg)
-
-        # FIXME TESTING
-
-        channels = [1, 2, 50, 100]
-        fig, ax = plt.subplots(nrows=len(channels), ncols=3)
-        fig.set_size_inches(6*len(channels), 15)
-        
-        for ci in range(len(channels)):
-            channel = channels[ci]-1
-            ax[ci, 0].scatter(voxels[:,:,channel,0].flatten(), voxels[:,:,channel,1].flatten(), c=values[:, :, channel].flatten(), cmap="plasma")
-            ax[ci, 0].set_title("Voxels for Channel "+str(channel+1))
-
-            ax[ci, 1].scatter(rasum[:,:,channel].flatten(), decsum[:,:,channel].flatten(), c=values[:, :, channel].flatten(), cmap="plasma")
-            ax[ci, 1].set_title("Offsets for Channel "+str(channel+1))
-
-            ax[ci, 2].scatter(rasum[:,:,channel].flatten(), decsum[:,:,channel].flatten(), c=values[:, :, channel].flatten(), cmap="plasma")
-            ax[ci, 2].set_title("RA/Dec for Channel "+str(channel+1))
-        
-        plt.show()
-
-        exit()
 
         # Record data to file
         if output_master_osm:
