@@ -77,7 +77,7 @@ oskar -l -b -f "test_beam.ini"
 rm "test_beam.ini"
 
 # Define the presets
-test_presets=("yuxiang1")
+test_presets=("yuxiang1_00")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
