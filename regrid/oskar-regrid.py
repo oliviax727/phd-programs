@@ -23,6 +23,7 @@ from matplotlib import pyplot as plt
 # Define Constants
 ZENITH_530 = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # SKA-Low Zenith at 5:30 am 2025-03-03
 ZERO_RADEC = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/Dec
+OSKAR_SIF  = "~/.oskar/OSKAR-2.12.0-Python3.sif"
 
 # Angular distance calculations
 norm = lambda t: (t % 360 + 360) % 360 - 180
@@ -638,7 +639,7 @@ class BTAnalysisPipeline(object):
 
 
     @staticmethod
-    def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="fits_output", oskar_sif="~/.oskar/OSKAR-2.8.3-Python3.sif"):
+    def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="fits_output", oskar_sif=OSKAR_SIF):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
 
@@ -656,6 +657,9 @@ class BTAnalysisPipeline(object):
         subprocess.run(["mkdir","-p","BTA/"+fits_output], check=True)
 
         #subprocess.run(["singularity","exec","--nv","--bind",os.getcwd(),"--cleanenv","--home",os.getcwd(),oskar_sif,"oskar_sim_beam_pattern","BTA/test_beam_gen.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # Convert SIF location to absolute path
+        oskar_sif = os.path.abspath(os.path.expanduser(os.path.expandvars(oskar_sif)))
 
         # Get files to iterate over
         osm_list = Collator.dir_list_sorted(dir_="BTA/"+osm_dir)
@@ -692,6 +696,8 @@ class BTAnalysisPipeline(object):
             BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "fovset", ofname)
 
             cwd = os.getcwd()+'/BTA'
+
+            print(oskar_sif)
 
             # Run OSKAR's interferometer simulation
             try:
@@ -759,7 +765,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean=True, oskar_sif="./oskar_run_stage/OSKAR-2.11.1-Python3.sif", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template_preset="", coeval=True, osm_dir=""):
+    def H5_box_to_datacube(file, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_sif = OSKAR_SIF, oskar_telescope_model = "./oskar_run_stage/telescope_model_AAstar", template_preset = "", coeval = True, osm_dir = ""):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -810,11 +816,11 @@ class BTAnalysisPipeline(object):
 
 # Testing stage
 
-Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_00_osm", coeval=True)
+#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_00_osm", coeval=True)
 
 #Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
 #Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
 
-#BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
+BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
 
-#BTAnalysisPipeline.H5_box_to_datacube("./regrid/yuxiang_bts/yuxiang1.h5", oskar_sif="/home/olivia/.oskar/OSKAR-2.8.3-Python3.sif", osm_dir="./regrid/yuxiang1_osm")
+#BTAnalysisPipeline.H5_box_to_datacube("./regrid/yuxiang_bts/yuxiang1.h5", oskar_sif=OSKAR_SIF, osm_dir="./regrid/yuxiang1_osm")
