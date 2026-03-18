@@ -736,7 +736,7 @@ class BTAnalysisPipeline(object):
 
         cwd = os.getcwd()
 
-        # 1. create directory
+        # 1. Create Directory
         subprocess.run(["mkdir","-p","BTA"], check=True)
 
         # 2. Move H5 file and INIs to directory
@@ -816,7 +816,8 @@ class BTAnalysisPipeline(object):
 
 # Testing stage
 
-#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_00_osm", coeval=True)
+#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_non_uniform_zenith_osm", coeval=True, require_regrid=False)
+#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_00_osm", coeval=True, phase_ref_point=ZERO_RADEC)
 
 #Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
 #Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
