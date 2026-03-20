@@ -77,12 +77,12 @@ oskar -l -b -f "test_beam.ini"
 rm "test_beam.ini"
 
 # Define the presets
-test_presets=("yuxiang1_zenith")
+test_presets=("yuxiang1_zenith yuxiang1_00")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
     # Move OSM folder to directory
-    cp -r "../regrid/${preset}_osm" "./test_${preset}_osm"
+    cp -r "../regrid/osm_output/${preset}_osm" "./test_${preset}_osm"
 
     # Get first OSM file name
     cd "test_${preset}_osm"
@@ -90,8 +90,8 @@ for preset in ${test_presets[@]}; do
     cd ..
 
     # Create output fits directory
-    rm -r "../regrid/test_output/${preset}_fits"
-    mkdir -p "../regrid/test_output/${preset}_fits"
+    rm -r "../regrid/fits_output/${preset}_fits"
+    mkdir -p "../regrid/fits_output/${preset}_fits"
 
     for file in ${files[@]}; do
         # Generate the INI files
@@ -112,7 +112,7 @@ for preset in ${test_presets[@]}; do
         oskar -l -I -f "test_img_${preset}.ini"
 
         # Copy output data to regrid folder
-        cp output/sim_image_I.fits "../regrid/test_output/${preset}_fits/${file}.fits"
+        cp output/sim_image_I.fits "../regrid/fits_output/${preset}_fits/${file}.fits"
 
         # Clear OSM folder and INI from directory
         rm "test_intif_${preset}.ini"

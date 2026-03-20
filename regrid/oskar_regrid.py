@@ -1,8 +1,5 @@
 #!/bin/python3
-# pylint: disable=E1101
-# pylint: disable=W0102
 
-#import copy
 import os
 import subprocess
 
@@ -17,7 +14,7 @@ from astropy.cosmology import z_at_value as getz
 from astropy.io import fits
 from scipy.interpolate import make_interp_spline as misp
 
-
+# pylint: disable-next=unused-import
 from matplotlib import pyplot as plt
 
 # Define Constants
@@ -77,12 +74,12 @@ class Regrid(object):
         return Fv
 
     @staticmethod
-    def mock_values(preset, scale = 3, d = (100, 100, 100)):
+    def mock_values(preset, scale = 10, d = (100, 100, 100)):
         """
         Create an array of mock simulation values.
 
         :param preset: Mock brightness temperature array format. Options are {"flat", "random", "gaussian", "sinusoid"}
-        :param scale: Define the Kelvin scale of the array (e.g. default value will create a uniform array of 3 K or a random array of 0 - 3 K).
+        :param scale: Define the Kelvin scale of the array (e.g. default value will create a uniform array of 10 K or a random array of 0 - 10 K).
         :return: Mock brightness temperature values.
         """
         print("Creating mock brightness temperatures ...")
@@ -223,7 +220,7 @@ class Regrid(object):
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
         :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
-        :param osm_output: The directory to output the osm file(s) if output_master_osm is false.
+        :param osm_output: The directory to output the osm file(s).
         :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
         """
         print("Initialising ...")
@@ -392,7 +389,7 @@ class Regrid(object):
         # Record data to file
         if output_master_osm:
             print("Recording data to .osm file")
-            with open('reformatted.osm', 'w', encoding='utf8') as osm:
+            with open(osm_output+'/master.osm', 'w', encoding='utf8') as osm:
 
                 # Clear file contents
                 osm.truncate(0)
@@ -434,13 +431,13 @@ class Regrid(object):
             print("Recording data to .osm files")
 
             if not os.path.isdir(osm_output):
-                os.mkdir(osm_output)
+                os.mkdir("./"+osm_output)
 
             for t in range(d[2]):
                 file_freq = np.format_float_positional(freqsum[0, 0, t] / 1e6, 3, False)
                 print("\rGenerating OSM for freq0 =", file_freq, "MHz ( file #", t+1, "of", d[2], ")", end="")
 
-                with open(osm_output+'/reformatted_no.'+str(t+1)+'_'+str(file_freq)+'MHz.osm', 'w', encoding='utf8') as osm:
+                with open(osm_output+'/no.'+str(t+1)+'_'+str(file_freq)+'MHz.osm', 'w', encoding='utf8') as osm:
                     # Clear file contents
                     osm.truncate(0)
 
@@ -547,7 +544,7 @@ class Collator(object):
         return header
 
     @staticmethod
-    def collate_fits(fits_dir, outdir=".", headers=["", "", ""]):
+    def collate_fits(fits_dir, outdir=".", headers=None):
         """
         Collates a directory of FITS images into a single FITS datacube. Adds a header to the file that corresponds to useful information about the simulation box.
 
@@ -720,7 +717,7 @@ class BTAnalysisPipeline(object):
 
 
     @staticmethod
-    def setup_BTA_dir(h5_file, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False, osm_dir=""):
+    def setup_BTA_dir(h5_file, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
         """
         Sets up the operating directory from which all anaysis will be done.
 
@@ -786,7 +783,7 @@ class BTAnalysisPipeline(object):
         template_flag = (template_preset != "")
 
         print("Setting up BTA directory ...")
-        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini, template=template_flag, osm_dir=osm_dir)
+        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini, template=template_flag)
 
         osm_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_osm"
         fits_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_fits"
@@ -811,17 +808,22 @@ class BTAnalysisPipeline(object):
 
         # If clean is true remove all data relating to execution
         print("Cleaning up ...")
-        #BTAnalysisPipeline.clean_BTA_dir(outdir=outdir, fits_cube="test_move.txt")#fits_cube, clean=clean)
+        BTAnalysisPipeline.clean_BTA_dir(outdir=outdir, fits_cube=fits_cube, clean=clean)
 
 
 # Testing stage
 
-#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_non_uniform_zenith_osm", coeval=True, require_regrid=False)
-#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/yuxiang1_00_osm", coeval=True, phase_ref_point=ZERO_RADEC)
+#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_non_uniform_zenith_osm", coeval=True, require_regrid=False)
+#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_00_osm", coeval=True, phase_ref_point=ZERO_RADEC)
+#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_zenith_osm", coeval=True)
+
+for template_preset in ["gaussian", "point", "random", "flat", "sinusoid", "point"]:
+    template_value = Regrid.mock_values(template_preset, scale=20)
+    Regrid.generate_osm_from_simulation(template_value, osm_output="./regrid/osm_output/"+template_preset+"_zenith_osm")
 
 #Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
 #Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
 
-BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
+#BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
 
 #BTAnalysisPipeline.H5_box_to_datacube("./regrid/yuxiang_bts/yuxiang1.h5", oskar_sif=OSKAR_SIF, osm_dir="./regrid/yuxiang1_osm")
