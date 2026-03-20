@@ -68,7 +68,12 @@ function oskar() {
 }
 
 # Set up run stage
-find . -mindepth 1 ! -regex '^./telescope_model_AAstar\(/.*\)?' -delete
+#find . -mindepth 1 ! -regex '^./telescope_model_AAstar\(/.*\)?' -delete
+rm -r output
+rm -r .nv
+rm -r *.log
+rm -r *.ini
+rm -r ./*_osm/*.osm
 mkdir -p output/sim.ms
 
 # Set up beamformer
