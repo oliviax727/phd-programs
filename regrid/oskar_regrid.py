@@ -205,7 +205,7 @@ class Regrid(object):
         else:
             return Regrid.convert_H5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
 
-
+    # FIXME: Seperate generate_osm_from_simulation into subfunctions
     @staticmethod
     def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, v = (1, 1, 1), output_master_osm=False, osm_output="osm_output", cosmology=Cosmo()):
         """
