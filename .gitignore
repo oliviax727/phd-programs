@@ -1,6 +1,4 @@
 # OSKAR run output
-oskar_run_stage
-!oskar_run_stage/telescope_model_AAstar
 BTA
 backup
 ./nohup.txt
