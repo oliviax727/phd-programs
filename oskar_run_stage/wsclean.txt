@@ -1,0 +1,6 @@
+wsclean -size 400 400 \
+  -scale 61.272018asec \
+  -niter 10000 \
+  -auto-threshold 3 \
+  -no-negative \
+  no.1_208.512MHz.ms
