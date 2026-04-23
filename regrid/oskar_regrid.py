@@ -1,3 +1,4 @@
+#!.venv/bin/python
 #!/bin/python3
 
 import os
@@ -20,7 +21,9 @@ from matplotlib import pyplot as plt
 # Define Constants
 ZENITH_530 = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # SKA-Low Zenith at 5:30 am 2025-03-03
 ZERO_RADEC = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/Dec
-OSKAR_SIF  = "~/.oskar/OSKAR-2.12.0-Python3.sif"
+OSKAR_SIF  = "~/.oskar/OSKAR-2.12.2-Python3.sif"
+OSKAR_BIN  = "~/.oskar/bin/"
+TELESCOPE  = "~/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
 
 # Angular distance calculations
 norm = lambda t: (t % 360 + 360) % 360 - 180
@@ -530,7 +533,7 @@ class Collator(object):
         :return: The file header as a dictionary.
         """
 
-        # FIXME Add a header modification for outname.
+        # FIXME (Delete header insertion) Add a header modification for outname.
 
         header = {}
 
@@ -543,6 +546,7 @@ class Collator(object):
 
         return header
 
+    # FIXME ignore header and defaullt to master osm
     @staticmethod
     def collate_fits(fits_dir, outdir=".", headers=None):
         """
@@ -612,7 +616,7 @@ class BTAnalysisPipeline(object):
         # Get number of voxels on a side
         n = np.sqrt(len(np.array(df['RA'])))
 
-        return n, fov*10
+        return n, fov
     
     @staticmethod
     def find_replace_line(file_name, find_line, replace_line):
@@ -636,7 +640,7 @@ class BTAnalysisPipeline(object):
 
 
     @staticmethod
-    def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="fits_output", oskar_sif=OSKAR_SIF):
+    def run_oskar_on_osms(osm_dir, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="fits_output", oskar_exec=OSKAR_SIF, oskar_mode="singularity"):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
 
@@ -644,19 +648,19 @@ class BTAnalysisPipeline(object):
         :param imager_template_ini: The file location of the OSKAR imager settings file.
         :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
         :param fits_output: The directory to output the resultant FITS files.
-        :param oskar_sif: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
+        :param oskar_exec: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
+        :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
         """
-        # FIXME: Run OSKAR Python Interface
+        # FIXME: Provide options for all four execution modes.
 
         # Create the output files
         subprocess.run(["mkdir","-p","BTA/output"], check=True)
         subprocess.run(["mkdir","-p","BTA/output/sim.ms"], check=True)
         subprocess.run(["mkdir","-p","BTA/"+fits_output], check=True)
-
-        #subprocess.run(["singularity","exec","--nv","--bind",os.getcwd(),"--cleanenv","--home",os.getcwd(),oskar_sif,"oskar_sim_beam_pattern","BTA/test_beam_gen.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        # Convert SIF location to absolute path
-        oskar_sif = os.path.abspath(os.path.expanduser(os.path.expandvars(oskar_sif)))
+        # Convert SIF/Binary location (if provided) to absolute path
+        if oskar_mode == "binary" or oskar_mode == "singularity":
+            oskar_exec = os.path.abspath(os.path.expanduser(os.path.expandvars(oskar_exec)))
 
         # Get files to iterate over
         osm_list = Collator.dir_list_sorted(dir_="BTA/"+osm_dir)
@@ -694,12 +698,13 @@ class BTAnalysisPipeline(object):
 
             cwd = os.getcwd()+'/BTA'
 
-            print(oskar_sif)
-
             # Run OSKAR's interferometer simulation
             try:
                 print("Running interferometer on "+osm)
-                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_sif,"oskar_sim_interferometer","test_intif.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                if oskar_mode == "singularity":
+                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer","test_intif.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                elif oskar_mode == "binary":
+                    subprocess.run([oskar_exec+"/oskar_sim_interferometer","test_intif.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
             except subprocess.CalledProcessError as e:
                 print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
@@ -707,7 +712,10 @@ class BTAnalysisPipeline(object):
             # Run OSKAR's imager simulation
             try:
                 print("Running imager on "+osm)
-                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_sif,"oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                if oskar_mode == "singularity":
+                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                elif oskar_mode == "binary":
+                    subprocess.run([oskar_exec+"/oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
             except subprocess.CalledProcessError as e:
                 print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
@@ -762,7 +770,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_sif = OSKAR_SIF, oskar_telescope_model = "./oskar_run_stage/telescope_model_AAstar", template_preset = "", coeval = True, osm_dir = ""):
+    def H5_box_to_datacube(file, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = TELESCOPE, template_preset = "", coeval = True, load_osm=False):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -773,12 +781,15 @@ class BTAnalysisPipeline(object):
         :param imager_template_ini: The file location of the OSKAR imager settings file.
         :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
         :param outdir: The output location of the final FITS file.
-        :param oskar_sif: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
+        :param oskar_exec: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
+        :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param template_preset: Use a mock values array instead of a h5 file. Ignores any provided h5 file.
         :param coeval: If the H5 box is coeval or lightcone based.
-        :param osm_dir: If a set of osms have already been generated, use the path to the directory specified to find the osms.
+        :param osm_dir: If true load treat the file variable as if it were an OSM directory.
         """
+
+        if load_osm: template_preset = file.split('/')[-1][:-4]
 
         template_flag = (template_preset != "")
 
@@ -789,7 +800,7 @@ class BTAnalysisPipeline(object):
         fits_output = (file.split('/')[-1][:-3] if not template_flag else template_preset) + "_fits"
         
         if not os.path.isdir("BTA/"+osm_output):
-            if osm_dir == "":
+            if not load_osm:
                 if template_flag:
                     print("Generating OSM files from template ...")
                     template_value = Regrid.mock_values(template_preset)
@@ -798,10 +809,10 @@ class BTAnalysisPipeline(object):
                     print("Generating OSM files from H5 ...")
                     Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output="BTA/"+osm_output, coeval=coeval)
             else:
-                subprocess.run(["cp","-r",osm_dir,"BTA/"+osm_output], check=True)
+                subprocess.run(["cp","-r",file,"BTA/"+osm_output], check=True)
 
-        print("Running OSKAR. Outputting to ./BTA/oskar.out ...")
-        BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_sif=oskar_sif)
+        print("Running OSKAR ...")
+        BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_exec=oskar_exec, oskar_mode=oskar_mode)
 
         print("Collating fits images ...")
         fits_cube = Collator.collate_fits(fits_output, headers=[h5_file, osm_output, fits_output])
@@ -817,13 +828,13 @@ class BTAnalysisPipeline(object):
 #Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_00_osm", coeval=True, phase_ref_point=ZERO_RADEC)
 #Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_zenith_osm", coeval=True)
 
-for template_preset in ["gaussian", "point", "random", "flat", "sinusoid", "point"]:
-    template_value = Regrid.mock_values(template_preset, scale=20)
-    Regrid.generate_osm_from_simulation(template_value, osm_output="./regrid/osm_output/"+template_preset+"_zenith_osm")
+#for template_preset in ["gaussian", "point", "random", "flat", "sinusoid", "point"]:
+#    template_value = Regrid.mock_values(template_preset, scale=20)
+#    Regrid.generate_osm_from_simulation(template_value, osm_output="./regrid/osm_output/"+template_preset+"_zenith_osm")
 
 #Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
 #Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
 
 #BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
 
-#BTAnalysisPipeline.H5_box_to_datacube("./regrid/yuxiang_bts/yuxiang1.h5", oskar_sif=OSKAR_SIF, osm_dir="./regrid/yuxiang1_osm")
+BTAnalysisPipeline.H5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec="/software/projects/mwaeor/ohrw/.oskar/bin", load_osm=True, oskar_mode="binary", oskar_telescope_model="/software/projects/mwaeor/ohrw/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm")
