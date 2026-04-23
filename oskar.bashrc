@@ -44,12 +44,12 @@ function oskar_bash() {
                 gflag=1
             ;;
             -l | --local)
-                exes="$2/bin"
+                exes=$(realpath "$2/bin")
                 gflag=0
                 shift
             ;;
             -s | --sif)
-                exes=$2
+                exes=$(realpath "$2")
                 bflag=0
                 shift
             ;;
@@ -63,7 +63,7 @@ function oskar_bash() {
                 prog="oskar_imager"
             ;;
             -f | --file)
-                ofile=$2
+                ofile=$(realpath "$2")
                 shift
             ;;
             -c | --clean)
@@ -93,7 +93,7 @@ function oskar_bash() {
     if [[ $bflag -eq 1 && $gflag -eq 1 ]]; then
         $prog $ofile
     elif [[ $bflag -eq 1 && $gflag -eq 0 ]]; then
-        "$exec/$prog" $ofile
+        "$exes/$prog" $ofile
     else
         singularity exec --nv --bind $PWD --cleanenv --home $PWD $sfile $prog $ofile
     fi

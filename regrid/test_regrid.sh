@@ -8,7 +8,7 @@ source ../oskar.bashrc
 # Set up run stage
 rm -rf output/*
 rm -rf .nv
-rm -rf *.log
+rm -rf oskar_*.log
 rm -rf test_*.ini
 rm -rf test_*_osm
 
@@ -44,8 +44,8 @@ for preset in ${test_presets[@]}; do
         sed -i "s/^freqset.*/${ofname}/" "test_intif_${preset}.ini"
 
         # Then, run the interferometry and imager simulations
-        oskar_bash -l "../.oskar" -i -f "test_intif_${preset}.ini" -c
-        oskar_bash -l "../.oskar" -I -f "test_img_${preset}.ini" -c
+        oskar_bash -l "../../.oskar" -i -f "test_intif_${preset}.ini" -c
+        oskar_bash -l "../../.oskar" -I -f "test_img_${preset}.ini" -c
 
         # Copy output data to regrid folder
         cp output/sim_image_I.fits "../regrid/fits_output/${preset}_fits/${file}.fits"
