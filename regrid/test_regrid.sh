@@ -2,87 +2,18 @@
 # Run a test of the OSKAR regridder
 cd ./oskar_run_stage
 
-# OSKAR Basic Command - add to .bashrc
-function oskar() {
-
-    cflag=0
-    gflag=0
-    prog=""
-    ofile=""
-    outf="./"
-    prevd=$PWD
-    
-    while [ $# -gt 0 ]; do
-        case $1 in
-            -g | --global | -s | --sample)
-                gflag=1
-            ;;
-            -l | --local)
-                gflag=0
-            ;;
-            -i | --intf)
-                prog="oskar_sim_interferometer"
-            ;;
-            -b | --beam)
-                prog="oskar_sim_beam_pattern"
-            ;;
-            -I | --image)
-                prog="oskar_imager"
-            ;;
-            -f | --file)
-                ofile=$2
-                shift
-            ;;
-            -o | --output)
-                outf=$2
-                shift
-            ;;
-            -c | --clean)
-                cflag=1
-            ;;
-            \?)
-                
-            ;;
-        esac
-        shift
-    done
-
-    if [ $cflag -eq 1 ]; then
-        if [ $gflag -eq 1 ]; then
-            find ~/.oskar -name '*.log' -type f -delete
-        else
-            find . -name '*.log' -type f -delete
-        fi
-        return 0
-    fi
-
-    if [ $gflag -eq 1 ]; then
-        ofile="$prog.ini"
-
-        cd ~/.oskar
-    fi
-
-    singularity exec --nv --bind $PWD --cleanenv --home $PWD ~/.oskar/OSKAR-2.12.0-Python3.sif $prog $ofile
-
-    cd $prevd
-}
+# Source oskar.bashrc
+source ../oskar.bashrc
 
 # Set up run stage
-#find . -mindepth 1 ! -regex '^./telescope_model_AAstar\(/.*\)?' -delete
-rm -r output
-rm -r .nv
-rm -r *.log
-rm -r *.ini
-rm -r ./*_osm/*.osm
-mkdir -p output/sim.ms
-
-# Set up beamformer
-cp "../regrid/test_intif_inis/test_beam_gen.ini" "test_beam.ini"
-oskar -l -b -f "test_beam.ini"
-rm "test_beam.ini"
+rm -rf output/*
+rm -rf .nv
+rm -rf *.log
+rm -rf test_*.ini
+rm -rf test_*_osm
 
 # Define the presets
-test_presets=("yuxiang1_zenith yuxiang1_00")
+test_presets=("yuxiang1_zenith")
 
 # Interferometer and image
 for preset in ${test_presets[@]}; do
@@ -113,8 +44,8 @@ for preset in ${test_presets[@]}; do
         sed -i "s/^freqset.*/${ofname}/" "test_intif_${preset}.ini"
 
         # Then, run the interferometry and imager simulations
-        oskar -l -i -f "test_intif_${preset}.ini"
-        oskar -l -I -f "test_img_${preset}.ini"
+        oskar_bash -l "../.oskar" -i -f "test_intif_${preset}.ini" -c
+        oskar_bash -l "../.oskar" -I -f "test_img_${preset}.ini" -c
 
         # Copy output data to regrid folder
         cp output/sim_image_I.fits "../regrid/fits_output/${preset}_fits/${file}.fits"
@@ -122,7 +53,6 @@ for preset in ${test_presets[@]}; do
         # Clear OSM folder and INI from directory
         rm "test_intif_${preset}.ini"
         rm "test_img_${preset}.ini"
-        oskar -l -c
     done
 
     rm -r "test_${preset}_osm"

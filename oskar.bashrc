@@ -1,24 +1,17 @@
 # ===== CUSTOM COMMANDS - OSKAR ===== #
 
+export INFORMATION_TEXT='\033[1;34mINFORMATION\033[00m'
+export WARNING_TEXT='\033[1;33mWARNING\033[00m'
+export ERROR_TEXT='\033[1;31mERROR\033[00m'
+
 # OSKAR Generic command
 function oskar_bash() {
+    local exes=""
     local cflag=0
-    local gflag=0
-    local bflag=0
+    local gflag=1
+    local bflag=1
     local prog=""
     local ofile=""
-    local prevd=$PWD
-    local sifs=(${HOME}/.oskar/*.sif)
-    local sfile="${sifs[0]}"
-
-    if [[ ! -d ~/.oskar ]]; then
-        mkdir ~/.oskar
-        printf "${WARNING_TEXT}: OSKAR directory has just been created. This means that there is no existing OSKAR version on this device that can be recognised. Please download a binary or SIF file into ~/.oskar before continuing.\n"
-    fi
-
-    if [[ ! -f sfile ]]; then
-        printf "${WARNING_TEXT}: There does not appear to be any SIF files in the ~/.oskar directory. Please make sure at least one sif file exists in the directory.\n"
-    fi
 
     if [[ $1 == "--help" || $1 == "-h" ]]; then
         echo "=================================="
@@ -26,18 +19,18 @@ function oskar_bash() {
         echo "finds in ~/.oskar. If there is no singularity image it will throw an error."
         echo "=================================="
         echo "Usage:"
-        echo "oskar_bash [(-p|--prog)|(-s|--sif) <exec_file>] "
+        echo "oskar_bash ((-g|--global)|((-l|--local|-s|--sif) <program>)) (-i|--intif|-I|--img|-b|--beam)"
+        echo "  (-f|--file) <ini_file> [(-c|--clean)]"
         echo "=================================="
         echo "Options:"
-        echo "-g --global -s --sample Run OSKAR with sample settings"
-        echo "-l --local              (Default) Run OSKAR in current directory with custom settings"
+        echo "-g --global             (Default) Run OSKAR as an installed CLI applet"
+        echo "-l --local              Run OSKAR from a specified binary directory"
+        echo "-s --sif                If running singularity, what sif file to use"
         echo "-i --intif              Run OSKAR's interferometer simulation"
         echo "-I --img                Run OSKAR's dirty imager simulation"
         echo "-b --beam               Run OSKAR's beam simulation"
         echo "-f --file               Settings file to use"
         echo "-c --clean              Clean directory of OSKAR logs"
-        echo "-s --sif                If running singularity, what sif file to use"
-        echo "-p --prog               If running a binary or application, the location of the binary or application"
         echo "=================================="
 
         return 0
@@ -47,11 +40,18 @@ function oskar_bash() {
     
     while [ $# -gt 0 ]; do
         case $1 in
-            -g | --global | -s | --sample)
+            -g | --global)
                 gflag=1
             ;;
             -l | --local)
+                exes="$2/bin"
                 gflag=0
+                shift
+            ;;
+            -s | --sif)
+                exes=$2
+                bflag=0
+                shift
             ;;
             -i | --intf)
                 prog="oskar_sim_interferometer"
@@ -69,43 +69,33 @@ function oskar_bash() {
             -c | --clean)
                 cflag=1
             ;;
-            -s | --sif)
-                sfile=$2
-                bflag=0
-                shift
-            ;;
-            -p | --prog)
-                prog=$2
-                bflag=1
-                shift
-            ;;
             \?)
                 echo "'$1' is not a valid option. Use --help or -h to see what options are available."
             ;;
         esac
         shift
     done
+    
+    # Check if files exist
+    if [[ $bflag -eq 1 && $gflag -eq 1 ]] && ! type "$prog" > /dev/null; then
+        printf "${ERROR_TEXT}: A CLI OSKAR applet/command on this system does not exist.\n"
+    elif [[ $bflag -eq 1 && $gflag -eq 0 ]] && ! type "$exes/$prog" > /dev/null; then
+        printf "${ERROR_TEXT}: There is no $prog executable file in $exes or the directory does not exist.\n"
+    elif [[ $bflag -eq 0 && ! -f $exes ]]; then
+        printf "${ERROR_TEXT}: There does not appear to be any OSKAR SIF files in the given directory.\n"
+    fi
 
+    # Execute commands
     if [ $cflag -eq 1 ]; then
-        if [ $gflag -eq 1 ]; then
-            find ${HOME}/.oskar -name '*.log' -type f -delete
-        else
-            find . -name '*.log' -type f -delete
-        fi
-        return 0
+        find . -name '*.log' -type f -delete
     fi
 
-    if [ $gflag -eq 1 ]; then
-        ofile="$prog.ini"
-
-        cd ${HOME}/.oskar
-    fi
-
-    if [ $bflag -eq 1 ]; then
+    if [[ $bflag -eq 1 && $gflag -eq 1 ]]; then
         $prog $ofile
+    elif [[ $bflag -eq 1 && $gflag -eq 0 ]]; then
+        "$exec/$prog" $ofile
     else
         singularity exec --nv --bind $PWD --cleanenv --home $PWD $sfile $prog $ofile
     fi
 
-    cd $prevd
 }
