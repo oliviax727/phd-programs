@@ -1,15 +1,24 @@
 # OSKAR run output
-oskar_run_stage
 BTA
-./nohup.txt
+backup
+nohup.txt
+eric_test_osm
+
+# OSKAR run stage
+oskar_run_stage/output/*
+oskar_run_stage/test_*.ini
+oskar_run_stage/test_*_osm
 
 # Outfiles
+*.nv
+*.log
 *.out
 *.fits
 *.f5_TSM0
 *.h5
 *.pkl
 *.sif
+*.ms
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
