@@ -1,6 +1,6 @@
 #!.venv/bin/python
-#!/bin/python3
 
+# Import the stuffs
 import os
 import subprocess
 
@@ -14,6 +14,8 @@ from astropy.cosmology import FlatLambdaCDM as fmodel
 from astropy.cosmology import z_at_value as getz
 from astropy.io import fits
 from scipy.interpolate import make_interp_spline as misp
+
+# FIXME: Turn into pip project (later)
 
 # pylint: disable-next=unused-import
 from matplotlib import pyplot as plt
@@ -41,6 +43,9 @@ def lm_to_radec(l, m, phase_centre=ZERO_RADEC):
     Ra = a0 + np.arctan(l/(n*np.cos(d0)-m*np.sin(d0)))
 
     return [Ra, Dec]
+
+def expand_path(path):
+    return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
 
 
 class Cosmo(object):
@@ -389,6 +394,7 @@ class Regrid(object):
         RAs = source_pos.ra.to_value(u.deg)
         Dcs = source_pos.dec.to_value(u.deg)
 
+        # FIXME: Use master OSM only
         # Record data to file
         if output_master_osm:
             print("Recording data to .osm file")
@@ -533,7 +539,7 @@ class Collator(object):
         :return: The file header as a dictionary.
         """
 
-        # FIXME (Delete header insertion) Add a header modification for outname.
+        # FIXME: (Delete header insertion) Add a header modification for outname.
 
         header = {}
 
@@ -546,7 +552,7 @@ class Collator(object):
 
         return header
 
-    # FIXME ignore header and defaullt to master osm
+    # FIXME: ignore header and defaullt to master osm
     @staticmethod
     def collate_fits(fits_dir, outdir=".", headers=None):
         """
@@ -652,15 +658,10 @@ class BTAnalysisPipeline(object):
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
         """
         # FIXME: Provide options for all four execution modes.
-
         # Create the output files
         subprocess.run(["mkdir","-p","BTA/output"], check=True)
         subprocess.run(["mkdir","-p","BTA/output/sim.ms"], check=True)
         subprocess.run(["mkdir","-p","BTA/"+fits_output], check=True)
-        
-        # Convert SIF/Binary location (if provided) to absolute path
-        if oskar_mode == "binary" or oskar_mode == "singularity":
-            oskar_exec = os.path.abspath(os.path.expanduser(os.path.expandvars(oskar_exec)))
 
         # Get files to iterate over
         osm_list = Collator.dir_list_sorted(dir_="BTA/"+osm_dir)
@@ -698,6 +699,7 @@ class BTAnalysisPipeline(object):
 
             cwd = os.getcwd()+'/BTA'
 
+
             # Run OSKAR's interferometer simulation
             try:
                 print("Running interferometer on "+osm)
@@ -722,6 +724,8 @@ class BTAnalysisPipeline(object):
 
             subprocess.run(["find",".","-name","'*.log'","-type","f","-delete"], check=True, cwd=cwd)
             subprocess.run(["cp","BTA/output/sim_image_I.fits","BTA/"+fits_output+"/"+osm+".fits"], check=True)
+
+            exit()
 
 
     @staticmethod
@@ -781,7 +785,7 @@ class BTAnalysisPipeline(object):
         :param imager_template_ini: The file location of the OSKAR imager settings file.
         :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
         :param outdir: The output location of the final FITS file.
-        :param oskar_exec: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
+        :param oskar_exec: The SIF file or location of compiled OSKAR binaries.
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param template_preset: Use a mock values array instead of a h5 file. Ignores any provided h5 file.
@@ -789,6 +793,17 @@ class BTAnalysisPipeline(object):
         :param osm_dir: If true load treat the file variable as if it were an OSM directory.
         """
 
+        # Expand paths
+        if oskar_mode == "binary" or oskar_mode == "singularity":
+            oskar_exec = expand_path(oskar_exec)
+        
+        file = expand_path(file)
+        interferometer_template_ini = expand_path(interferometer_template_ini)
+        imager_template_ini = expand_path(imager_template_ini)
+        oskar_telescope_model = expand_path(oskar_telescope_model)
+        outdir = expand_path(outdir)
+        
+        # Set templates
         if load_osm: template_preset = file.split('/')[-1][:-4]
 
         template_flag = (template_preset != "")
@@ -837,4 +852,4 @@ class BTAnalysisPipeline(object):
 
 #BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
 
-BTAnalysisPipeline.H5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec="/software/projects/mwaeor/ohrw/.oskar/bin", load_osm=True, oskar_mode="binary", oskar_telescope_model="/software/projects/mwaeor/ohrw/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm")
+BTAnalysisPipeline.H5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=TELESCOPE)

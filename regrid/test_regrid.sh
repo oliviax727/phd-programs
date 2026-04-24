@@ -44,8 +44,8 @@ for preset in ${test_presets[@]}; do
         sed -i "s/^freqset.*/${ofname}/" "test_intif_${preset}.ini"
 
         # Then, run the interferometry and imager simulations
-        oskar_bash -l "../../.oskar" -i -f "test_intif_${preset}.ini" -c
-        oskar_bash -l "../../.oskar" -I -f "test_img_${preset}.ini" -c
+        oskar_bash -g -i -f "test_intif_${preset}.ini" -c
+        oskar_bash -g -I -f "test_img_${preset}.ini" -c
 
         # Copy output data to regrid folder
         cp output/sim_image_I.fits "../regrid/fits_output/${preset}_fits/${file}.fits"

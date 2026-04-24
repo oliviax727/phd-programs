@@ -1,5 +1,5 @@
 #!/bin/bash
-find -name "*.py" -not -path "./.*" -exec sed -i '1i #!.venv/bin/python' {} ';'
+#find -name "*.py" -not -path "./.*" -exec sed -i '1i #!.venv/bin/python' {} ';'
 python3.12 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install --upgrade pip
