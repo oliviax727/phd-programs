@@ -26,6 +26,7 @@ ZERO_RADEC = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/Dec
 OSKAR_SIF  = "~/.oskar/OSKAR-2.12.2-Python3.sif"
 OSKAR_BIN  = "~/.oskar/bin/"
 TELESCOPE  = "~/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
+SIGMA_F    = (np.sqrt(c.k_B / (1.008 * c.u * (21.106 * u.cm)**2))).to(u.Hz*u.K**-0.5).value
 
 # Angular distance calculations
 norm = lambda t: (t % 360 + 360) % 360 - 180
@@ -80,6 +81,11 @@ class Regrid(object):
         Fv = 2 * c.k_B.value * fxy**2 * Tb * (dθ * dφ) / c.c.value ** 2
         Fv = Fv * 1e26 # Converts to Jansky
         return Fv
+    
+    @staticmethod
+    def brightness_temperature_to_linewidth(Tb):
+        # Calculate linewidth in Hz
+        return (Tb ** 0.5) * SIGMA_F
 
     @staticmethod
     def mock_values(preset, scale = 10, d = (100, 100, 100)):
@@ -215,7 +221,7 @@ class Regrid(object):
 
     # FIXME: Seperate generate_osm_from_simulation into subfunctions
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, v = (1, 1, 1), output_master_osm=False, osm_output="osm_output", cosmology=Cosmo()):
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, v = (1, 1, 1), osm_output="osm_output", cosmology=Cosmo()):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -227,7 +233,6 @@ class Regrid(object):
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
         :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
-        :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
         :param osm_output: The directory to output the osm file(s).
         :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
         """
@@ -251,7 +256,8 @@ class Regrid(object):
         fq = f_ref.to_value(u.Hz)
         Dz_val = Dz_ref.to_value(u.Mpc)
 
-        #test_arr = []
+        # Set Linewidth array
+        sigma_f = Regrid.brightness_temperature_to_linewidth(values)
 
         print("Transforming coordinates ...")
         # Main loop of creation
@@ -340,10 +346,12 @@ class Regrid(object):
 
                     # Create interpolation B-spline
                     bspline = misp(freq_values, values[x, y, :])
+                    dspline = misp(freq_values, sigma_f[x, y, :])
 
                     # Perform regridding
                     new_freq, freq_bandw = np.linspace(freq_values[0], freq_values[-1], d[2], retstep=True)
                     new_flux = np.clip(bspline(new_freq), 0, None)
+                    new_sigf = np.clip(dspline(new_freq), 0, None)
 
                     # Create array of uniform bin sizes
                     freq_bins = np.ones(d[2]) * freq_bandw
@@ -351,31 +359,12 @@ class Regrid(object):
                     # Save variables
                     voxels[x, y, :, 2] = freq_bins
                     values[x, y, :] = new_flux
-
-                    #if (x == 0 and y == 35):
-                    #    test_arr = np.array(test_arr)
-                    #    test_arr[:, 5] = new_flux
+                    sigma_f[x, y, :] = new_sigf
 
             print("\nRegrid complete.")
 
         else:
             print("No regrid required!")
-
-
-        #test_arr = np.array(test_arr)
-        #dpn = test_arr.shape[1]
-
-        #fig, ax = plt.subplots(nrows=1, ncols=dpn)
-        #fig.set_size_inches((dpn*6, 4))
-
-        #dps = ["Tb", "fxy", "dθ", "dφ", "Fv", "I"]
-
-        #for dp in range(dpn):
-        #    ax[dp].plot(test_arr[:, dp])
-        #    ax[dp].set_title(dps[dp])
-        #plt.show()
-
-        #breakpoint()
         
         # STEP 8 - Write data to OSM file
         print("Configuring datacube for OSKAR file format ...")
@@ -394,96 +383,54 @@ class Regrid(object):
         RAs = source_pos.ra.to_value(u.deg)
         Dcs = source_pos.dec.to_value(u.deg)
 
-        # FIXME: Use master OSM only
         # Record data to file
-        if output_master_osm:
-            print("Recording data to .osm file")
-            with open(osm_output+'/master.osm', 'w', encoding='utf8') as osm:
+        print("Recording data to .osm file")
+        osm_filename = osm_output+'_sky.osm'
 
-                # Clear file contents
-                osm.truncate(0)
+        with open(osm_filename, 'w', encoding='utf8') as osm:
+            # Clear file contents
+            osm.truncate(0)
 
-                # Add header lines
-                osm.write("# Entries Key:\n")
-                osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6\n")
-                osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0\n")
+            # Add header lines
+            osm.write("Format = RaD DecD I Q U V ReferenceFrequency LineWidth\n")
+            osm.write("# Entries Key:\n")
+            osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6 0.0000+e00\n")
+            osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0     Linewidth\n")
 
-                # Write OSM lines
-                for x in range(d[0]):
-                    for y in range(d[1]):
-                        for t in range(d[2]):
+            # Write OSM lines
+            for x in range(d[0]):
+                for y in range(d[1]):
+                    for t in range(d[2]):
 
-                            # Format data
-                            RAscn = np.char.zfill(np.format_float_positional(RAs[x, y, t], 6, False), 10)
-                            Decln = np.char.zfill(np.format_float_positional(np.abs(Dcs[x, y, t]), 6, False), 9)
-                            value = np.format_float_scientific(values[x, y, t], 4, False)
-                            freq0 = np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False)
+                        # Format data
+                        RAscn = np.char.zfill(np.format_float_positional(RAs[x, y, t], 6, False), 10)
+                        Decln = np.char.zfill(np.format_float_positional(np.abs(Dcs[x, y, t]), 6, False), 9)
+                        value = np.format_float_scientific(values[x, y, t], 4, False)
+                        freq0 = np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False)
+                        linew = np.format_float_scientific(sigma_f[x, y, t], 4, False)
 
-                            # Add +/- value to Declinations
-                            if Dcs[x, y, y] >= 0: Decln = "+" + str(Decln)
-                            else:                 Decln = "-" + str(Decln)
+                        # Add +/- value to Declinations
+                        if Dcs[x, y, y] >= 0: Decln = "+" + str(Decln)
+                        else:                 Decln = "-" + str(Decln)
 
-                            # Write to OSM
-                            osm.write(
-                                str(RAscn)    + " " + # Right Ascension
-                                Decln         + " " + # Declination
-                                str(value)    + " " + # Intensity
-                                "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
-                                str(freq0)  + "e6 " + # Point source frequency
-                                "\n"
-                            )
+                        # Write to OSM
+                        osm.write(
+                            str(RAscn)    + " " + # Right Ascension
+                            Decln         + " " + # Declination
+                            str(value)    + " " + # Intensity
+                            "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
+                            str(freq0)  + "e6 " + # Point source frequency
+                            str(linew)    + " " + # Spectral profile linewidth
+                            "\n"
+                        )
 
-                        print("\rSpaxel # (", x, ",", y, ")", end="")
+                    print("\rSpaxel # (", x, ",", y, ")", end="")
 
-            print("\nProcess complete, data saved to "+osm_output)
-        else:
-            print("Recording data to .osm files")
+        print("\nProcess complete, data saved to "+osm_output+"")
 
-            if not os.path.isdir(osm_output):
-                os.mkdir("./"+osm_output)
-
-            for t in range(d[2]):
-                file_freq = np.format_float_positional(freqsum[0, 0, t] / 1e6, 3, False)
-                print("\rGenerating OSM for freq0 =", file_freq, "MHz ( file #", t+1, "of", d[2], ")", end="")
-
-                with open(osm_output+'/no.'+str(t+1)+'_'+str(file_freq)+'MHz.osm', 'w', encoding='utf8') as osm:
-                    # Clear file contents
-                    osm.truncate(0)
-
-                    # Add header lines
-                    # FIXME: Add new named-column format
-                    # FIXME: Add spectral width
-                    osm.write("# Entries Key:\n")
-                    osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6\n")
-                    osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0\n")
-
-                    # Write OSM lines
-                    for x in range(d[0]):
-                        for y in range(d[1]):
-                            # Format data
-                            RAscn = np.char.zfill(np.format_float_positional(RAs[x, y, t], 6, False), 10)
-                            Decln = np.char.zfill(np.format_float_positional(np.abs(Dcs[x, y, t]), 6, False), 9)
-                            value = np.format_float_scientific(values[x, y, t], 4, False)
-                            freq0 = np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False)
-
-                            # Add +/- value to Declinations
-                            if Dcs[x, y, y] >= 0: Decln = "+" + str(Decln)
-                            else:                 Decln = "-" + str(Decln)
-
-                            # Write to OSM
-                            osm.write(
-                                str(RAscn)    + " " + # Right Ascension
-                                Decln         + " " + # Declination
-                                str(value)    + " " + # Intensity
-                                "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
-                                str(freq0)  + "e6 " + # Point source frequency
-                                "\n"
-                            )
-
-            print("\nProcess complete, data saved to "+osm_output)
     
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, output_master_osm=False, osm_output="", coeval=True):
+    def generate_osm_from_H5(file, phase_ref_point = ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="", coeval=True):
         """
         Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
@@ -491,15 +438,14 @@ class Regrid(object):
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
-        :param output_master_osm: If true, output the entire datacube to one .osm file. If false, output a set of .osm files corresponding to each refrence frequency.
-        :param osm_output: The directory to output the osm file(s) if output_master_osm is false.
+        :param osm_output: The directory to output the osm file.
         """
 
         values, dim, z_ref, vox, cosmology = Regrid.convert_H5_to_csv(file, coeval=coeval)
 
         if osm_output == "": osm_output = file.split('/')[-1][:-3] + "_osm"
 
-        Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=vox, output_master_osm=output_master_osm, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
+        Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=vox, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
 
 class Collator(object):
     """
@@ -552,7 +498,7 @@ class Collator(object):
 
         return header
 
-    # FIXME: ignore header and defaullt to master osm
+    # FIXME: ignore header and default to master osm
     @staticmethod
     def collate_fits(fits_dir, outdir=".", headers=None):
         """
