@@ -69,7 +69,7 @@ class Regrid_Helper(object):
 
     # l, m, n to RA, Dec
     @staticmethod
-    def lm_to_radec(l, m, phase_centre=Regrid_Helper.ZERO_RADEC):
+    def lm_to_radec(l, m, phase_centre=ZERO_RADEC):
         d0 = phase_centre.dec.to_value(u.rad)
         a0 = phase_centre.ra.to_value(u.rad)
         n = np.sqrt(1-l**2-m**2)
@@ -274,30 +274,27 @@ class Regrid(object):
             return Regrid.convert_H5_coeval_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
         else:
             return Regrid.convert_H5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
-
-    # FIXME: Seperate generate_osm_from_simulation into subfunctions
+        
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = Regrid_Helper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, v = (1, 1, 1), osm_output="osm_output", cosmology=Cosmo()):
+    def transform_datacube_units(values, voxels = None, d = None, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), cosmology=Cosmo()):
         """
-        Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
+        Transform a datacube with dimensions x, y, t (cMpc x cMpc x cMpc) to ⍺, δ, f (rad x rad x Hz),
 
         :param values: The simulation datacube, must have shape d.
         :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element.
         :param d: Number of voxels in simulation in dimensions (x, y, t).
         :param z_ref: Refrence redshift, the ending redshift of the simulation.
-        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
-        :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
+        :param max_freq_res: Maximum allowable voxel frequency resolution.
         :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param osm_output: The relative path to save the osm file to.
         :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
         """
-        print("Initialising ...")
 
-        # Calculate refrence comoving dist.
-        Dz_ref = cosmology.z_to_Dz(z_ref)
-        f_ref = cosmology.z_to_f(z_ref)
-
+        # Configure d variable
+        if d is None:
+            d = values.shape()
+        
         # Set voxels array
         if voxels == None:
             print("Creating mock voxels ...")
@@ -306,11 +303,18 @@ class Regrid(object):
         # Set regrid flag
         regrid_flag = require_regrid
 
+        # Calculate refrence comoving dist.
+        Dz_ref = cosmology.z_to_Dz(z_ref)
+        f_ref = cosmology.z_to_f(z_ref)
+
         # Set cosmological redshift parameters
         Dz = Dz_ref
         z_prev = z_ref
         fq = f_ref.to_value(u.Hz)
         Dz_val = Dz_ref.to_value(u.Mpc)
+
+        # Set maximum frequency resolution
+        max_freq_res_hz = max_freq_res.to_value(u.Hz)
 
         # Set Linewidth array
         sigma_f = Regrid.brightness_temperature_to_linewidth(values)
@@ -335,7 +339,6 @@ class Regrid(object):
                     dφ = np.arctan(dy/Dz_pix)
 
                     # STEPS 2 & 3 - Convert line-of-sight comoving distance to frequency
-
                     df = 0
 
                     if (x == 0 and y == 0):
@@ -351,7 +354,7 @@ class Regrid(object):
                         df = np.abs((f_bot-f_top).to_value(u.Hz))
 
                         # STEP 7.1 - Check if regridding is needed
-                        if df > max_freq_res:
+                        if df > max_freq_res_hz:
                             regrid_flag = regrid_flag or True
 
                     else:
@@ -379,42 +382,85 @@ class Regrid(object):
 
         print("\nTransforming complete.")
 
-        # STEP 7 - Regrid frequency-dimension data if needed
-        if regrid_flag:
-            print("Performing regrid ...")
-
-            for x in range(d[0]):
-                for y in range(d[1]):
-
-                    print("\rSpaxel # (", x, ",", y, ")", end="")
-
-                    # Set the values as being in the middle of each bin
-                    freq_values = np.cumsum(voxels[x, y, :, 2]) - voxels[x, y, :, 2]/2
-
-                    # Create interpolation B-spline
-                    bspline = misp(freq_values, values[x, y, :])
-                    dspline = misp(freq_values, sigma_f[x, y, :])
-
-                    # Perform regridding
-                    new_freq, freq_bandw = np.linspace(freq_values[0], freq_values[-1], d[2], retstep=True)
-                    new_flux = np.clip(bspline(new_freq), 0, None)
-                    new_sigf = np.clip(dspline(new_freq), 0, None)
-
-                    # Create array of uniform bin sizes
-                    freq_bins = np.ones(d[2]) * freq_bandw
-
-                    # Save variables
-                    voxels[x, y, :, 2] = freq_bins
-                    values[x, y, :] = new_flux
-                    sigma_f[x, y, :] = new_sigf
-
-            print("\nRegrid complete.")
-
-        else:
-            print("No regrid required!")
+        return values, voxels, d, sigma_f, f_ref, regrid_flag
         
-        # STEP 8 - Write data to OSM file
+    @staticmethod
+    def regrid_datacube(values, voxels = None, d = None, sigma_f = None, max_freq_res=100 * u.MHz):
+        """
+        Regrids each spaxel of a sky model given a maximum frequency resolution.
+
+        :param values: The simulation datacube, must have shape d.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element.
+        :param d: Number of voxels in simulation in dimensions (x, y, t).
+        :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
+        :param max_freq_res: Maximum allowable voxel frequency resolution.
+        """
+
+        print("Performing regrid ...")
+
+        # Set maximum frequency resolution
+        max_freq_res_hz = max_freq_res.to_value(u.Hz)
+
+        # Configure d variable
+        if d is None:
+            d = values.shape()
+
+        for x in range(d[0]):
+            for y in range(d[1]):
+
+                print("\rSpaxel # (", x, ",", y, ")", end="")
+
+                # Set the values as being in the middle of each bin
+                freq_values = np.cumsum(voxels[x, y, :, 2]) - voxels[x, y, :, 2]/2
+
+                # Create interpolation B-spline
+                bspline = misp(freq_values, values[x, y, :])
+                dspline = misp(freq_values, sigma_f[x, y, :])
+
+                # Check maximum frequency resolution
+                if np.abs(freq_values[0], freq_values[-1])/d[2] > max_freq_res_hz:
+                    # Resize d[2] to match maximum resolution
+                    d[2] = np.abs(freq_values[0], freq_values[-1])/max_freq_res_hz
+
+                # Generate evenly-distributed frequency array
+                new_freq, freq_bandw = np.linspace(freq_values[0], freq_values[-1], d[2], retstep=True)
+
+                # Perform regridding
+                new_flux = np.clip(bspline(new_freq), 0, None)
+                new_sigf = np.clip(dspline(new_freq), 0, None)
+
+                # Create array of uniform bin sizes
+                freq_bins = np.ones(d[2]) * freq_bandw
+
+                # Save variables
+                voxels[x, y, :, 2] = freq_bins
+                values[x, y, :] = new_flux
+                sigma_f[x, y, :] = new_sigf
+
+        print("\nRegrid complete.")
+        
+        return values, voxels, d, sigma_f
+        
+    @staticmethod
+    def save_datacube_to_osm(values, voxels, d = None, sigma_f = None, f_ref = 180 * u.MHz, phase_ref_point = Regrid_Helper.ZENITH_530, osm_output="osm_output.fits"):
+        """
+        Saves a given datacube of flux values and voxel dimensions (RA, Dec, Freq.) to a master OSM file.
+
+        :param values: The sky model datacube, must have shape d.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element.
+        :param d: Number of voxels in sky model in dimensions (x, y, t).
+        :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
+        :param f_ref: Refrence frequency, the ending frequency of the model.
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
+        :param osm_output: The relative path to save the osm file to.
+        """
+
         print("Configuring datacube for OSKAR file format ...")
+
+        # Configure d variable
+        if d is None:
+            d = values.shape()
 
         # RA, Dec centering function
         # Add half the total and half the spaxel widths to centre the main point
@@ -474,7 +520,36 @@ class Regrid(object):
 
         print("\nProcess complete, data saved to "+osm_output)
 
-    
+    @staticmethod
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = Regrid_Helper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), osm_output="osm_output.fits", cosmology=Cosmo()):
+        """
+        Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
+
+        :param values: The simulation datacube, must have shape d.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element.
+        :param d: Number of voxels in simulation in dimensions (x, y, t).
+        :param z_ref: Refrence redshift, the ending redshift of the simulation.
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
+        :param max_freq_res: Maximum allowable voxel frequency resolution.
+        :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
+        :param osm_output: The relative path to save the osm file to.
+        :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
+        """
+        print("Initialising ...")
+
+        # Transform datacube
+        values, voxels, d, sigma_f, f_ref, regrid_flag = Regrid.transform_datacube_units(values=values, voxels=voxels, d=d, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=v, cosmology=cosmology)
+
+        # STEP 7 - Regrid frequency-dimension data if needed
+        if regrid_flag:
+            values, voxels, d, sigma_f = Regrid.regrid_datacube(values=values, voxels=voxels, d=d, sigma_f=sigma_f, max_freq_res=max_freq_res)
+        else:
+            print("No regrid required!")
+
+        # STEP 8 - Write data to OSM file
+        Regrid.save_datacube_to_osm(values=values, voxels=voxels, d=d, sigma_f=sigma_f, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
+        
     @staticmethod
     def generate_osm_from_H5(file, phase_ref_point = Regrid_Helper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="", coeval=True):
         """
@@ -712,8 +787,8 @@ class BTAnalysisPipeline(object):
             if not load_osm:
                 if template_flag:
                     print("Generating OSM files from template ...")
-                    template_value = Regrid.mock_values(template_preset)
-                    Regrid.generate_osm_from_simulation(template_value, osm_output=osm_output)
+                    template_values = Regrid.mock_values(template_preset)
+                    Regrid.generate_osm_from_simulation(template_values, osm_output=osm_output)
                 else:
                     print("Generating OSM files from H5 ...")
                     Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output=osm_output, coeval=coeval)
