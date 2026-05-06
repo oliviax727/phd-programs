@@ -23,7 +23,7 @@ import configparser as cfp
 from matplotlib import pyplot as plt
 
 # Regrid helper functions
-class RegridHelper(object):
+class RegridHelper():
     """
         Helper functions and constants for the Regridding process.
     """
@@ -108,7 +108,7 @@ class RegridHelper(object):
 
         return sorted_files
 
-class Cosmo(object):
+class Cosmo():
     """
     Define a static cosmology method for other classes to use.
     """
@@ -129,15 +129,15 @@ class Cosmo(object):
     @staticmethod
     def z_to_f(z): return 1.42e9 * u.Hz / (z + 1)
 
-class Regrid(object):
+class Regrid():
     """
     The regridding class contains functions relating to translating simulation data to OSKAR output data.
     """
 
     @staticmethod
-    def brightness_temperature_to_flux(Tb, fxy, dθ, dφ):
+    def brightness_temperature_to_flux(Tb, fxy, dtheta, dphi):
         # Calculate pixelated luminosity
-        Fv = 2 * c.k_B.value * fxy**2 * Tb * (dθ * dφ) / c.c.value ** 2
+        Fv = 2 * c.k_B.value * fxy**2 * Tb * (dtheta * dphi) / c.c.value ** 2
         Fv = Fv * 1e26 # Converts to Jansky
         return Fv
     
@@ -299,7 +299,7 @@ class Regrid(object):
             d = values.shape()
         
         # Set voxels array
-        if voxels == None:
+        if voxels is None:
             print("Creating mock voxels ...")
             voxels = np.full((*d, 3), v, dtype=np.float64)
 
@@ -338,8 +338,8 @@ class Regrid(object):
                     Dz_pix = Dz_val+dt/2 # Alter it by the CENTRAL pixel value
 
                     # Calculate transformed dimensions
-                    dθ = np.arctan(dx/Dz_pix)
-                    dφ = np.arctan(dy/Dz_pix)
+                    dtheta = np.arctan(dx/Dz_pix)
+                    dphi = np.arctan(dy/Dz_pix)
 
                     # STEPS 2 & 3 - Convert line-of-sight comoving distance to frequency
                     df = 0
@@ -367,11 +367,11 @@ class Regrid(object):
                     fxy = fq + df/2
                       
                     # Calculate pixelated luminosity
-                    Fv = Regrid.brightness_temperature_to_flux(Tb=Tb, fxy=fxy, dθ=dθ, dφ=dφ)
+                    Fv = Regrid.brightness_temperature_to_flux(Tb=Tb, fxy=fxy, dtheta=dtheta, dphi=dphi)
                 
                     # Save values
-                    voxels[x, y, t, 0] = dθ
-                    voxels[x, y, t, 1] = dφ
+                    voxels[x, y, t, 0] = dtheta
+                    voxels[x, y, t, 1] = dphi
                     voxels[x, y, t, 2] = df
                     values[x, y, t] = Fv
             
@@ -498,8 +498,8 @@ class Regrid(object):
                     for t in range(d[2]):
 
                         # Format data
-                        RAscn = np.char.zfill(np.format_float_positional(RAs[x, y, t], 6, False), 10)
-                        Decln = np.char.zfill(np.format_float_positional(np.abs(Dcs[x, y, t]), 6, False), 9)
+                        rascn = np.char.zfill(np.format_float_positional(RAs[x, y, t], 6, False), 10)
+                        decln = np.char.zfill(np.format_float_positional(np.abs(Dcs[x, y, t]), 6, False), 9)
                         value = np.format_float_scientific(values[x, y, t], 4, False)
                         freq0 = np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False)
                         linew = np.format_float_scientific(sigma_f[x, y, t], 4, False)
@@ -510,8 +510,8 @@ class Regrid(object):
 
                         # Write to OSM
                         osm.write(
-                            str(RAscn)    + " " + # Right Ascension
-                            Decln         + " " + # Declination
+                            str(rascn)    + " " + # Right Ascension
+                            decln         + " " + # Declination
                             str(value)    + " " + # Intensity
                             "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
                             str(freq0)  + "e6 " + # Point source frequency
@@ -590,13 +590,13 @@ class BTAnalysisPipeline(object):
         print(osm_file)
 
         # Calculate RA dimension
-        RAc = RegridHelper.diff(np.array(df['RA'])[-1], np.array(df['RA'])[0])
+        rac = RegridHelper.diff(np.array(df['RA'])[-1], np.array(df['RA'])[0])
 
         # Calculate Dec dimension
-        Decc = RegridHelper.diff(np.array(df['Dec'])[-1], np.array(df['Dec'])[0])
+        decc = RegridHelper.diff(np.array(df['Dec'])[-1], np.array(df['Dec'])[0])
 
         # Calculate FOV
-        fov = max(RAc, Decc)
+        fov = max(rac, decc)
 
         # Get number of voxels on a side
         n = np.sqrt(len(np.array(df['RA'])))
@@ -630,7 +630,7 @@ class BTAnalysisPipeline(object):
 
         :param osm_dir: Directory containing the OSM files to be imaged.
         :param imager_template_ini: The file location of the OSKAR imager settings file.
-        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
+        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file.
         :param fits_output: The directory and file to output the resultant FITS files.
         :param oskar_exec: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
@@ -698,14 +698,14 @@ class BTAnalysisPipeline(object):
         subprocess.run(["cp","BTA/oskar_output/sim_image_I.fits",fits_output], check=True)
 
     @staticmethod
-    def setup_BTA_dir(h5_file, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
+    def setup_bta_dir(h5_file, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
         """
         Sets up the operating directory from which all anaysis will be done.
 
         :param h5_file: The location of the H5 file.
         :param cd_in: Whether to cd into the directory once finished or not.
         :param imager_template_ini: The file location of the OSKAR imager settings file.
-        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
+        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param template: If true, handle and return no h5 data.
         :return: The new location of the H5, imager ini, and interterometer template ini files, as well as the telescope model location. Also returns the PWD if cd_in is True.
@@ -727,7 +727,7 @@ class BTAnalysisPipeline(object):
         return ("BTA/analysis.h5" if not template else ""), "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
 
     @staticmethod
-    def clean_BTA_dir(outdir, fits_output, clean=True):
+    def clean_bta_dir(outdir, fits_output, clean=True):
         """
         Finishes and cleans up the mess created by the BTA class.
 
@@ -743,16 +743,17 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False):
+    def h5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
         :param file: Location of the H5 file.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
-        :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
+        :param require_regrid: If true then always regrid frequency bins, if false,
+        regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
         :param imager_template_ini: The file location of the OSKAR imager settings file.
-        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file. The ini file must contain a line under [observation] with text "fset" in liu of the start_frequency_hz setting, and a line under [sky] with text "preset" in liu of the oskar_sky_model/file setting.
+        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file.
         :param outdir: The output location of the final FITS file.
         :param oskar_exec: The SIF file or location of compiled OSKAR binaries.
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
@@ -778,7 +779,13 @@ class BTAnalysisPipeline(object):
         template_flag = (template_preset != "")
 
         print("Setting up BTA directory ...")
-        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_BTA_dir(file, oskar_telescope_model=oskar_telescope_model, imager_template_ini=imager_template_ini, interferometer_template_ini=interferometer_template_ini, template=template_flag)
+        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_bta_dir(
+            file,
+            oskar_telescope_model=oskar_telescope_model,
+            imager_template_ini=imager_template_ini,
+            interferometer_template_ini=interferometer_template_ini,
+            template=template_flag
+            )
 
         # Create output file locations
         h5_id = file.split('/')[-1][:-3] if not template_flag else template_preset
@@ -794,19 +801,34 @@ class BTAnalysisPipeline(object):
                     Regrid.generate_osm_from_simulation(template_values, osm_output=osm_output)
                 else:
                     print("Generating OSM files from H5 ...")
-                    Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output=osm_output, coeval=coeval)
+                    Regrid.generate_osm_from_H5(
+                        h5_file,
+                        phase_ref_point=phase_ref_point,
+                        require_regrid=require_regrid,
+                        max_freq_res=max_freq_res,
+                        osm_output=osm_output,
+                        coeval=coeval
+                        )
             else:
                 subprocess.run(["cp", file, osm_output], check=True)
 
         print("Running OSKAR ...")
-        BTAnalysisPipeline.run_oskar_on_osms(osm_output, imager_template_ini=img_temp_ini, interferometer_template_ini=intif_temp_ini, fits_output=fits_output, oskar_exec=oskar_exec, oskar_mode=oskar_mode)
+        BTAnalysisPipeline.run_oskar_on_osms(
+            osm_output,
+            imager_template_ini=img_temp_ini,
+            interferometer_template_ini=intif_temp_ini,
+            fits_output=fits_output,
+            oskar_exec=oskar_exec,
+            oskar_mode=oskar_mode
+            )
 
         # If clean is true remove all data relating to execution
         print("Cleaning up ...")
-        BTAnalysisPipeline.clean_BTA_dir(outdir=outdir, fits_output=fits_output, clean=clean)
+        BTAnalysisPipeline.clean_bta_dir(outdir=outdir, fits_output=fits_output, clean=clean)
 
 
 # Testing stage
+# pylint: disable=line-too-long
 
 #Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_non_uniform_zenith_osm", coeval=True, require_regrid=False)
 #Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_00_osm", coeval=True, phase_ref_point=RegridHelper.ZERO_RADEC)
@@ -819,6 +841,6 @@ class BTAnalysisPipeline(object):
 #Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
 #Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
 
-#BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
+#BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
 
-BTAnalysisPipeline.H5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
+BTAnalysisPipeline.h5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
