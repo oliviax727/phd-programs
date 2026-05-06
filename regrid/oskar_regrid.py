@@ -37,31 +37,62 @@ class RegridHelper():
     SIGMA_F     = (np.sqrt(c.k_B / (1.008 * c.u * (21.106 * u.cm)**2))).to(u.Hz*u.K**-0.5).value
 
     # Define default settings
-    # FIXME: Edit default settings
-    DEFAULT_INI = {
+    
+    # Calculated settings: [observation] num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, [interferometer] channel_bandwidth_hz
+    DEFAULT_INTERFEROMETER_SETTINGS = {
+        "general": {
+            "app": "oskar_sim_interferometer"
+        },
         "simulator": {
             "use_gpus": False
         },
         "observation" : {
-            "num_channels": 1,
-            "start_frequency_hz": 177.408e6,
-            "frequency_inc_hz": 20e6,
-            "phase_centre_ra_deg": 0.0,
-            "phase_centre_dec_deg": -27.0,
-            "num_time_steps": 8,
+            "num_time_steps": 24,
             "start_time_utc": "2025-03-03 05:30:00.00",
-            "length": "00:02:00.000"
+            "length": "04:00:00.000"
         },
         "telescope": {
-            "input_directory": "../oskar_run_stage/telescope_model_AAstar"
+            "input_directory": "telescope_model",
+            "apeture_array": {
+                "element_pattern": {
+                    "enable_numerical": "false"
+                },
+                "array_pattern": {
+                    "element": {
+                        "x_gain": 1.0,
+                        "y_gain": 1.0,
+                        "x_gain_error_time": 0.0015057,
+                        "y_gain_error_time": 0.0015057,
+                        "x_phase_error_fixed_deg": 0.0,
+                        "y_phase_error_fixed_deg": 0.0,
+                        "x_phase_error_time_deg": 0.0015057,
+                        "y_phase_error_time_deg": 0.0015057
+                    }
+                }
+            }
         },
         "interferometer": {
             "oskar_vis_filename": "oskar_output/vis.vis",
             "ms_filename": "oskar_output/sim.ms",
             "channel_bandwidth_hz": 1e6,
-            "time_average_sec": 10.0
+            "time_average_sec": 10.0,
+            "uv_filter_max": 1000,
+            "uv_filter_units": "Wavelengths"
         },
         "sky": {}
+    }
+
+    # Calculated settings: [image] fov_deg, size
+    DEFAULT_IMAGER_SETTINGS = {
+        "general": {
+            "app": "oskar_imager"
+        },
+        "image": {
+            "use_gpus": False,
+            "channel_snapshots": "false",
+            "input_vis_data": "output/sim.ms",
+            "root_path": "output/sim_image"
+        }
     }
 
     # Angular distance calculation
