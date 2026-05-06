@@ -17,7 +17,7 @@ from astropy.cosmology import z_at_value as getz
 from scipy.interpolate import make_interp_spline as misp
 import configparser as cfp
 
-# FIXME: Turn into pip project (later)
+# TODO: Turn into pip project (later)
 
 # pylint: disable-next=unused-import
 from matplotlib import pyplot as plt
@@ -37,8 +37,6 @@ class RegridHelper():
     SIGMA_F     = (np.sqrt(c.k_B / (1.008 * c.u * (21.106 * u.cm)**2))).to(u.Hz*u.K**-0.5).value
 
     # Define default settings
-    
-    # Calculated settings: [observation] num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, [interferometer] channel_bandwidth_hz
     DEFAULT_INTERFEROMETER_SETTINGS = {
         "general": {
             "app": "oskar_sim_interferometer"
@@ -82,7 +80,6 @@ class RegridHelper():
         "sky": {}
     }
 
-    # Calculated settings: [image] fov_deg, size
     DEFAULT_IMAGER_SETTINGS = {
         "general": {
             "app": "oskar_imager"
@@ -138,6 +135,53 @@ class RegridHelper():
         sorted_files, _ = zip(*np.sort(np.array(list(map(sort_prep, files)), dtype=sort_type), order="num"))
 
         return sorted_files
+    
+    @staticmethod
+    def get_osm_sky_dimensions(osm_file):
+        """
+        Get the pixel count for a FITS file with it's corresponding OSKAR sky model.
+
+        :param osm_file: The OSM file to analyse.
+        :return: The ideal image size and fov
+        """
+
+        df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
+
+        print(osm_file)
+
+        # Calculate RA dimension
+        rac = RegridHelper.diff(np.array(df['RA'])[-1], np.array(df['RA'])[0])
+
+        # Calculate Dec dimension
+        decc = RegridHelper.diff(np.array(df['Dec'])[-1], np.array(df['Dec'])[0])
+
+        # Calculate FOV
+        fov = max(rac, decc)
+
+        # Get number of voxels on a side
+        n = np.sqrt(len(np.array(df['RA'])))
+
+        return n, fov
+    
+    @staticmethod
+    def find_replace_line(file_name, find_line, replace_line):
+        """
+        Replace a given line in a settings.ini file given the line is equal to a special string.
+        
+        :param file: The file to perform the find-and-replace.
+        :param find_line: The special keyword to trigger a replace.
+        :param replace_line: The line to replace the preset.
+        """
+
+        with open(file_name, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        with open(file_name, 'w', encoding='utf-8') as file:
+            for line in lines:
+                if line.startswith(find_line):
+                    file.write(replace_line+"\n")
+                else:
+                    file.write(line)
 
 class Cosmo():
     """
@@ -184,6 +228,7 @@ class Regrid():
 
         :param preset: Mock brightness temperature array format. Options are {"flat", "random", "gaussian", "sinusoid"}
         :param scale: Define the Kelvin scale of the array (e.g. default value will create a uniform array of 10 K or a random array of 0 - 10 K).
+        :param d: The size of the values datacube.
         :return: Mock brightness temperature values.
         """
         print("Creating mock brightness temperatures ...")
@@ -214,6 +259,8 @@ class Regrid():
         elif preset == "point":
             # Point source with diffusion of 2-Sigma
             values = normal(values, var=2)
+
+        # FIXME: Add OzStar H5 files as template files
 
         return values.astype(np.float64)
 
@@ -310,13 +357,12 @@ class Regrid():
             return Regrid.convert_H5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
         
     @staticmethod
-    def transform_datacube_units(values, voxels = None, d = None, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), cosmology=Cosmo()):
+    def transform_datacube_units(values, voxels = None, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), cosmology=Cosmo()):
         """
         Transform a datacube with dimensions x, y, t (cMpc x cMpc x cMpc) to ⍺, δ, f (rad x rad x Hz),
 
-        :param values: The simulation datacube, must have shape d.
+        :param values: The simulation datacube.
         :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element.
-        :param d: Number of voxels in simulation in dimensions (x, y, t).
         :param z_ref: Refrence redshift, the ending redshift of the simulation.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution.
@@ -326,8 +372,7 @@ class Regrid():
         """
 
         # Configure d variable
-        if d is None:
-            d = values.shape()
+        d = values.shape()
         
         # Set voxels array
         if voxels is None:
@@ -416,16 +461,15 @@ class Regrid():
 
         print("\nTransforming complete.")
 
-        return values, voxels, d, sigma_f, f_ref, regrid_flag
+        return values, voxels, sigma_f, f_ref, regrid_flag
         
     @staticmethod
     def regrid_datacube(values, voxels = None, d = None, sigma_f = None, max_freq_res=100 * u.MHz):
         """
         Regrids each spaxel of a sky model given a maximum frequency resolution.
 
-        :param values: The simulation datacube, must have shape d.
+        :param values: The simulation datacube.
         :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element.
-        :param d: Number of voxels in simulation in dimensions (x, y, t).
         :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
         :param max_freq_res: Maximum allowable voxel frequency resolution.
         """
@@ -436,8 +480,7 @@ class Regrid():
         max_freq_res_hz = max_freq_res.to_value(u.Hz)
 
         # Configure d variable
-        if d is None:
-            d = values.shape()
+        d = values.shape()
 
         for x in range(d[0]):
             for y in range(d[1]):
@@ -473,16 +516,15 @@ class Regrid():
 
         print("\nRegrid complete.")
         
-        return values, voxels, d, sigma_f
+        return values, voxels, sigma_f
         
     @staticmethod
-    def save_datacube_to_osm(values, voxels, d = None, sigma_f = None, f_ref = 180 * u.MHz, phase_ref_point = RegridHelper.ZENITH_530, osm_output="osm_output.fits"):
+    def save_datacube_to_osm(values, voxels, sigma_f = None, f_ref = 180 * u.MHz, phase_ref_point = RegridHelper.ZENITH_530, osm_output="regrid/osm_output/osm_output.osm"):
         """
         Saves a given datacube of flux values and voxel dimensions (RA, Dec, Freq.) to a master OSM file.
 
-        :param values: The sky model datacube, must have shape d.
+        :param values: The sky model datacube.
         :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element.
-        :param d: Number of voxels in sky model in dimensions (x, y, t).
         :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
         :param f_ref: Refrence frequency, the ending frequency of the model.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
@@ -493,8 +535,7 @@ class Regrid():
         print("Configuring datacube for OSKAR file format ...")
 
         # Configure d variable
-        if d is None:
-            d = values.shape()
+        d = values.shape()
 
         # RA, Dec centering function
         # Add half the total and half the spaxel widths to centre the main point
@@ -554,14 +595,32 @@ class Regrid():
 
         print("\nProcess complete, data saved to "+osm_output)
 
+    # FIXME: Generate Dynamic Settings
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), osm_output="osm_output.fits", cosmology=Cosmo()):
+    def generate_dynamic_settings(values, voxels = None, phase_ref_point = RegridHelper.ZENITH_530, f_ref = 100 * u.MHz):
+        """
+        Generates a set of dynamically-set ini settings for OSKAR to utilise.
+
+        :param values: The simulation datacube.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element.
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param f_ref: Refrence frequency, the ending frequency of the model.
+        :return: The dynamically defined settings dictionary.
+        """
+        # Calculated settings: [observation] num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, [interferometer] channel_bandwidth_hz
+        # Calculated settings: [image] fov_deg, size
+
+        # Configure d variable
+        d = values.shape()
+
+        return {}
+
+    @staticmethod
+    def generate_osm_from_simulation(values, voxels = None, z_ref = 7, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), osm_output="regrid/osm_output/osm_output.osm", cosmology=Cosmo(), save_dynamic_settings = ""):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
-        :param values: The simulation datacube, must have shape d.
-        :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element.
-        :param d: Number of voxels in simulation in dimensions (x, y, t).
+        :param values: The simulation datacube.
         :param z_ref: Refrence redshift, the ending redshift of the simulation.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
@@ -569,23 +628,34 @@ class Regrid():
         :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param osm_output: The relative path to save the osm file to.
         :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
+        :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
+        :return: The dynamically defined settings dictionary.
         """
         print("Initialising ...")
 
         # Transform datacube
-        values, voxels, d, sigma_f, f_ref, regrid_flag = Regrid.transform_datacube_units(values=values, voxels=voxels, d=d, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=v, cosmology=cosmology)
+        values, voxels, sigma_f, f_ref, regrid_flag = Regrid.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=v, cosmology=cosmology)
 
         # STEP 7 - Regrid frequency-dimension data if needed
         if regrid_flag:
-            values, voxels, d, sigma_f = Regrid.regrid_datacube(values=values, voxels=voxels, d=d, sigma_f=sigma_f, max_freq_res=max_freq_res)
+            values, voxels, sigma_f = Regrid.regrid_datacube(values=values, voxels=voxels, sigma_f=sigma_f, max_freq_res=max_freq_res)
         else:
             print("No regrid required!")
 
         # STEP 8 - Write data to OSM file
-        Regrid.save_datacube_to_osm(values=values, voxels=voxels, d=d, sigma_f=sigma_f, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
+        Regrid.save_datacube_to_osm(values=values, voxels=voxels, sigma_f=sigma_f, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
+
+        # Output dynamic settings file
+        dynamic_settings = Regrid.generate_dynamic_settings(values=values, voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
+
+        if save_dynamic_settings:
+            # FIXME: Save dynamic settings
+            print(0)
+
+        return dynamic_settings
         
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="", coeval=True):
+    def generate_osm_from_H5(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="regrid/osm_output/osm_output.osm", coeval=True):
         """
         Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
@@ -594,89 +664,37 @@ class Regrid():
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
         :param osm_output: The directory to output the osm file.
+        :return: The dynamically defined settings dictionary.
         """
 
-        values, dim, z_ref, vox, cosmology = Regrid.convert_H5_to_csv(file, coeval=coeval)
+        values, z_ref, vox, cosmology = Regrid.convert_H5_to_csv(file, coeval=coeval)
 
-        if osm_output == "": osm_output = file.split('/')[-1][:-3] + "_osm"
+        if osm_output == "": osm_output = file.split('/')[-1][:-3] + "_osm.osm"
 
-        Regrid.generate_osm_from_simulation(values, d=dim, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=vox, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
+        return Regrid.generate_osm_from_simulation(values, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=vox, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
 
 class BTAnalysisPipeline(object):
     """
     A broader class that combines all components of the individual components of the simulated IGM to simulated observation pipeline together.
     """
 
+    # FIXME: Implement config parser
     @staticmethod
-    def get_osm_sky_dimensions(osm_file):
+    def configure_oskar_settings(osm_file, dynamic_settings, interferometer_settings_override = "", imager_settings_override = "", use_imager=True, save_dir=""):
         """
-        Get the pixel count for a FITS file with it's corresponding OSKAR sky model.
+        Configure the settings files for the OSKAR interferometer and imager programs.
 
-        :param osm_file: The OSM file to analyse.
-        :return: The ideal image size and fov
+        :param osm_file: Directory containing the OSM files to be imaged.
+        :param dynamic_settings: Dynamically generated settings from the regridding code.
+        :param interferometer_settings_override: The file location of the OSKAR imager settings file. Leave blank if no override.
+        :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
+        :param use_imager: Whether or not to generate a dirty image with oskar_imager.
+        :param save_dir: Directory to save the compiled ini file. If blank, pass the settings only as a return.
+        :return: The updated settings dictionary.
         """
-
-        df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
-
-        print(osm_file)
-
-        # Calculate RA dimension
-        rac = RegridHelper.diff(np.array(df['RA'])[-1], np.array(df['RA'])[0])
-
-        # Calculate Dec dimension
-        decc = RegridHelper.diff(np.array(df['Dec'])[-1], np.array(df['Dec'])[0])
-
-        # Calculate FOV
-        fov = max(rac, decc)
-
-        # Get number of voxels on a side
-        n = np.sqrt(len(np.array(df['RA'])))
-
-        return n, fov
-    
-    @staticmethod
-    def find_replace_line(file_name, find_line, replace_line):
-        """
-        Replace a given line in a settings.ini file given the line is equal to a special string.
-        
-        :param file: The file to perform the find-and-replace.
-        :param find_line: The special keyword to trigger a replace.
-        :param replace_line: The line to replace the preset.
-        """
-
-        with open(file_name, 'r', encoding='utf-8') as file:
-            lines = file.readlines()
-
-        with open(file_name, 'w', encoding='utf-8') as file:
-            for line in lines:
-                if line.startswith(find_line):
-                    file.write(replace_line+"\n")
-                else:
-                    file.write(line)
-
-    @staticmethod
-    def run_oskar_on_osms(osm_file, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="./fits_output.fits", oskar_exec=RegridHelper.OSKAR_SIF, oskar_mode="singularity"):
-        """
-        Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
-
-        :param osm_dir: Directory containing the OSM files to be imaged.
-        :param imager_template_ini: The file location of the OSKAR imager settings file.
-        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file.
-        :param fits_output: The directory and file to output the resultant FITS files.
-        :param oskar_exec: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
-        :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
-        """
-        # FIXME: Provide options for all four execution modes.
-        # Create the output files
-        subprocess.run(["mkdir","-p","BTA/oskar_output"], check=True)
-        subprocess.run(["mkdir","-p","BTA/oskar_output/sim.ms"], check=True)
 
         # Get FOV and Image size
-        size, fov = BTAnalysisPipeline.get_osm_sky_dimensions("BTA/"+osm_file)
-
-        print("Setting up OSKAR for "+osm_file)
-        
-        # FIXME: Implement config parser
+        #size, fov = BTAnalysisPipeline.get_osm_sky_dimensions("BTA/"+osm_file)
 
         # Setup the interferometer ini file
         # FIXME: Write to new interferometer file and copy over settings
@@ -701,6 +719,43 @@ class BTAnalysisPipeline(object):
             #ofname = "fov_deg="+str(fov)
             #BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "fovset", ofname)
 
+        if use_imager:
+            return {}, {}
+        else:
+            return {}
+            
+
+    @staticmethod
+    def run_oskar_on_osms(osm_file, dynamic_settings={}, interferometer_settings_override = "", imager_settings_override = "", fits_output="./fits_output.fits", oskar_exec=RegridHelper.OSKAR_SIF, oskar_mode="singularity", use_imager=True):
+        """
+        Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
+
+        :param osm_file: Directory containing the OSM files to be imaged.
+        :param dynamic_settings: Dynamically generated settings from the regridding code.
+        :param interferometer_settings_override: The file location of the OSKAR imager settings file. Leave blank if no override.
+        :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
+        :param fits_output: The directory and file to output the resultant FITS files.
+        :param oskar_exec: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
+        :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
+        :param use_imager: Whether or not to generate a dirty image with oskar_imager.
+        """
+
+        # TODO: Provide options for all four execution modes.
+        # Create the output files
+        subprocess.run(["mkdir","-p","BTA/oskar_output"], check=True)
+        subprocess.run(["mkdir","-p","BTA/oskar_output/sim.ms"], check=True)
+
+        print("Setting up OSKAR for "+osm_file)
+        
+        intif_settings, img_settings = BTAnalysisPipeline.configure_oskar_settings(
+            osm_file=osm_file,
+            dynamic_settings=dynamic_settings,
+            interferometer_settings_override=interferometer_settings_override,
+            imager_settings_override=imager_settings_override,
+            use_imager=use_imager,
+            save_dir="BTA"
+            )
+
         cwd = os.getcwd()+'/BTA'
 
         # Run OSKAR's interferometer simulation
@@ -715,32 +770,32 @@ class BTAnalysisPipeline(object):
             print(f"Error output: {e.stderr.decode()}")
 
         # Run OSKAR's imager simulation
-        try:
-            print("Running imager on "+osm_file)
-            if oskar_mode == "singularity":
-                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
-            elif oskar_mode == "binary":
-                subprocess.run([oskar_exec+"/oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
-        except subprocess.CalledProcessError as e:
-            print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
-            print(f"Error output: {e.stderr.decode()}")
+        if use_imager:
+            try:
+                print("Running imager on "+osm_file)
+                if oskar_mode == "singularity":
+                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                elif oskar_mode == "binary":
+                    subprocess.run([oskar_exec+"/oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+            except subprocess.CalledProcessError as e:
+                print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
+                print(f"Error output: {e.stderr.decode()}")
 
         subprocess.run(["find",".","-name","'*.log'","-type","f","-delete"], check=True, cwd=cwd)
         subprocess.run(["cp","BTA/oskar_output/sim_image_I.fits",fits_output], check=True)
 
     @staticmethod
-    def setup_bta_dir(h5_file, imager_template_ini="./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
+    def setup_bta_dir(h5_file, interferometer_settings_override="./regrid/test_intif_inis/test_img_gen.ini", imager_settings_override="./regrid/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
         """
         Sets up the operating directory from which all anaysis will be done.
 
         :param h5_file: The location of the H5 file.
         :param cd_in: Whether to cd into the directory once finished or not.
-        :param imager_template_ini: The file location of the OSKAR imager settings file.
-        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file.
+        :param interferometer_settings_override: The file location of the OSKAR imager settings file. Leave blank if no override.
+        :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param template: If true, handle and return no h5 data.
         :return: The new location of the H5, imager ini, and interterometer template ini files, as well as the telescope model location. Also returns the PWD if cd_in is True.
-        :param osm_dir: If a set of osms have already been generated, use the path to the directory specified to find the osms.
         """
 
         cwd = os.getcwd()
@@ -750,8 +805,8 @@ class BTAnalysisPipeline(object):
 
         # 2. Move H5 file and INIs to directory
         if not template: subprocess.run(["cp",h5_file,"BTA/analysis.h5"], check=True)
-        subprocess.run(["cp",imager_template_ini,"BTA/imager_template.ini"], check=True)
-        subprocess.run(["cp",interferometer_template_ini,"BTA/interferometer_template.ini"], check=True)
+        subprocess.run(["cp",interferometer_settings_override,"BTA/imager_template.ini"], check=True)
+        subprocess.run(["cp",imager_settings_override,"BTA/interferometer_template.ini"], check=True)
         if not os.path.isdir("BTA/telescope_model"):
             subprocess.run(["cp","-r",oskar_telescope_model,"BTA/telescope_model"], check=True)
 
@@ -774,7 +829,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def h5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False):
+    def h5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, interferometer_settings_override = "./regrid/test_intif_inis/test_img_gen.ini", imager_settings_override = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -783,8 +838,8 @@ class BTAnalysisPipeline(object):
         :param require_regrid: If true then always regrid frequency bins, if false,
         regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
-        :param imager_template_ini: The file location of the OSKAR imager settings file.
-        :param interferometer_template_ini: The file location of the OSKAR interferometer settings template file.
+        :param interferometer_settings_override: The file location of the OSKAR imager settings file.
+        :param imager_settings_override: The file location of the OSKAR interferometer settings template file.
         :param outdir: The output location of the final FITS file.
         :param oskar_exec: The SIF file or location of compiled OSKAR binaries.
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
@@ -799,8 +854,8 @@ class BTAnalysisPipeline(object):
             oskar_exec = RegridHelper.expand_path(oskar_exec)
         
         file = RegridHelper.expand_path(file)
-        interferometer_template_ini = RegridHelper.expand_path(interferometer_template_ini)
-        imager_template_ini = RegridHelper.expand_path(imager_template_ini)
+        imager_settings_override = RegridHelper.expand_path(imager_settings_override)
+        interferometer_settings_override = RegridHelper.expand_path(interferometer_settings_override)
         oskar_telescope_model = RegridHelper.expand_path(oskar_telescope_model)
         outdir = RegridHelper.expand_path(outdir)
         
@@ -810,11 +865,10 @@ class BTAnalysisPipeline(object):
         template_flag = (template_preset != "")
 
         print("Setting up BTA directory ...")
-        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_bta_dir(
-            file,
+        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_bta_dir(file,
             oskar_telescope_model=oskar_telescope_model,
-            imager_template_ini=imager_template_ini,
-            interferometer_template_ini=interferometer_template_ini,
+            interferometer_settings_override=interferometer_settings_override,
+            imager_settings_override=imager_settings_override,
             template=template_flag
             )
 
@@ -822,6 +876,9 @@ class BTAnalysisPipeline(object):
         h5_id = file.split('/')[-1][:-3] if not template_flag else template_preset
         osm_output = RegridHelper.expand_path("BTA/" + h5_id + "_sky.osm")
         fits_output = RegridHelper.expand_path("BTA/" + h5_id + "_image.fits")
+
+        # Set the default dynamic settings array
+        dynamic_settings={}
         
         # Run the OSM generator
         if not os.path.isfile(osm_output):
@@ -829,28 +886,21 @@ class BTAnalysisPipeline(object):
                 if template_flag:
                     print("Generating OSM files from template ...")
                     template_values = Regrid.mock_values(template_preset)
-                    Regrid.generate_osm_from_simulation(template_values, osm_output=osm_output)
+                    dynamic_settings = Regrid.generate_osm_from_simulation(template_values, osm_output=osm_output)
                 else:
                     print("Generating OSM files from H5 ...")
-                    Regrid.generate_osm_from_H5(
-                        h5_file,
-                        phase_ref_point=phase_ref_point,
-                        require_regrid=require_regrid,
-                        max_freq_res=max_freq_res,
-                        osm_output=osm_output,
-                        coeval=coeval
-                        )
+                    dynamic_settings = Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output=osm_output, coeval=coeval)
             else:
                 subprocess.run(["cp", file, osm_output], check=True)
 
         print("Running OSKAR ...")
         BTAnalysisPipeline.run_oskar_on_osms(
             osm_output,
-            imager_template_ini=img_temp_ini,
-            interferometer_template_ini=intif_temp_ini,
-            fits_output=fits_output,
-            oskar_exec=oskar_exec,
-            oskar_mode=oskar_mode
+            interferometer_settings_override=img_temp_ini,
+            imager_settings_override=intif_temp_ini,
+            fits_output=fits_output, oskar_exec=oskar_exec,
+            oskar_mode=oskar_mode,
+            dynamic_settings=dynamic_settings
             )
 
         # If clean is true remove all data relating to execution
