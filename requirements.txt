@@ -8,3 +8,5 @@ configparser
 jupyter
 ipython
 pdoc
+pylint
+pylint-venv

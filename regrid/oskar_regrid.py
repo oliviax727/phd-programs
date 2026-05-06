@@ -1,4 +1,7 @@
 #!.venv/bin/python
+"""
+The oskar_regrid module contains all funtions that help convert early universe simulations into sky models, measurement sets, and power spectra for the analysis of simulated SKA observations.
+"""
 
 # Import the stuffs
 import os
@@ -20,7 +23,7 @@ import configparser as cfp
 from matplotlib import pyplot as plt
 
 # Regrid helper functions
-class Regrid_Helper(object):
+class RegridHelper(object):
     """
         Helper functions and constants for the Regridding process.
     """
@@ -63,9 +66,9 @@ class Regrid_Helper(object):
 
     # Angular distance calculation
     norm = lambda t: (t % 360 + 360) % 360 - 180
-    delta = lambda a, b: Regrid_Helper.norm(a)-Regrid_Helper.norm(b)
-    diff = lambda a, b: min(abs(Regrid_Helper.delta(a, b)),360-abs(Regrid_Helper.delta(a, b)))
-    diff_sgn = lambda a, b: Regrid_Helper.delta(a, b) - 360 if Regrid_Helper.delta(a, b) > 180 else (Regrid_Helper.delta(a, b) + 360 if Regrid_Helper.delta(a, b) < -180 else Regrid_Helper.delta(a, b))
+    delta = lambda a, b: RegridHelper.norm(a)-RegridHelper.norm(b)
+    diff = lambda a, b: min(abs(RegridHelper.delta(a, b)),360-abs(RegridHelper.delta(a, b)))
+    diff_sgn = lambda a, b: RegridHelper.delta(a, b) - 360 if RegridHelper.delta(a, b) > 180 else (RegridHelper.delta(a, b) + 360 if RegridHelper.delta(a, b) < -180 else RegridHelper.delta(a, b))
 
     # l, m, n to RA, Dec
     @staticmethod
@@ -141,7 +144,7 @@ class Regrid(object):
     @staticmethod
     def brightness_temperature_to_linewidth(Tb):
         # Calculate linewidth in Hz
-        return (Tb ** 0.5) * Regrid_Helper.SIGMA_F
+        return (Tb ** 0.5) * RegridHelper.SIGMA_F
 
     @staticmethod
     def mock_values(preset, scale = 10, d = (100, 100, 100)):
@@ -442,7 +445,7 @@ class Regrid(object):
         return values, voxels, d, sigma_f
         
     @staticmethod
-    def save_datacube_to_osm(values, voxels, d = None, sigma_f = None, f_ref = 180 * u.MHz, phase_ref_point = Regrid_Helper.ZENITH_530, osm_output="osm_output.fits"):
+    def save_datacube_to_osm(values, voxels, d = None, sigma_f = None, f_ref = 180 * u.MHz, phase_ref_point = RegridHelper.ZENITH_530, osm_output="osm_output.fits"):
         """
         Saves a given datacube of flux values and voxel dimensions (RA, Dec, Freq.) to a master OSM file.
 
@@ -521,7 +524,7 @@ class Regrid(object):
         print("\nProcess complete, data saved to "+osm_output)
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = Regrid_Helper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), osm_output="osm_output.fits", cosmology=Cosmo()):
+    def generate_osm_from_simulation(values, voxels = None, d = (100, 100, 100), z_ref = 7, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), osm_output="osm_output.fits", cosmology=Cosmo()):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -551,7 +554,7 @@ class Regrid(object):
         Regrid.save_datacube_to_osm(values=values, voxels=voxels, d=d, sigma_f=sigma_f, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
         
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = Regrid_Helper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="", coeval=True):
+    def generate_osm_from_H5(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="", coeval=True):
         """
         Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
@@ -587,10 +590,10 @@ class BTAnalysisPipeline(object):
         print(osm_file)
 
         # Calculate RA dimension
-        RAc = Regrid_Helper.diff(np.array(df['RA'])[-1], np.array(df['RA'])[0])
+        RAc = RegridHelper.diff(np.array(df['RA'])[-1], np.array(df['RA'])[0])
 
         # Calculate Dec dimension
-        Decc = Regrid_Helper.diff(np.array(df['Dec'])[-1], np.array(df['Dec'])[0])
+        Decc = RegridHelper.diff(np.array(df['Dec'])[-1], np.array(df['Dec'])[0])
 
         # Calculate FOV
         fov = max(RAc, Decc)
@@ -621,7 +624,7 @@ class BTAnalysisPipeline(object):
                     file.write(line)
 
     @staticmethod
-    def run_oskar_on_osms(osm_file, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="./fits_output.fits", oskar_exec=Regrid_Helper.OSKAR_SIF, oskar_mode="singularity"):
+    def run_oskar_on_osms(osm_file, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./test_intif_inis/test_intif_gen.ini", fits_output="./fits_output.fits", oskar_exec=RegridHelper.OSKAR_SIF, oskar_mode="singularity"):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
 
@@ -740,7 +743,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def H5_box_to_datacube(file, phase_ref_point = Regrid_Helper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = Regrid_Helper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = Regrid_Helper.TELESCOPE, template_preset = "", coeval = True, load_osm=False):
+    def H5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, imager_template_ini = "./regrid/test_intif_inis/test_img_gen.ini", interferometer_template_ini = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -761,13 +764,13 @@ class BTAnalysisPipeline(object):
 
         # Expand paths
         if oskar_mode == "binary" or oskar_mode == "singularity":
-            oskar_exec = Regrid_Helper.expand_path(oskar_exec)
+            oskar_exec = RegridHelper.expand_path(oskar_exec)
         
-        file = Regrid_Helper.expand_path(file)
-        interferometer_template_ini = Regrid_Helper.expand_path(interferometer_template_ini)
-        imager_template_ini = Regrid_Helper.expand_path(imager_template_ini)
-        oskar_telescope_model = Regrid_Helper.expand_path(oskar_telescope_model)
-        outdir = Regrid_Helper.expand_path(outdir)
+        file = RegridHelper.expand_path(file)
+        interferometer_template_ini = RegridHelper.expand_path(interferometer_template_ini)
+        imager_template_ini = RegridHelper.expand_path(imager_template_ini)
+        oskar_telescope_model = RegridHelper.expand_path(oskar_telescope_model)
+        outdir = RegridHelper.expand_path(outdir)
         
         # Set templates
         if load_osm: template_preset = file.split('/')[-1][:-4]
@@ -779,8 +782,8 @@ class BTAnalysisPipeline(object):
 
         # Create output file locations
         h5_id = file.split('/')[-1][:-3] if not template_flag else template_preset
-        osm_output = Regrid_Helper.expand_path("BTA/" + h5_id + "_sky.osm")
-        fits_output = Regrid_Helper.expand_path("BTA/" + h5_id + "_image.fits")
+        osm_output = RegridHelper.expand_path("BTA/" + h5_id + "_sky.osm")
+        fits_output = RegridHelper.expand_path("BTA/" + h5_id + "_image.fits")
         
         # Run the OSM generator
         if not os.path.isfile(osm_output):
@@ -806,7 +809,7 @@ class BTAnalysisPipeline(object):
 # Testing stage
 
 #Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_non_uniform_zenith_osm", coeval=True, require_regrid=False)
-#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_00_osm", coeval=True, phase_ref_point=Regrid_Helper.ZERO_RADEC)
+#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_00_osm", coeval=True, phase_ref_point=RegridHelper.ZERO_RADEC)
 #Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_zenith_osm", coeval=True)
 
 #for template_preset in ["gaussian", "point", "random", "flat", "sinusoid", "point"]:
@@ -818,4 +821,4 @@ class BTAnalysisPipeline(object):
 
 #BTAnalysisPipeline.H5_box_to_datacube(None, template_preset="gaussian")
 
-BTAnalysisPipeline.H5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=Regrid_Helper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=Regrid_Helper.TELESCOPE)
+BTAnalysisPipeline.H5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
