@@ -5,17 +5,19 @@ The oskar_regrid module contains all funtions that help convert early universe s
 
 # Import the stuffs
 import os
+import warnings
 import subprocess
+import configparser as cfp
 import astropy.constants as c
 import astropy.units as u
 import h5py
 import numpy as np
 import pandas as pd
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, EarthLocation
+from astropy.time import Time, TimeDelta
 from astropy.cosmology import FlatLambdaCDM as fmodel
 from astropy.cosmology import z_at_value as getz
 from scipy.interpolate import make_interp_spline as misp
-import configparser as cfp
 
 # TODO: Turn into pip project (later)
 
@@ -29,6 +31,9 @@ class RegridHelper():
     """
 
     # Define Constants
+    SKA_REF_LOC = EarthLocation.of_site("SKA-LOW")
+    OBS_LEN_4HR = TimeDelta(4 * u.hr)
+    REF_TIME    = Time(val="2025-03-03T05:30:00.00", format='isot', scale='utc')
     ZENITH_530  = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # SKA-Low Zenith at 5:30 am 2025-03-03
     ZERO_RADEC  = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/Dec
     OSKAR_SIF   = "~/.oskar/OSKAR-2.12.2-Python3.sif"
@@ -45,9 +50,7 @@ class RegridHelper():
             "use_gpus": False
         },
         "observation" : {
-            "num_time_steps": 24,
-            "start_time_utc": "2025-03-03 05:30:00.00",
-            "length": "04:00:00.000"
+            "num_time_steps": 24
         },
         "telescope": {
             "input_directory": "telescope_model",
@@ -72,7 +75,7 @@ class RegridHelper():
         "interferometer": {
             "oskar_vis_filename": "oskar_output/vis.vis",
             "ms_filename": "oskar_output/sim.ms",
-            "channel_bandwidth_hz": 1e6,
+            "channel_bandwidth_hz": 5e4,
             "time_average_sec": 10.0,
             "uv_filter_max": 1000,
             "uv_filter_units": "Wavelengths"
@@ -91,6 +94,8 @@ class RegridHelper():
             "root_path": "output/sim_image"
         }
     }
+
+    DEFAULT_GENERAL_SETTINGS = DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | { "general": {} }
 
     # Angular distance calculation
     norm = lambda t: (t % 360 + 360) % 360 - 180
@@ -135,33 +140,6 @@ class RegridHelper():
         sorted_files, _ = zip(*np.sort(np.array(list(map(sort_prep, files)), dtype=sort_type), order="num"))
 
         return sorted_files
-    
-    @staticmethod
-    def get_osm_sky_dimensions(osm_file):
-        """
-        Get the pixel count for a FITS file with it's corresponding OSKAR sky model.
-
-        :param osm_file: The OSM file to analyse.
-        :return: The ideal image size and fov
-        """
-
-        df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
-
-        print(osm_file)
-
-        # Calculate RA dimension
-        rac = RegridHelper.diff(np.array(df['RA'])[-1], np.array(df['RA'])[0])
-
-        # Calculate Dec dimension
-        decc = RegridHelper.diff(np.array(df['Dec'])[-1], np.array(df['Dec'])[0])
-
-        # Calculate FOV
-        fov = max(rac, decc)
-
-        # Get number of voxels on a side
-        n = np.sqrt(len(np.array(df['RA'])))
-
-        return n, fov
     
     @staticmethod
     def find_replace_line(file_name, find_line, replace_line):
@@ -357,27 +335,22 @@ class Regrid():
             return Regrid.convert_H5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
         
     @staticmethod
-    def transform_datacube_units(values, voxels = None, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), cosmology=Cosmo()):
+    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), cosmology=Cosmo()):
         """
         Transform a datacube with dimensions x, y, t (cMpc x cMpc x cMpc) to ⍺, δ, f (rad x rad x Hz),
 
-        :param values: The simulation datacube.
-        :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element.
+        :param values: The simulation datacube in units of Kelvin.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element in units of (cMpc, cMpc, cMps).
         :param z_ref: Refrence redshift, the ending redshift of the simulation.
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution.
-        :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
+        :param v: If all voxels are the same, provides the initial voxel dimensions in cMpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param osm_output: The relative path to save the osm file to.
         :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
         """
 
         # Configure d variable
         d = values.shape()
-        
-        # Set voxels array
-        if voxels is None:
-            print("Creating mock voxels ...")
-            voxels = np.full((*d, 3), v, dtype=np.float64)
 
         # Set regrid flag
         regrid_flag = require_regrid
@@ -464,12 +437,12 @@ class Regrid():
         return values, voxels, sigma_f, f_ref, regrid_flag
         
     @staticmethod
-    def regrid_datacube(values, voxels = None, d = None, sigma_f = None, max_freq_res=100 * u.MHz):
+    def regrid_datacube(values, voxels, d = None, sigma_f = None, max_freq_res=100 * u.MHz):
         """
         Regrids each spaxel of a sky model given a maximum frequency resolution.
 
         :param values: The simulation datacube.
-        :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element in units of (rad, rad, Hz).
         :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
         :param max_freq_res: Maximum allowable voxel frequency resolution.
         """
@@ -517,14 +490,43 @@ class Regrid():
         print("\nRegrid complete.")
         
         return values, voxels, sigma_f
+    
+    @staticmethod
+    def calculate_cumulative_voxels(voxels, f_ref = 200 * u.MHz, phase_ref_point = RegridHelper.ZENITH_530):
+        """
+        Calculate the cumulative voxel sum and centre with a refrence point and frequency.
+
+        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element in units of (rad, rad, Hz).
+        :param f_ref: Refrence frequency, the ending frequency of the model.
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+
+        :return: An array determining the specific central value of each voxel in its corresponding values array in units of (deg, deg, Hz).
+        """
+
+        # RA, Dec centering function
+        # Add half the total and half the spaxel widths to centre the main point
+        centering = (lambda x: (x - np.max(x, axis=(0, 1))/2 + np.min(x, axis=(0, 1))/2))
+
+        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0))
+        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1))
+        freqsum = f_ref.to_value(u.Hz) - (np.cumsum(voxels[:,:,:,2], axis=2))
+
+        # Calculate phase centre offsets
+        source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
+        RAs = source_pos.ra.to_value(u.deg)
+        Dcs = source_pos.dec.to_value(u.deg)
+
+        return (RAs, Dcs, freqsum)
+
         
     @staticmethod
-    def save_datacube_to_osm(values, voxels, sigma_f = None, f_ref = 180 * u.MHz, phase_ref_point = RegridHelper.ZENITH_530, osm_output="regrid/osm_output/osm_output.osm"):
+    def save_datacube_to_osm(values, voxels = None, cumulative_voxels = None, sigma_f = None, f_ref = 200 * u.MHz, phase_ref_point = RegridHelper.ZENITH_530, osm_output="regrid/osm_output/osm_output.osm"):
         """
         Saves a given datacube of flux values and voxel dimensions (RA, Dec, Freq.) to a master OSM file.
 
         :param values: The sky model datacube.
-        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element (rad, rad, Hz).
+        :param cumulative_voxels: A jagged array consisting of the cumulative summation of components from the voxel array (deg, deg, Hz).
         :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
         :param f_ref: Refrence frequency, the ending frequency of the model.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
@@ -537,20 +539,15 @@ class Regrid():
         # Configure d variable
         d = values.shape()
 
-        # RA, Dec centering function
-        # Add half the total and half the spaxel widths to centre the main point
-        centering = (lambda x: (x - np.max(x, axis=(0, 1))/2 + np.min(x, axis=(0, 1))/2))
-
         # Cumulative sums are more important than voxel bins now
-        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0))
-        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1))
-        freqsum = f_ref.to_value(u.Hz) - (np.cumsum(voxels[:,:,:,2], axis=2))
-
-        # Calculate phase centre offsets
-        source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
-        RAs = source_pos.ra.to_value(u.deg)
-        Dcs = source_pos.dec.to_value(u.deg)
-
+        (RAs, Dcs, freqsum) = (None, None, None) # Keep Pylint Happy
+        if cumulative_voxels is None and voxels is None:
+            raise ValueError("Error: Either an array of voxels or cumulative voxes must be provided!")
+        elif voxels is None:
+            (RAs, Dcs, freqsum) = cumulative_voxels
+        elif cumulative_voxels is None:
+            (RAs, Dcs, freqsum) = Regrid.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
+            
         # Record data to file
         print("Recording data to .osm file")
 
@@ -577,7 +574,7 @@ class Regrid():
                         linew = np.format_float_scientific(sigma_f[x, y, t], 4, False)
 
                         # Add +/- value to Declinations
-                        if Dcs[x, y, y] >= 0: Decln = "+" + str(Decln)
+                        if Dcs[x, y, t] >= 0: Decln = "+" + str(Decln)
                         else:                 Decln = "-" + str(Decln)
 
                         # Write to OSM
@@ -595,28 +592,100 @@ class Regrid():
 
         print("\nProcess complete, data saved to "+osm_output)
 
-    # FIXME: Generate Dynamic Settings
+    # TODO: Automatically find ideal UTC time of observation
+    # pylint: disable=unused-argument
     @staticmethod
-    def generate_dynamic_settings(values, voxels = None, phase_ref_point = RegridHelper.ZENITH_530, f_ref = 100 * u.MHz):
+    def calculate_observation_time_from_date(phase_ref_point = RegridHelper.ZENITH_530, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
+        """
+        Calculates the closest ideal observation time from a given UTC date and telescope lattitude.
+
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
+        :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
+        :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+
+        :returns: The ideal UTC refrence date for the observation, and if the object goes below the horizon due to the length of observation.
+        """
+
+        obs_length_flag = False
+
+        if obs_length_flag:
+            warnings.warn("Warning: The provided observation time is too long! The object will not be in the sky for the entire duration of time.")
+
+        return ref_time, obs_length_flag
+    # pylint: enable=unused-argument
+
+    @staticmethod
+    def generate_dynamic_settings(values, voxels = None, cumulative_voxels = None, phase_ref_point = RegridHelper.ZENITH_530, f_ref = 200 * u.MHz, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
         """
         Generates a set of dynamically-set ini settings for OSKAR to utilise.
 
         :param values: The simulation datacube.
-        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element (rad, rad, Hz).
+        :param cumulative_voxels: A jagged array consisting of the cumulative summation of components from the voxel array (deg, deg, Hz).
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param f_ref: Refrence frequency, the ending frequency of the model.
+        :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
+        :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
+        :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+
         :return: The dynamically defined settings dictionary.
         """
-        # Calculated settings: [observation] num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, [interferometer] channel_bandwidth_hz
+        # Calculated settings: [observation] start_frequency_hz, num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, length, start_time_utc
         # Calculated settings: [image] fov_deg, size
+
+        # SETUP
+        # Cumulative sums are more important than voxel bins now
+        (RAs, Dcs, freqsum) = (None, None, None) # Keep Pylint Happy
+        if cumulative_voxels is None and voxels is None:
+            raise ValueError("Error: Either an array of voxels or cumulative voxes must be provided!")
+        elif voxels is None:
+            (RAs, Dcs, freqsum) = cumulative_voxels
+        elif cumulative_voxels is None:
+            (RAs, Dcs, freqsum) = Regrid.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
 
         # Configure d variable
         d = values.shape()
 
-        return {}
+        # Create deep copy of union/logical or settings set
+        dynamic_settings = dict(RegridHelper.DEFAULT_INTERFEROMETER_SETTINGS)
+
+        # BASIC CONFIG
+        # Set starting frequency NB: The last channel has the lowest frequency!
+        dynamic_settings['observation']['start_frequency_hz'] = np.mean(freqsum[:,:,-1])
+
+        # Set number of channels and image size
+        dynamic_settings['observation']['num_channels'] = d[2]
+        dynamic_settings['image']['size'] = max(d[0], d[1])
+
+        # Set the frequency increment
+        dynamic_settings['observation']['start_frequency_hz'] = np.mean(voxels[:,:,:,2])
+
+        # Set phase centre RA and Dec
+        dynamic_settings['observation']['phase_centre_ra_deg'] = phase_ref_point.ra.deg
+        dynamic_settings['observation']['phase_centre_dec_deg'] = phase_ref_point.dec.deg
+
+        # COORDINATE CONFIG
+        # Set image field of view and size
+        ref_time, _ = Regrid.calculate_observation_time_from_date(phase_ref_point=phase_ref_point, ref_time=ref_time, ref_location=ref_location, observation_length=observation_length)
+
+        # Calculate RA dimension
+        rac = RegridHelper.diff(np.mean(RAs[-1,:,:]), np.mean(RAs[0,:,:]))
+
+        # Calculate Dec dimension
+        decc = RegridHelper.diff(np.mean(Dcs[-1,:,:]), np.mean(Dcs[0,:,:]))
+
+        # Set the field of view
+        dynamic_settings['image']['fov_deg'] = max(rac, decc)
+
+        # Set the observation time and length
+        dynamic_settings['observation']['start_time_utc'] = (ref_time - observation_length / 2).utc.value
+        dynamic_settings['observation']['length'] = str(observation_length.to_value(format='datetime'))
+        
+        return dynamic_settings
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, z_ref = 7, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), osm_output="regrid/osm_output/osm_output.osm", cosmology=Cosmo(), save_dynamic_settings = ""):
+    def generate_osm_from_simulation(values, voxels = None, z_ref = 7, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), osm_output="regrid/osm_output/osm_output.osm", cosmology=Cosmo(), save_dynamic_settings = "", ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -629,9 +698,21 @@ class Regrid():
         :param osm_output: The relative path to save the osm file to.
         :param cosmology: The specific cosmology parameters in the form of a custom Cosmo object.
         :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
+        :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
+        :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
+        :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+
         :return: The dynamically defined settings dictionary.
         """
         print("Initialising ...")
+
+        # Configure d variable
+        d = values.shape()
+
+        # Set default voxel array according to v
+        if voxels is None:
+            print("Creating mock voxels ...")
+            voxels = np.full((*d, 3), v, dtype=np.float64)
 
         # Transform datacube
         values, voxels, sigma_f, f_ref, regrid_flag = Regrid.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=v, cosmology=cosmology)
@@ -646,7 +727,7 @@ class Regrid():
         Regrid.save_datacube_to_osm(values=values, voxels=voxels, sigma_f=sigma_f, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
 
         # Output dynamic settings file
-        dynamic_settings = Regrid.generate_dynamic_settings(values=values, voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
+        dynamic_settings = Regrid.generate_dynamic_settings(values=values, voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point, ref_time=ref_time, ref_location=ref_location, observation_length=observation_length)
 
         if save_dynamic_settings:
             # FIXME: Save dynamic settings
@@ -655,7 +736,7 @@ class Regrid():
         return dynamic_settings
         
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="regrid/osm_output/osm_output.osm", coeval=True):
+    def generate_osm_from_H5(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="regrid/osm_output/osm_output.osm", coeval=True, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
         """
         Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
@@ -664,6 +745,10 @@ class Regrid():
         :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
         :param osm_output: The directory to output the osm file.
+        :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
+        :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
+        :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+
         :return: The dynamically defined settings dictionary.
         """
 
@@ -671,16 +756,52 @@ class Regrid():
 
         if osm_output == "": osm_output = file.split('/')[-1][:-3] + "_osm.osm"
 
-        return Regrid.generate_osm_from_simulation(values, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=vox, osm_output=osm_output, cosmology=cosmology, phase_ref_point=phase_ref_point)
+        return Regrid.generate_osm_from_simulation(values,
+                z_ref=z_ref,
+                require_regrid=require_regrid,
+                max_freq_res=max_freq_res,
+                v=vox, osm_output=osm_output,
+                cosmology=cosmology,
+                phase_ref_point=phase_ref_point,
+                ref_time=ref_time,
+                ref_location=ref_location,
+                observation_length=observation_length
+                )
+    
+    # FIXME: Reverse-read OSM
+    @staticmethod
+    def convert_osm_file_to_arrays(osm_file, generate_dynamic_settings = True):
+        """
+        Reverse-engineer an osm file to retreive its values, voxels, sigma_f, f_ref, phase_ref_point, and dynamic settings.
+
+        :param osm_file: The OSM file to analyse.
+        :param generate_dynamic_settings: Whether or not to reverse-engineer the dynamic settings as well
+
+        :return: The values, voxels, sigma_f, f_ref, and phase_ref_point contained in a tuple. If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
+        """
+
+        #df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
+
+        print(osm_file)
+
+        output_data = (None, None, None, None, None)
+
+        if generate_dynamic_settings:
+            dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS
+
+            return output_data, dynamic_settings
+        else:
+            return output_data
+
 
 class BTAnalysisPipeline(object):
     """
     A broader class that combines all components of the individual components of the simulated IGM to simulated observation pipeline together.
     """
-
+    
     # FIXME: Implement config parser
     @staticmethod
-    def configure_oskar_settings(osm_file, dynamic_settings, interferometer_settings_override = "", imager_settings_override = "", use_imager=True, save_dir=""):
+    def configure_oskar_settings(osm_file, dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", use_imager=True, save_dir=""):
         """
         Configure the settings files for the OSKAR interferometer and imager programs.
 
@@ -690,11 +811,11 @@ class BTAnalysisPipeline(object):
         :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
         :param save_dir: Directory to save the compiled ini file. If blank, pass the settings only as a return.
+
         :return: The updated settings dictionary.
         """
 
-        # Get FOV and Image size
-        #size, fov = BTAnalysisPipeline.get_osm_sky_dimensions("BTA/"+osm_file)
+        #_, osm_settings = Regrid.convert_osm_file_to_arrays(osm_file)
 
         # Setup the interferometer ini file
         # FIXME: Write to new interferometer file and copy over settings
@@ -726,7 +847,7 @@ class BTAnalysisPipeline(object):
             
 
     @staticmethod
-    def run_oskar_on_osms(osm_file, dynamic_settings={}, interferometer_settings_override = "", imager_settings_override = "", fits_output="./fits_output.fits", oskar_exec=RegridHelper.OSKAR_SIF, oskar_mode="singularity", use_imager=True):
+    def run_oskar_on_osms(osm_file, dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", fits_output="./fits_output.fits", oskar_exec=RegridHelper.OSKAR_SIF, oskar_mode="singularity", use_imager=True):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
 
@@ -829,7 +950,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def h5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, interferometer_settings_override = "./regrid/test_intif_inis/test_img_gen.ini", imager_settings_override = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False):
+    def h5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, interferometer_settings_override = "./regrid/test_intif_inis/test_img_gen.ini", imager_settings_override = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -847,6 +968,9 @@ class BTAnalysisPipeline(object):
         :param template_preset: Use a mock values array instead of a h5 file. Ignores any provided h5 file.
         :param coeval: If the H5 box is coeval or lightcone based.
         :param load_osm: If true load treat the file variable as if it were an OSM file.
+        :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
+        :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
+        :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
         """
 
         # Expand paths
@@ -878,7 +1002,7 @@ class BTAnalysisPipeline(object):
         fits_output = RegridHelper.expand_path("BTA/" + h5_id + "_image.fits")
 
         # Set the default dynamic settings array
-        dynamic_settings={}
+        dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS
         
         # Run the OSM generator
         if not os.path.isfile(osm_output):
@@ -889,7 +1013,17 @@ class BTAnalysisPipeline(object):
                     dynamic_settings = Regrid.generate_osm_from_simulation(template_values, osm_output=osm_output)
                 else:
                     print("Generating OSM files from H5 ...")
-                    dynamic_settings = Regrid.generate_osm_from_H5(h5_file, phase_ref_point=phase_ref_point, require_regrid=require_regrid, max_freq_res=max_freq_res, osm_output=osm_output, coeval=coeval)
+                    dynamic_settings = Regrid.generate_osm_from_H5(
+                        h5_file,
+                        phase_ref_point=phase_ref_point,
+                        require_regrid=require_regrid,
+                        max_freq_res=max_freq_res,
+                        osm_output=osm_output,
+                        coeval=coeval,
+                        ref_time=ref_time,
+                        ref_location=ref_location,
+                        observation_length=observation_length
+                        )
             else:
                 subprocess.run(["cp", file, osm_output], check=True)
 
