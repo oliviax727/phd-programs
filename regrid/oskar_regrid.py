@@ -1084,7 +1084,6 @@ class BTAnalysisPipeline(object):
             dynamic_settings=dynamic_settings,
             interferometer_settings_override=interf_override_ini,
             imager_settings_override=imager_override_ini,
-            use_imager=use_imager,
             save_ini=ini_output
             )
 
@@ -1111,17 +1110,13 @@ class BTAnalysisPipeline(object):
 # Testing stage
 # pylint: disable=line-too-long
 
-#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_non_uniform_zenith_osm", coeval=True, require_regrid=False)
-#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_00_osm", coeval=True, phase_ref_point=RegridHelper.ZERO_RADEC)
-#Regrid.generate_osm_from_H5("./regrid/yuxiang_bts/yuxiang1.h5", osm_output="./regrid/osm_output/yuxiang1_zenith_osm", coeval=True)
+for template_preset in ["gaussian", "point", "random", "flat", "sinusoid", "point"]:
+    template_value = Regrid.mock_values(template_preset, scale=20)
+    Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"))
 
-#for template_preset in ["gaussian", "point", "random", "flat", "sinusoid", "point"]:
-#    template_value = Regrid.mock_values(template_preset, scale=20)
-#    Regrid.generate_osm_from_simulation(template_value, osm_output="./regrid/osm_output/"+template_preset+"_zenith_osm")
-
-#Collator.collate_fits("./regrid/test_output/yuxiang1_fits", "./regrid/test_output")
-#Collator.collate_fits("./regrid/test_output/yuxiangbad_fits", "./regrid/test_output")
+for template_preset in ["yuxiang1", "yuxiang2"]:
+    Regrid.generate_osm_from_H5(RegridHelper.expand_path("~/.oskar/simulations/legacy_templates/"+template_preset+".h5"), osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), coeval=True)
 
 #BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
 
-BTAnalysisPipeline.h5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
+#BTAnalysisPipeline.h5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
