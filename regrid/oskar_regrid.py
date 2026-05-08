@@ -19,6 +19,8 @@ from astropy.cosmology import FlatLambdaCDM as fmodel
 from astropy.cosmology import z_at_value as getz
 from scipy.interpolate import make_interp_spline as misp
 
+# FIXME: Test both the OSM and OSKAR project parts of the file
+
 # TODO: Turn into pip project (later)
 
 # TODO: Clean pylint errors
@@ -812,10 +814,9 @@ class BTAnalysisPipeline(object):
     """
     A broader class that combines all components of the individual components of the simulated IGM to simulated observation pipeline together.
     """
-    
-    # FIXME: Implement config parser
+
     @staticmethod
-    def configure_oskar_settings(osm_file, dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", use_imager=True, save_ini=""):
+    def configure_oskar_settings(osm_file, dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", save_ini=""):
         """
         Configure the settings files for the OSKAR interferometer and imager programs.
 
@@ -843,10 +844,7 @@ class BTAnalysisPipeline(object):
             #ofname = r"start_frequency_hz="+freq
             #BTAnalysisPipeline.find_replace_line("BTA/test_intif.ini", "freqset", ofname)
 
-        if use_imager:
-            print("imager")
             # Setup the imager ini file
-            # FIXME: Write to new imager file and copy over settings
             #with open('sim_img.ini', 'w', encoding='utf-8'):
                 # Set the pixel resolution
                 #ofname = "size="+str(size) 
@@ -1077,6 +1075,8 @@ class BTAnalysisPipeline(object):
                 else:
                     # IF we want to skip generating the osm file AND a use a specified already-complete osm file
                     subprocess.run(["cp", file, osm_output], check=True)
+
+                    _, dynamic_settings = Regrid.convert_osm_file_to_arrays(osm_output, generate_dynamic_settings=True)
 
         # Configure the OSKAR settings
         dynamic_settings = BTAnalysisPipeline.configure_oskar_settings(
