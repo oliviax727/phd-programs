@@ -21,6 +21,11 @@ from scipy.interpolate import make_interp_spline as misp
 
 # TODO: Turn into pip project (later)
 
+# TODO: Clean pylint errors
+# pylint: disable=missing-function-docstring
+# pylint: disable=unnecessary-lambda-assignment
+# pylint: disable=invalid-name
+
 # pylint: disable-next=unused-import
 from matplotlib import pyplot as plt
 
@@ -551,7 +556,7 @@ class Regrid():
         # Record data to file
         print("Recording data to .osm file")
 
-        with open(osm_output, 'w', encoding='utf8') as osm:
+        with open(osm_output, 'w', encoding='utf-8') as osm:
             # Clear file contents
             osm.truncate(0)
 
@@ -729,14 +734,21 @@ class Regrid():
         # Output dynamic settings file
         dynamic_settings = Regrid.generate_dynamic_settings(values=values, voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point, ref_time=ref_time, ref_location=ref_location, observation_length=observation_length)
 
-        if save_dynamic_settings:
-            # FIXME: Save dynamic settings
-            print(0)
+        if save_dynamic_settings != "":
+            settings_path = RegridHelper.expand_path(save_dynamic_settings)
+
+            config = cfp.ConfigParser()
+            config.read_dict(dynamic_settings)
+
+            with open(save_dynamic_settings, 'w', encoding='utf-8') as settings_file:
+                config.write(settings_file)
+
+            print("Saved dynamic and default settings to ini file: "+settings_path)
 
         return dynamic_settings
         
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="regrid/osm_output/osm_output.osm", coeval=True, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
+    def generate_osm_from_H5(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="regrid/osm_output/osm_output.osm", coeval=True, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR, save_dynamic_settings = ""):
         """
         Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
 
@@ -748,6 +760,7 @@ class Regrid():
         :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+        :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
 
         :return: The dynamically defined settings dictionary.
         """
@@ -765,7 +778,8 @@ class Regrid():
                 phase_ref_point=phase_ref_point,
                 ref_time=ref_time,
                 ref_location=ref_location,
-                observation_length=observation_length
+                observation_length=observation_length,
+                save_dynamic_settings=save_dynamic_settings
                 )
     
     # FIXME: Reverse-read OSM
@@ -801,16 +815,16 @@ class BTAnalysisPipeline(object):
     
     # FIXME: Implement config parser
     @staticmethod
-    def configure_oskar_settings(osm_file, dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", use_imager=True, save_dir=""):
+    def configure_oskar_settings(osm_file, dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", use_imager=True, save_ini=""):
         """
         Configure the settings files for the OSKAR interferometer and imager programs.
 
-        :param osm_file: Directory containing the OSM files to be imaged.
+        :param osm_file: File path to the existing OSM file
         :param dynamic_settings: Dynamically generated settings from the regridding code.
         :param interferometer_settings_override: The file location of the OSKAR imager settings file. Leave blank if no override.
         :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
-        :param save_dir: Directory to save the compiled ini file. If blank, pass the settings only as a return.
+        :param save_ini: File path to save the compiled ini file. If blank, pass the settings only as a return.
 
         :return: The updated settings dictionary.
         """
@@ -819,7 +833,7 @@ class BTAnalysisPipeline(object):
 
         # Setup the interferometer ini file
         # FIXME: Write to new interferometer file and copy over settings
-        #with open('sim_intif.ini', 'w', encoding='utf8'):
+        #with open('sim_intif.ini', 'w', encoding='utf-8'):
         
             # Set sky model location
             #ofname = "oskar_sky_model/file="+osm_file
@@ -829,34 +843,64 @@ class BTAnalysisPipeline(object):
             #ofname = r"start_frequency_hz="+freq
             #BTAnalysisPipeline.find_replace_line("BTA/test_intif.ini", "freqset", ofname)
 
-        # Setup the imager ini file
-        # FIXME: Write to new imager file and copy over settings
-        #with open('sim_img.ini', 'w', encoding='utf8'):
-            # Set the pixel resolution
-            #ofname = "size="+str(size) 
-            #BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "sizeset", ofname)
+        if use_imager:
+            print("imager")
+            # Setup the imager ini file
+            # FIXME: Write to new imager file and copy over settings
+            #with open('sim_img.ini', 'w', encoding='utf-8'):
+                # Set the pixel resolution
+                #ofname = "size="+str(size) 
+                #BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "sizeset", ofname)
 
-            # Set the FOV
-            #ofname = "fov_deg="+str(fov)
-            #BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "fovset", ofname)
+                # Set the FOV
+                #ofname = "fov_deg="+str(fov)
+                #BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "fovset", ofname)
+
+        if save_ini:
+            print(0)
+        
+        return {}
+    
+    @staticmethod
+    def split_general_settings(dynamic_settings = None, settings_file = "", use_imager = True):
+        """
+        Split a settings dictionary into its components for the OSKAR interferometer and OSKAR imager.
+
+        :param dynamic_settings: Dynamically generated settings from the regridding code. If none do not mutate.
+        :param settings_file: A file containing the ini settings. If empty don't split the settings files.
+        :param use_imager: Whether to create a seperate imager file path and settings dictionary pair.
+
+        :return: The two tuples containing the split settings (settings file location, settings dictionary)
+        """
+
+        interf_settings_dict = None
+        imager_settings_dict = None
+
+        interf_settings_path = ""
+        imager_settings_path = ""
+
+        if not dynamic_settings is None:
+            print(0)
+
+        if settings_file != "":
+            print(0)
 
         if use_imager:
-            return {}, {}
+            return (interf_settings_path, interf_settings_dict), (imager_settings_path, imager_settings_dict)
         else:
-            return {}
-            
+            return (interf_settings_path, interf_settings_dict), (None, "")
+
 
     @staticmethod
-    def run_oskar_on_osms(osm_file, dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", fits_output="./fits_output.fits", oskar_exec=RegridHelper.OSKAR_SIF, oskar_mode="singularity", use_imager=True):
+    def run_oskar_on_osms(osm_file, interferometer_settings = ("", RegridHelper.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", RegridHelper.DEFAULT_IMAGER_SETTINGS), fits_output="./fits_output.fits", oskar_exec=None, oskar_mode="python", use_imager=True):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
 
         :param osm_file: Directory containing the OSM files to be imaged.
-        :param dynamic_settings: Dynamically generated settings from the regridding code.
-        :param interferometer_settings_override: The file location of the OSKAR imager settings file. Leave blank if no override.
-        :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
+        :param interferometer_settings: A tuple containing the file path to the OSKAR interferometer settings file and the interferometer settings dictionary.
+        :param imager_settings: A tuple containing the file path to the OSKAR imager settings file and the imager settings dictionary.
         :param fits_output: The directory and file to output the resultant FITS files.
-        :param oskar_exec: The SIF file containing the OSKAR program. OSKAR must be run from singularity.
+        :param oskar_exec: The SIF file or binary file path containing the OSKAR programs.
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
         """
@@ -867,15 +911,6 @@ class BTAnalysisPipeline(object):
         subprocess.run(["mkdir","-p","BTA/oskar_output/sim.ms"], check=True)
 
         print("Setting up OSKAR for "+osm_file)
-        
-        intif_settings, img_settings = BTAnalysisPipeline.configure_oskar_settings(
-            osm_file=osm_file,
-            dynamic_settings=dynamic_settings,
-            interferometer_settings_override=interferometer_settings_override,
-            imager_settings_override=imager_settings_override,
-            use_imager=use_imager,
-            save_dir="BTA"
-            )
 
         cwd = os.getcwd()+'/BTA'
 
@@ -926,12 +961,12 @@ class BTAnalysisPipeline(object):
 
         # 2. Move H5 file and INIs to directory
         if not template: subprocess.run(["cp",h5_file,"BTA/analysis.h5"], check=True)
-        subprocess.run(["cp",interferometer_settings_override,"BTA/imager_template.ini"], check=True)
-        subprocess.run(["cp",imager_settings_override,"BTA/interferometer_template.ini"], check=True)
+        subprocess.run(["cp",interferometer_settings_override,"BTA/interferometer_override.ini"], check=True)
+        subprocess.run(["cp",imager_settings_override,"BTA/imager_override.ini"], check=True)
         if not os.path.isdir("BTA/telescope_model"):
             subprocess.run(["cp","-r",oskar_telescope_model,"BTA/telescope_model"], check=True)
 
-        return ("BTA/analysis.h5" if not template else ""), "BTA/imager_template.ini", "BTA/interferometer_template.ini", "BTA/telescope_model", cwd
+        return ("BTA/analysis.h5" if not template else ""), "BTA/interferometer_override.ini", "BTA/imager_override.ini", "BTA/telescope_model", cwd
 
     @staticmethod
     def clean_bta_dir(outdir, fits_output, clean=True):
@@ -950,7 +985,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def h5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, interferometer_settings_override = "./regrid/test_intif_inis/test_img_gen.ini", imager_settings_override = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
+    def h5_box_to_datacube(file, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, interferometer_settings_override = "./regrid/test_intif_inis/test_img_gen.ini", imager_settings_override = "./regrid/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = RegridHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = RegridHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR, use_imager = True):
         """
         Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
 
@@ -971,6 +1006,7 @@ class BTAnalysisPipeline(object):
         :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+        :param use_imager: Whether or not to generate a dirty image with oskar_imager.
         """
 
         # Expand paths
@@ -982,14 +1018,14 @@ class BTAnalysisPipeline(object):
         interferometer_settings_override = RegridHelper.expand_path(interferometer_settings_override)
         oskar_telescope_model = RegridHelper.expand_path(oskar_telescope_model)
         outdir = RegridHelper.expand_path(outdir)
+
+        template_flag = (template_preset != "")
         
         # Set templates
         if load_osm: template_preset = file.split('/')[-1][:-4]
 
-        template_flag = (template_preset != "")
-
         print("Setting up BTA directory ...")
-        h5_file, img_temp_ini, intif_temp_ini, _, _ = BTAnalysisPipeline.setup_bta_dir(file,
+        h5_file, interf_override_ini, imager_override_ini, _, _ = BTAnalysisPipeline.setup_bta_dir(file,
             oskar_telescope_model=oskar_telescope_model,
             interferometer_settings_override=interferometer_settings_override,
             imager_settings_override=imager_settings_override,
@@ -998,20 +1034,23 @@ class BTAnalysisPipeline(object):
 
         # Create output file locations
         h5_id = file.split('/')[-1][:-3] if not template_flag else template_preset
-        osm_output = RegridHelper.expand_path("BTA/" + h5_id + "_sky.osm")
-        fits_output = RegridHelper.expand_path("BTA/" + h5_id + "_image.fits")
+        osm_output = RegridHelper.expand_path("BTA/" + h5_id + "_sky_model.osm")
+        ini_output = RegridHelper.expand_path("BTA/" + h5_id + "_general_settings.ini")
+        fits_output = RegridHelper.expand_path("BTA/" + h5_id + "_datacube.fits")
 
         # Set the default dynamic settings array
         dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS
         
-        # Run the OSM generator
+        # Run the OSM and Settings generators
         if not os.path.isfile(osm_output):
             if not load_osm:
                 if template_flag:
+                    # IF we want to generate a fresh osm file AND its from a template
                     print("Generating OSM files from template ...")
                     template_values = Regrid.mock_values(template_preset)
-                    dynamic_settings = Regrid.generate_osm_from_simulation(template_values, osm_output=osm_output)
+                    dynamic_settings = Regrid.generate_osm_from_simulation(template_values, osm_output=osm_output, save_dynamic_settings=ini_output)
                 else:
+                    # IF we want to generate a fresh osm file AND its from a provided h5 file
                     print("Generating OSM files from H5 ...")
                     dynamic_settings = Regrid.generate_osm_from_H5(
                         h5_file,
@@ -1022,19 +1061,46 @@ class BTAnalysisPipeline(object):
                         coeval=coeval,
                         ref_time=ref_time,
                         ref_location=ref_location,
-                        observation_length=observation_length
+                        observation_length=observation_length,
+                        save_dynamic_settings=ini_output
                         )
             else:
-                subprocess.run(["cp", file, osm_output], check=True)
+                if template_flag:
+                    # IF we want to skip generating the osm file AND a template osm has been specified
+                    subprocess.run(["cp", RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), osm_output], check=True)
+                    subprocess.run(["cp", RegridHelper.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"), ini_output], check=True)
 
+                    config = cfp.ConfigParser()
+                    config.read_file(open(ini_output, encoding='utf-8'))
+
+                    dynamic_settings = {s:dict(config.items(s)) for s in config.sections()}
+                else:
+                    # IF we want to skip generating the osm file AND a use a specified already-complete osm file
+                    subprocess.run(["cp", file, osm_output], check=True)
+
+        # Configure the OSKAR settings
+        dynamic_settings = BTAnalysisPipeline.configure_oskar_settings(
+            osm_file=osm_output,
+            dynamic_settings=dynamic_settings,
+            interferometer_settings_override=interf_override_ini,
+            imager_settings_override=imager_override_ini,
+            use_imager=use_imager,
+            save_ini=ini_output
+            )
+
+        # Split the current settings files and retreive specific files
+        interferometer_settings, imager_settings = BTAnalysisPipeline.split_general_settings(dynamic_settings=dynamic_settings, settings_file=ini_output, use_imager=use_imager)
+
+        # Run OSKAR
         print("Running OSKAR ...")
         BTAnalysisPipeline.run_oskar_on_osms(
-            osm_output,
-            interferometer_settings_override=img_temp_ini,
-            imager_settings_override=intif_temp_ini,
-            fits_output=fits_output, oskar_exec=oskar_exec,
+            osm_file=osm_output,
+            interferometer_settings=interferometer_settings,
+            imager_settings=imager_settings,
+            fits_output=fits_output,
+            oskar_exec=oskar_exec,
             oskar_mode=oskar_mode,
-            dynamic_settings=dynamic_settings
+            use_imager=use_imager
             )
 
         # If clean is true remove all data relating to execution
