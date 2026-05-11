@@ -61,23 +61,15 @@ class RegridHelper():
         },
         "telescope": {
             "input_directory": "telescope_model",
-            "apeture_array": {
-                "element_pattern": {
-                    "enable_numerical": "false"
-                },
-                "array_pattern": {
-                    "element": {
-                        "x_gain": 1.0,
-                        "y_gain": 1.0,
-                        "x_gain_error_time": 0.0015057,
-                        "y_gain_error_time": 0.0015057,
-                        "x_phase_error_fixed_deg": 0.0,
-                        "y_phase_error_fixed_deg": 0.0,
-                        "x_phase_error_time_deg": 0.0015057,
-                        "y_phase_error_time_deg": 0.0015057
-                    }
-                }
-            }
+            "apeture_array/element_pattern/enable_numerical": False,
+            "apeture_array/array_pattern/element/x_gain": 1.0,
+            "apeture_array/array_pattern/element/y_gain": 1.0,
+            "apeture_array/array_pattern/element/x_gain_error_time": 0.0015057,
+            "apeture_array/array_pattern/element/y_gain_error_time": 0.0015057,
+            "apeture_array/array_pattern/element/x_phase_error_fixed_deg": 0.0,
+            "apeture_array/array_pattern/element/y_phase_error_fixed_deg": 0.0,
+            "apeture_array/array_pattern/element/x_phase_error_time_deg": 0.0015057,
+            "apeture_array/array_pattern/element/y_phase_error_time_deg": 0.0015057
         },
         "interferometer": {
             "oskar_vis_filename": "oskar_output/vis.vis",
@@ -290,7 +282,7 @@ class Regrid():
         "sinusoid" : (
             { "sinc", "interference", "fringe", "i", "intf", "s" },
             "Rotationally symmetric centered sinc function with freq = 1/d(t).",
-            lambda p: RegridHelper.sinc(p['r'], f=1/p['d'][2], amp=p['T_max'])
+            lambda p: np.abs(RegridHelper.sinc(p['r'], f=1/p['d'][2], amp=p['T_max']))
             ),
         "point"    : (
             { "delta", "source", "p" },
@@ -1236,7 +1228,11 @@ class BTAnalysisPipeline(object):
 # pylint: disable=line-too-long
 
 for template_preset in Regrid.TEMPLATE_PRESETS:
-    template_value = Regrid.mock_values(template_preset, scale=20)
+    if "coeval" in template_preset:
+        template_value = Regrid.mock_values(template_preset, scale=20, d=(400, 400, 400))
+    else:
+        continue
+
     Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"))
 
 #BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
