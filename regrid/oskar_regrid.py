@@ -368,8 +368,10 @@ class Regrid():
                     
                     # Populate array cell
                     values[i, j, t] = func(params)
+        
+        print("Values created!")
 
-        return values.astype(np.float64), preset
+        return values.astype(np.float64)
 
     @staticmethod
     def convert_H5_coeval_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
