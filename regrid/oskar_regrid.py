@@ -779,7 +779,7 @@ class Regrid():
         d = np.shape(values)
 
         # Create deep copy of union/logical or settings set
-        dynamic_settings = dict(RegridHelper.DEFAULT_INTERFEROMETER_SETTINGS)
+        dynamic_settings = dict(RegridHelper.DEFAULT_GENERAL_SETTINGS)
 
         # BASIC CONFIG
         # Set starting frequency NB: The last channel has the lowest frequency!
@@ -1234,12 +1234,9 @@ class BTAnalysisPipeline(object):
 # Testing stage
 # pylint: disable=line-too-long
 
-for template_preset in ["gaussian", "point", "random", "flat", "sinusoid", "point"]:
+for template_preset in Regrid.TEMPLATE_PRESETS:
     template_value = Regrid.mock_values(template_preset, scale=20)
     Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"))
-
-for template_preset in ["yuxiang1", "yuxiang2"]:
-    Regrid.generate_osm_from_H5(RegridHelper.expand_path("~/.oskar/simulations/legacy_templates/"+template_preset+".h5"), osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), coeval=True, save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"))
 
 #BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
 
