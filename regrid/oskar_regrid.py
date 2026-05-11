@@ -110,6 +110,71 @@ class RegridHelper():
     diff = lambda a, b: min(abs(RegridHelper.delta(a, b)),360-abs(RegridHelper.delta(a, b)))
     diff_sgn = lambda a, b: RegridHelper.delta(a, b) - 360 if RegridHelper.delta(a, b) > 180 else (RegridHelper.delta(a, b) + 360 if RegridHelper.delta(a, b) < -180 else RegridHelper.delta(a, b))
 
+    # Load yuxiang's h5 data
+    # Properties: size = (400, 400, 400) px; voxels = (1.5, 1.5, 1.5) cMPc; z_ref = ~7 (box #1), ~8 (box #2)
+    COEVAL_TEMPLATE_1        = h5py.File('/home/olivia/.oskar/simulations/legacy_templates/yuxiang1.h5', 'r')
+    COEVAL_TEMPLATE_2        = h5py.File('/home/olivia/.oskar/simulations/legacy_templates/yuxiang2.h5', 'r')
+    COEVAL_TEMPLATE_VALUES_1 = np.array(COEVAL_TEMPLATE_1.get('BrightnessTemp')['brightness_temp'])
+    COEVAL_TEMPLATE_VALUES_2 = np.array(COEVAL_TEMPLATE_2.get('BrightnessTemp')['brightness_temp'])
+
+    # Normal, sinusoid, and sinc functions for convenienve
+    normal   = lambda x, mean=0, var=1, norm=1/np.sqrt(2*np.pi): norm * np.exp(-(x-mean)**2/(2*var))/np.sqrt(2*np.pi*var)
+    sinusoid = lambda x, f=1, ph=0, amp=1:                       amp * np.cos(2*np.pi*f*x+ph)
+    sinc     = lambda x, f=1, ph=0, amp=1:                       amp * np.nan_to_num(np.sin(2*np.pi*f*x+ph)/(2*np.pi*f*x+ph), nan=1, posinf=1, neginf=1)
+    
+    # Convert FWHM to Variance and vice versa
+    FWHM  = lambda x: x * 2 * np.sqrt(2*np.log(2))
+    STDEV = lambda x: x / (2 * np.sqrt(2*np.log(2)))
+
+    @staticmethod
+    def select_option(options, selection):
+        """
+        Select an option from an option dictionary.
+
+        :param options: The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
+        :param selection: The option to select. If empty return the whole option dictionary.
+
+        :return: A dictionary containing only the option or the entire option dictionary
+        """
+
+        if selection == "":
+            return options
+
+        for option in options:
+            if selection.lower() == option or selection.lower() in options[option][0]:
+                return options[option]
+            
+        raise ValueError("Option "+selection+" is not a valid option.")
+
+    @staticmethod
+    def display_options(options, print_options=True, selection=""):
+        """
+        Select and/or display option(s) from an option dictionary.
+
+        :param options: The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
+        :param selection: The option to select. If empty return the whole option dictionary.
+        :param print_options: If true print the help for the option dictionary. If false return dictionary only.
+
+        :return: A dictionary containing only the option or the entire option dictionary.
+        """
+
+        options = RegridHelper.select_option(options, selection)
+
+        if print_options:
+            print("============")
+            for option in options:
+                print(
+                    "OPTION: "      + option.upper()                                + "\n" +
+                    "Description: " + options[option][1]                            + "\n" +
+                    "Synonyms: "    + option + ", " + ", ".join(options[option][0]) + "\n" +
+                    "Preset: "      + option                                        + "\n" +
+                    "============"
+                    )
+            print("Option keys will ignore case.")
+            print("============")
+            
+        return options
+
     # l, m, n to RA, Dec
     @staticmethod
     def lm_to_radec(l, m, phase_centre=ZERO_RADEC):
@@ -205,49 +270,107 @@ class Regrid():
     def brightness_temperature_to_linewidth(Tb):
         # Calculate linewidth in Hz
         return (Tb ** 0.5) * RegridHelper.SIGMA_F
+    
+    TEMPLATE_PRESETS = {
+        "gaussian" : (
+            { "normal", "gauss", "bell", "n", "g", "b" },
+            "Rotationally symmetric centered gaussian plane with FWHM = d(t)/3.",
+            lambda p: RegridHelper.normal(p['r'], var=RegridHelper.STDEV(p['d'][2]/3)**2, norm=p['T_max'])
+            ),
+        "flat"     : (
+            { "plane", "constant", "const", "c", "f" },
+            "Constant temperature for every pixel.",
+            lambda p: p['T_max']
+            ),
+        "random"   : (
+            { "rand", "r" },
+            "Random values for every cell from 0 to the defined scale (T_max).",
+            lambda p: p['T_max'] * np.random.rand()
+            ),
+        "sinusoid" : (
+            { "sinc", "interference", "fringe", "i", "intf", "s" },
+            "Rotationally symmetric centered sinc function with freq = 1/d(t).",
+            lambda p: RegridHelper.sinc(p['r'], f=1/p['d'][2], amp=p['T_max'])
+            ),
+        "point"    : (
+            { "delta", "source", "p" },
+            "A point source in the direct centre of the field.",
+            lambda p: p['T_max'] if (p['i'] == p['d'][0] // 2 and p['j'] == p['d'][1] // 2) else 0
+            ),
+        "dark"     : (
+            { "clear", "empty", "d" },
+            "A completely clear sky.",
+            lambda p: 0,
+            ),
+        "coeval1"  : (
+            { "coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1" },
+            "One of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
+            + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
+            lambda p: RegridHelper.COEVAL_TEMPLATE_VALUES_1[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)]
+            ),
+        "coeval2"  : (
+            { "coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2" },
+            "The second of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
+            + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
+            lambda p: RegridHelper.COEVAL_TEMPLATE_VALUES_2[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)]
+            )
+    }
 
     @staticmethod
-    def mock_values(preset, scale = 10, d = (100, 100, 100)):
+    def display_template_presets(print_presets=True, filter_preset=""):
+        """
+        Return and/or display all available templates, their names, and their descriptions. All templates except random, coeval1, and coeval2 are identical in all t-dimension voxels.
+
+        :param print_presets: If true print the templates to console and return the dictionary. If false only return the dictionary.
+        :param filter_preset: If true print/return the information for only one specific template entry, according to the given string.
+        
+        :return: The dictionary containing all available templates or a dictionary of the specific desired template.
+        """
+
+        return RegridHelper.display_options(Regrid.TEMPLATE_PRESETS, print_options=print_presets, selection=filter_preset)
+
+    @staticmethod
+    def mock_values(preset, scale = 10, d = (100, 100, 100), special = None):
         """
         Create an array of mock simulation values.
 
-        :param preset: Mock brightness temperature array format. Options are {"flat", "random", "gaussian", "sinusoid"}
-        :param scale: Define the Kelvin scale of the array (e.g. default value will create a uniform array of 10 K or a random array of 0 - 10 K).
+        :param preset: Mock brightness temperature array format. Run Regrid.display_template_presets for more information.
+        :param scale: a.k.a. `T_max`. The maximum Kelvin value for the whole array, acts as a normalisation factor.
         :param d: The size of the values datacube.
+        :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `theta`, `T_max`) and returns a float, treat the preset parameter as a custom name. Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
+
         :return: Mock brightness temperature values.
         """
-        print("Creating mock brightness temperatures ...")
 
+        # Select specific template
+        if special is None:
+            selection = Regrid.display_template_presets(False, preset)
+            preset = list(selection.keys())[0]
+            func = selection[preset]
+        else:
+            func = special
+
+        # Create initial array
+        print("Creating mock brightness temperatures for the template: "+preset)
         values = np.zeros(d).astype(np.float64)
 
-        for x in range(d[0]):
-            for y in range(d[1]):
+        # Iterate through all elements of the dictionary
+        for i in range(d[0]):
+            for j in range(d[1]):
                 for t in range(d[2]):
-                    values[x, y, t] = np.sqrt((x-d[0]/2)**2 + (y-d[1]/2)**2)
+                    # Define the iteration dictionary
+                    params = {
+                        "d" : d, "i" : i, "j" : j, "t": t,
+                        "x" : i - d[0]/2, "y" : j - d[1]/2,
+                        "r": np.sqrt((i - d[0]/2)**2 + (j - d[1]/2)**2),
+                        "theta" : np.tan((j - d[1]/2)/(i - d[0]/2)),
+                        "T_max" : scale
+                        }
+                    
+                    # Populate array cell
+                    values[i, j, t] = func(params)
 
-        normal = lambda x, mean=0, var=1: np.exp(-(x-mean)**2/(2*var))/np.sqrt(2*np.pi*var)
-        sinusoid = lambda x, f=1, ph=0: np.sin(2*np.pi*f*x+ph)
-
-        # Set values array
-        if preset == "random":
-            # Completely random values
-            values = np.random.rand(*d) * scale
-        elif preset == "flat":
-            # Completely uniform values
-            values = np.ones(d) * scale
-        elif preset == "gaussian":
-            # Simple gaussian over sky in y-direction
-            values = normal(values, var=d[2])
-        elif preset == "sinusoid":
-            # Simple sine wave over sky in x-direction
-            values = sinusoid(values, f=5/d[2])
-        elif preset == "point":
-            # Point source with diffusion of 2-Sigma
-            values = normal(values, var=2)
-
-        # FIXME: Add OzStar H5 files as template files
-
-        return values.astype(np.float64)
+        return values.astype(np.float64), preset
 
     @staticmethod
     def convert_H5_coeval_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
@@ -258,6 +381,7 @@ class Regrid():
         :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
         :param outdir: The directory to output both CSV and text information.
         :param name: The file name template to be saved to.
+
         :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
 
@@ -342,7 +466,7 @@ class Regrid():
             return Regrid.convert_H5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
         
     @staticmethod
-    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), cosmology=Cosmo()):
+    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1.5, 1.5, 1.5), cosmology=Cosmo()):
         """
         Transform a datacube with dimensions x, y, t (cMpc x cMpc x cMpc) to ⍺, δ, f (rad x rad x Hz),
 
@@ -357,7 +481,7 @@ class Regrid():
         """
 
         # Configure d variable
-        d = values.shape()
+        d = np.shape(values)
 
         # Set regrid flag
         regrid_flag = require_regrid
@@ -400,7 +524,7 @@ class Regrid():
                     # STEPS 2 & 3 - Convert line-of-sight comoving distance to frequency
                     df = 0
 
-                    if (x == 0 and y == 0):
+                    if x == y == 0:
                         # Determine corresponding redshifts
                         z_bot = z_prev
                         z_top = cosmology.Dz_to_z(Dz+dt*u.Mpc)
@@ -460,7 +584,7 @@ class Regrid():
         max_freq_res_hz = max_freq_res.to_value(u.Hz)
 
         # Configure d variable
-        d = values.shape()
+        d = np.shape(values)
 
         for x in range(d[0]):
             for y in range(d[1]):
@@ -475,9 +599,9 @@ class Regrid():
                 dspline = misp(freq_values, sigma_f[x, y, :])
 
                 # Check maximum frequency resolution
-                if np.abs(freq_values[0], freq_values[-1])/d[2] > max_freq_res_hz:
+                if np.abs(freq_values[0] - freq_values[-1])/d[2] > max_freq_res_hz:
                     # Resize d[2] to match maximum resolution
-                    d[2] = np.abs(freq_values[0], freq_values[-1])/max_freq_res_hz
+                    d[2] = np.abs(freq_values[0] - freq_values[-1])/max_freq_res_hz
 
                 # Generate evenly-distributed frequency array
                 new_freq, freq_bandw = np.linspace(freq_values[0], freq_values[-1], d[2], retstep=True)
@@ -544,12 +668,12 @@ class Regrid():
         print("Configuring datacube for OSKAR file format ...")
 
         # Configure d variable
-        d = values.shape()
+        d = np.shape(values)
 
         # Cumulative sums are more important than voxel bins now
         (RAs, Dcs, freqsum) = (None, None, None) # Keep Pylint Happy
         if cumulative_voxels is None and voxels is None:
-            raise ValueError("Error: Either an array of voxels or cumulative voxes must be provided!")
+            raise ValueError("Either an array of voxels or cumulative voxes must be provided!")
         elif voxels is None:
             (RAs, Dcs, freqsum) = cumulative_voxels
         elif cumulative_voxels is None:
@@ -581,8 +705,8 @@ class Regrid():
                         linew = np.format_float_scientific(sigma_f[x, y, t], 4, False)
 
                         # Add +/- value to Declinations
-                        if Dcs[x, y, t] >= 0: Decln = "+" + str(Decln)
-                        else:                 Decln = "-" + str(Decln)
+                        if Dcs[x, y, t] >= 0: decln = "+" + str(decln)
+                        else:                 decln = "-" + str(decln)
 
                         # Write to OSM
                         osm.write(
@@ -617,7 +741,7 @@ class Regrid():
         obs_length_flag = False
 
         if obs_length_flag:
-            warnings.warn("Warning: The provided observation time is too long! The object will not be in the sky for the entire duration of time.")
+            warnings.warn("The provided observation time is too long! The object will not be in the sky for the entire duration of time.")
 
         return ref_time, obs_length_flag
     # pylint: enable=unused-argument
@@ -645,14 +769,14 @@ class Regrid():
         # Cumulative sums are more important than voxel bins now
         (RAs, Dcs, freqsum) = (None, None, None) # Keep Pylint Happy
         if cumulative_voxels is None and voxels is None:
-            raise ValueError("Error: Either an array of voxels or cumulative voxes must be provided!")
+            raise ValueError("Either an array of voxels or cumulative voxes must be provided!")
         elif voxels is None:
             (RAs, Dcs, freqsum) = cumulative_voxels
         elif cumulative_voxels is None:
             (RAs, Dcs, freqsum) = Regrid.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
 
         # Configure d variable
-        d = values.shape()
+        d = np.shape(values)
 
         # Create deep copy of union/logical or settings set
         dynamic_settings = dict(RegridHelper.DEFAULT_INTERFEROMETER_SETTINGS)
@@ -692,7 +816,7 @@ class Regrid():
         return dynamic_settings
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, z_ref = 7, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1, 1, 1), osm_output="regrid/osm_output/osm_output.osm", cosmology=Cosmo(), save_dynamic_settings = "", ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
+    def generate_osm_from_simulation(values, voxels = None, z_ref = 7, phase_ref_point = RegridHelper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1.5, 1.5, 1.5), osm_output="regrid/osm_output/osm_output.osm", cosmology=Cosmo(), save_dynamic_settings = "", ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -714,7 +838,7 @@ class Regrid():
         print("Initialising ...")
 
         # Configure d variable
-        d = values.shape()
+        d = np.shape(values)
 
         # Set default voxel array according to v
         if voxels is None:
@@ -1112,10 +1236,10 @@ class BTAnalysisPipeline(object):
 
 for template_preset in ["gaussian", "point", "random", "flat", "sinusoid", "point"]:
     template_value = Regrid.mock_values(template_preset, scale=20)
-    Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"))
+    Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"))
 
 for template_preset in ["yuxiang1", "yuxiang2"]:
-    Regrid.generate_osm_from_H5(RegridHelper.expand_path("~/.oskar/simulations/legacy_templates/"+template_preset+".h5"), osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), coeval=True)
+    Regrid.generate_osm_from_H5(RegridHelper.expand_path("~/.oskar/simulations/legacy_templates/"+template_preset+".h5"), osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), coeval=True, save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"))
 
 #BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
 
