@@ -142,7 +142,7 @@ class RegridHelper():
 
         for option in options:
             if selection.lower() == option or selection.lower() in options[option][0]:
-                return options[option]
+                return { option : options[option] }
             
         raise ValueError("Option "+selection+" is not a valid option.")
 
@@ -337,7 +337,7 @@ class Regrid():
         :param preset: Mock brightness temperature array format. Run Regrid.display_template_presets for more information.
         :param scale: a.k.a. `T_max`. The maximum Kelvin value for the whole array, acts as a normalisation factor.
         :param d: The size of the values datacube.
-        :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `theta`, `T_max`) and returns a float, treat the preset parameter as a custom name. Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
+        :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `T_max`) and returns a float, treat the preset parameter as a custom name. Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
 
         :return: Mock brightness temperature values.
         """
@@ -346,7 +346,7 @@ class Regrid():
         if special is None:
             selection = Regrid.display_template_presets(False, preset)
             preset = list(selection.keys())[0]
-            func = selection[preset]
+            func = selection[preset][2]
         else:
             func = special
 
@@ -363,7 +363,6 @@ class Regrid():
                         "d" : d, "i" : i, "j" : j, "t": t,
                         "x" : i - d[0]/2, "y" : j - d[1]/2,
                         "r": np.sqrt((i - d[0]/2)**2 + (j - d[1]/2)**2),
-                        "theta" : np.tan((j - d[1]/2)/(i - d[0]/2)),
                         "T_max" : scale
                         }
                     
