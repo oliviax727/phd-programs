@@ -19,8 +19,6 @@ from astropy.cosmology import FlatLambdaCDM as fmodel
 from astropy.cosmology import z_at_value as getz
 from scipy.interpolate import make_interp_spline as misp
 
-# FIXME: Test both the OSM and OSKAR project parts of the file
-
 # TODO: Turn into pip project (later)
 
 # TODO: Clean pylint errors
@@ -50,14 +48,14 @@ class RegridHelper():
 
     # Define default settings
     DEFAULT_INTERFEROMETER_SETTINGS = {
-        "general": {
+        "General": {
             "app": "oskar_sim_interferometer"
         },
         "simulator": {
             "use_gpus": False
         },
         "observation" : {
-            "num_time_steps": 24
+            "num_time_steps": 24,
         },
         "telescope": {
             "input_directory": "telescope_model",
@@ -83,7 +81,7 @@ class RegridHelper():
     }
 
     DEFAULT_IMAGER_SETTINGS = {
-        "general": {
+        "General": {
             "app": "oskar_imager"
         },
         "image": {
@@ -94,7 +92,31 @@ class RegridHelper():
         }
     }
 
-    DEFAULT_GENERAL_SETTINGS = DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | { "general": {} }
+    # Calculated settings: [observation] start_frequency_hz, num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, length, start_time_utc
+    # Calculated settings: [image] fov_deg, size
+    DEFAULT_DYNAMIC_GENERAL_SETTINGS = {
+        "observation" : {
+            "start_frequency_hz": 200e6,
+            "num_channels": 100,
+            "frequency_inc_hz": 140e3,
+            "phase_centre_ra_deg": 0.0,
+            "phase_centre_dec_deg": -27.0,
+            "length": "4:00:00.00",
+            "start_time_utc": "2025-03-03 03:30:00.00"
+        },
+        "image" : {
+            "fov_deg": 1.5,
+            "size": 100
+        }
+    }
+
+    PRIMARY_GENERAL_SETTINGS = { "General": {} }
+
+    DEFAULT_GENERAL_SETTINGS = DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | DEFAULT_DYNAMIC_GENERAL_SETTINGS | PRIMARY_GENERAL_SETTINGS
+
+    # Legal settings keywords
+    LEGAL_INTERFEROMETER_HEADINGS = { "simulator", "sky", "telescope", "observation", "interferometer"}
+    LEGAL_IMAGER_HEADINGS = { "image" }
 
     # Angular distance calculation
     norm = lambda t: (t % 360 + 360) % 360 - 180
@@ -225,6 +247,36 @@ class RegridHelper():
                 else:
                     file.write(line)
 
+    @staticmethod
+    def read_settings_to_dictionary(file):
+        """
+        Convert a settings ini file into a dictionary using configparser.
+
+        :param file: The specific ini file to read.
+
+        :return: The settings in the form of a dictionary.
+        """
+
+        config = cfp.ConfigParser()
+        config.read_file(open(file, encoding='utf-8'))
+
+        return { s: dict(config.items(s)) for s in config.sections() }
+    
+    @staticmethod
+    def save_settings_from_dictionary(file, settings_dict):
+        """
+        Save a dictionary contents as an ini file using configparser.
+
+        :param file: The specific ini file to save the data to.
+        """
+
+        config = cfp.ConfigParser()
+        config.read_dict(settings_dict)
+
+        with open(file, 'w', encoding='utf-8') as settings_file:
+            config.write(settings_file)
+    
+
 class Cosmo():
     """
     Define a static cosmology method for other classes to use.
@@ -329,7 +381,9 @@ class Regrid():
         :param preset: Mock brightness temperature array format. Run Regrid.display_template_presets for more information.
         :param scale: a.k.a. `T_max`. The maximum Kelvin value for the whole array, acts as a normalisation factor.
         :param d: The size of the values datacube.
-        :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `T_max`) and returns a float, treat the preset parameter as a custom name. Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
+        :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `T_max`) and returns a float, treat the preset parameter as a custom name.
+        
+        Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
 
         :return: Mock brightness temperature values.
         """
@@ -347,9 +401,9 @@ class Regrid():
         values = np.zeros(d).astype(np.float64)
 
         # Iterate through all elements of the dictionary
-        for i in range(d[0]):
-            for j in range(d[1]):
-                for t in range(d[2]):
+        for t in range(d[2]):
+            for i in range(d[0]):
+                for j in range(d[1]):
                     # Define the iteration dictionary
                     params = {
                         "d" : d, "i" : i, "j" : j, "t": t,
@@ -360,8 +414,10 @@ class Regrid():
                     
                     # Populate array cell
                     values[i, j, t] = func(params)
+
+            print("\rTime step #", t, end="")
         
-        print("Values created!")
+        print("\nValues created!")
 
         return values.astype(np.float64)
 
@@ -856,11 +912,7 @@ class Regrid():
         if save_dynamic_settings != "":
             settings_path = RegridHelper.expand_path(save_dynamic_settings)
 
-            config = cfp.ConfigParser()
-            config.read_dict(dynamic_settings)
-
-            with open(save_dynamic_settings, 'w', encoding='utf-8') as settings_file:
-                config.write(settings_file)
+            RegridHelper.save_settings_from_dictionary(save_dynamic_settings, dynamic_settings)
 
             print("Saved dynamic and default settings to ini file: "+settings_path)
 
@@ -933,7 +985,7 @@ class BTAnalysisPipeline(object):
     """
 
     @staticmethod
-    def configure_oskar_settings(osm_file, dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", save_ini=""):
+    def configure_oskar_settings(dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS, interferometer_settings_override = "", imager_settings_override = "", save_ini=""):
         """
         Configure the settings files for the OSKAR interferometer and imager programs.
 
@@ -947,64 +999,66 @@ class BTAnalysisPipeline(object):
         :return: The updated settings dictionary.
         """
 
-        #_, osm_settings = Regrid.convert_osm_file_to_arrays(osm_file)
+        # Function to mutate the existing dynamic settings dictionary
+        def mutate_settings(override_file, settings_dict):
+            override_data = RegridHelper.read_settings_to_dictionary(override_file)
+
+            return settings_dict | override_data | RegridHelper.PRIMARY_GENERAL_SETTINGS
 
         # Setup the interferometer ini file
-        # FIXME: Write to new interferometer file and copy over settings
-        #with open('sim_intif.ini', 'w', encoding='utf-8'):
+        if interferometer_settings_override != "":
+            dynamic_settings = mutate_settings(interferometer_settings_override, dynamic_settings)
+            
+        if imager_settings_override != "":
+            dynamic_settings = mutate_settings(imager_settings_override, dynamic_settings)
+
+        if save_ini != "":
+            RegridHelper.save_settings_from_dictionary(save_ini, dynamic_settings)
         
-            # Set sky model location
-            #ofname = "oskar_sky_model/file="+osm_file
-
-            # Set frequency bin
-            #freq = osm.split("_")[-1][:-7]+"e6"
-            #ofname = r"start_frequency_hz="+freq
-            #BTAnalysisPipeline.find_replace_line("BTA/test_intif.ini", "freqset", ofname)
-
-            # Setup the imager ini file
-            #with open('sim_img.ini', 'w', encoding='utf-8'):
-                # Set the pixel resolution
-                #ofname = "size="+str(size) 
-                #BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "sizeset", ofname)
-
-                # Set the FOV
-                #ofname = "fov_deg="+str(fov)
-                #BTAnalysisPipeline.find_replace_line("BTA/test_img.ini", "fovset", ofname)
-
-        if save_ini:
-            print(0)
-        
-        return {}
+        return dynamic_settings
     
     @staticmethod
-    def split_general_settings(dynamic_settings = None, settings_file = "", use_imager = True):
+    def split_general_settings(settings = ("", None), use_imager = True, save_file=True):
         """
         Split a settings dictionary into its components for the OSKAR interferometer and OSKAR imager.
 
-        :param dynamic_settings: Dynamically generated settings from the regridding code. If none do not mutate.
-        :param settings_file: A file containing the ini settings. If empty don't split the settings files.
+        :param settings: A tuple containing a filepath and dictionary, the code will always prioritise using an evaluation the dictionary if available.
         :param use_imager: Whether to create a seperate imager file path and settings dictionary pair.
+        :param save_file: If true, save to a file with a path and base name given by settings.
 
         :return: The two tuples containing the split settings (settings file location, settings dictionary)
         """
 
+        # Declare default return values
         interf_settings_dict = None
         imager_settings_dict = None
 
         interf_settings_path = ""
         imager_settings_path = ""
 
-        if not dynamic_settings is None:
-            print(0)
+        # If file is provided but not a dictionary, read the file
+        if settings[1] is None and settings[0] != "":
+            settings[1] = RegridHelper.read_settings_to_dictionary(settings[0])
 
-        if settings_file != "":
-            print(0)
+        # Make sure that the settings exists before splitting
+        if not settings[1] is None:
+            interf_settings_dict = {k: settings[k] for k in RegridHelper.LEGAL_INTERFEROMETER_HEADINGS}
 
-        if use_imager:
-            return (interf_settings_path, interf_settings_dict), (imager_settings_path, imager_settings_dict)
-        else:
-            return (interf_settings_path, interf_settings_dict), (None, "")
+            if use_imager:
+                imager_settings_dict = {k: settings[k] for k in RegridHelper.LEGAL_IMAGER_HEADINGS}
 
+        # Make sure a file path has been provided to save the file to
+        if settings[0] != "" and save_file:
+            interf_settings_path = settings[0] + ".oskar_sim_interferometer.ini"
+
+            RegridHelper.save_settings_from_dictionary(interf_settings_path, interf_settings_dict)
+
+            if use_imager:
+                imager_settings_path = settings[0] + ".oskar_imager.ini"
+                
+                RegridHelper.save_settings_from_dictionary(imager_settings_path, imager_settings_dict)
+
+        return (interf_settings_path, interf_settings_dict), (imager_settings_path, imager_settings_dict)
 
     @staticmethod
     def run_oskar_on_osms(osm_file, interferometer_settings = ("", RegridHelper.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", RegridHelper.DEFAULT_IMAGER_SETTINGS), fits_output="./fits_output.fits", oskar_exec=None, oskar_mode="python", use_imager=True):
@@ -1185,10 +1239,7 @@ class BTAnalysisPipeline(object):
                     subprocess.run(["cp", RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), osm_output], check=True)
                     subprocess.run(["cp", RegridHelper.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"), ini_output], check=True)
 
-                    config = cfp.ConfigParser()
-                    config.read_file(open(ini_output, encoding='utf-8'))
-
-                    dynamic_settings = {s:dict(config.items(s)) for s in config.sections()}
+                    dynamic_settings = RegridHelper.read_settings_to_dictionary(ini_output)
                 else:
                     # IF we want to skip generating the osm file AND a use a specified already-complete osm file
                     subprocess.run(["cp", file, osm_output], check=True)
@@ -1197,7 +1248,6 @@ class BTAnalysisPipeline(object):
 
         # Configure the OSKAR settings
         dynamic_settings = BTAnalysisPipeline.configure_oskar_settings(
-            osm_file=osm_output,
             dynamic_settings=dynamic_settings,
             interferometer_settings_override=interf_override_ini,
             imager_settings_override=imager_override_ini,
@@ -1205,7 +1255,7 @@ class BTAnalysisPipeline(object):
             )
 
         # Split the current settings files and retreive specific files
-        interferometer_settings, imager_settings = BTAnalysisPipeline.split_general_settings(dynamic_settings=dynamic_settings, settings_file=ini_output, use_imager=use_imager)
+        interferometer_settings, imager_settings = BTAnalysisPipeline.split_general_settings(settings=(ini_output, dynamic_settings), use_imager=use_imager, save_file=True)
 
         # Run OSKAR
         print("Running OSKAR ...")
