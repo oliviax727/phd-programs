@@ -515,7 +515,7 @@ class Regrid():
             return Regrid.convert_H5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
         
     @staticmethod
-    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1.5, 1.5, 1.5), cosmology=Cosmo()):
+    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, cosmology=Cosmo()):
         """
         Transform a datacube with dimensions x, y, t (cMpc x cMpc x cMpc) to ⍺, δ, f (rad x rad x Hz),
 
@@ -796,7 +796,7 @@ class Regrid():
     # pylint: enable=unused-argument
 
     @staticmethod
-    def generate_dynamic_settings(values, voxels = None, cumulative_voxels = None, phase_ref_point = RegridHelper.ZENITH_530, f_ref = 200 * u.MHz, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR):
+    def generate_dynamic_settings(values, voxels = None, cumulative_voxels = None, phase_ref_point = RegridHelper.ZENITH_530, f_ref = 200 * u.MHz, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR, save_dynamic_settings = ""):
         """
         Generates a set of dynamically-set ini settings for OSKAR to utilise.
 
@@ -808,6 +808,7 @@ class Regrid():
         :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+        :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
 
         :return: The dynamically defined settings dictionary.
         """
@@ -861,6 +862,14 @@ class Regrid():
         # Set the observation time and length
         dynamic_settings['observation']['start_time_utc'] = (ref_time - observation_length / 2).utc.value
         dynamic_settings['observation']['length'] = str(observation_length.to_value(format='datetime'))
+
+        # Save the dynamic settings
+        if save_dynamic_settings != "":
+            settings_path = RegridHelper.expand_path(save_dynamic_settings)
+
+            RegridHelper.save_settings_from_dictionary(save_dynamic_settings, dynamic_settings)
+
+            print("Saved dynamic and default settings to ini file: "+settings_path)
         
         return dynamic_settings
 
@@ -895,7 +904,7 @@ class Regrid():
             voxels = np.full((*d, 3), v, dtype=np.float64)
 
         # Transform datacube
-        values, voxels, sigma_f, f_ref, regrid_flag = Regrid.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, v=v, cosmology=cosmology)
+        values, voxels, sigma_f, f_ref, regrid_flag = Regrid.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, cosmology=cosmology)
 
         # STEP 7 - Regrid frequency-dimension data if needed
         if regrid_flag:
@@ -907,14 +916,16 @@ class Regrid():
         Regrid.save_datacube_to_osm(values=values, voxels=voxels, sigma_f=sigma_f, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
 
         # Output dynamic settings file
-        dynamic_settings = Regrid.generate_dynamic_settings(values=values, voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point, ref_time=ref_time, ref_location=ref_location, observation_length=observation_length)
-
-        if save_dynamic_settings != "":
-            settings_path = RegridHelper.expand_path(save_dynamic_settings)
-
-            RegridHelper.save_settings_from_dictionary(save_dynamic_settings, dynamic_settings)
-
-            print("Saved dynamic and default settings to ini file: "+settings_path)
+        dynamic_settings = Regrid.generate_dynamic_settings(
+            values=values,
+            voxels=voxels,
+            f_ref=f_ref,
+            phase_ref_point=phase_ref_point,
+            ref_time=ref_time,
+            ref_location=ref_location,
+            observation_length=observation_length,
+            save_dynamic_settings=save_dynamic_settings
+        )
 
         return dynamic_settings
         
@@ -953,28 +964,58 @@ class Regrid():
                 save_dynamic_settings=save_dynamic_settings
                 )
     
-    # FIXME: Reverse-read OSM
     @staticmethod
-    def convert_osm_file_to_arrays(osm_file, generate_dynamic_settings = True):
+    # FIXME: Reverse-Read OSM
+    def convert_osm_file_to_arrays(osm_file, generate_dynamic_settings = True, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR, save_dynamic_settings = "", d = None):
         """
         Reverse-engineer an osm file to retreive its values, voxels, sigma_f, f_ref, phase_ref_point, and dynamic settings.
 
-        :param osm_file: The OSM file to analyse.
-        :param generate_dynamic_settings: Whether or not to reverse-engineer the dynamic settings as well
+        NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending).
 
-        :return: The values, voxels, sigma_f, f_ref, and phase_ref_point contained in a tuple. If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
+        :param osm_file: The OSM file to analyse.
+        :param generate_dynamic_settings: Whether or not to reverse-engineer the dynamic settings as well.
+        :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
+        :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
+        :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+        :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
+        :param d: The dimensions of the array, if none, the program will assume a cubic values array with side-lengths equal to the floor of the cube root of the number of entries in the OSM file.
+
+        :return: The values, voxels, cumulative voxels, sigma_f, f_ref, and phase_ref_point contained in a dictionary. If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
         """
 
-        #df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
+        df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
 
-        print(osm_file)
+        #values, voxels = None, cumulative_voxels = None, phase_ref_point = RegridHelper.ZENITH_530, f_ref = 200 * u.MHz
+        output_data = {
+            "values": None,
+            "voxels": None,
+            "cumulative_voxels": None,
+            "phase_ref_point": None,
+            "f_ref": None
+        }
 
-        output_data = (None, None, None, None, None)
+        # Get dimensions of box
+        if d is None:
+            d = np.ones(3, dtype=np.int32) * int(np.floor(df.shape[0] ** (1/3)))
+
+        # Extract values
+        output_data["values"] = np.array(df["Stokes I"]).reshape(d)
 
         if generate_dynamic_settings:
-            dynamic_settings = RegridHelper.DEFAULT_GENERAL_SETTINGS
+            dynamic_settings = Regrid.generate_dynamic_settings(
+                values = output_data["values"],
+                voxels = output_data["voxels"],
+                cumulative_voxels = output_data["cumulative_voxels"],
+                phase_ref_point = output_data["phase_ref_point"],
+                f_ref = output_data["f_ref"],
+                ref_time=ref_time,
+                ref_location=ref_location,
+                observation_length=observation_length,
+                save_dynamic_settings=save_dynamic_settings
+                )
 
             return output_data, dynamic_settings
+        
         else:
             return output_data
 
@@ -1061,6 +1102,7 @@ class BTAnalysisPipeline(object):
         return (interf_settings_path, interf_settings_dict), (imager_settings_path, imager_settings_dict)
 
     @staticmethod
+    # FIXME: Read interferometer and imager settings files
     def run_oskar_on_osms(osm_file, interferometer_settings = ("", RegridHelper.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", RegridHelper.DEFAULT_IMAGER_SETTINGS), fits_output="./fits_output.fits", oskar_exec=None, oskar_mode="python", use_imager=True):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Regrid object.
@@ -1160,8 +1202,7 @@ class BTAnalysisPipeline(object):
 
         :param file: Location of the H5 file.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
-        :param require_regrid: If true then always regrid frequency bins, if false,
-        regrid only when max frequency resolution is met.
+        :param require_regrid: If true then always regrid frequency bins, if false, regrid only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
         :param interferometer_settings_override: The file location of the OSKAR imager settings file.
         :param imager_settings_override: The file location of the OSKAR interferometer settings template file.
@@ -1217,7 +1258,17 @@ class BTAnalysisPipeline(object):
                     # IF we want to generate a fresh osm file AND its from a template
                     print("Generating OSM files from template ...")
                     template_values = Regrid.mock_values(template_preset)
-                    dynamic_settings = Regrid.generate_osm_from_simulation(template_values, osm_output=osm_output, save_dynamic_settings=ini_output)
+                    dynamic_settings = Regrid.generate_osm_from_simulation(
+                        template_values,
+                        phase_ref_point=phase_ref_point,
+                        require_regrid=require_regrid,
+                        max_freq_res=max_freq_res,
+                        osm_output=osm_output,
+                        ref_time=ref_time,
+                        ref_location=ref_location,
+                        observation_length=observation_length,
+                        save_dynamic_settings=ini_output
+                        )
                 else:
                     # IF we want to generate a fresh osm file AND its from a provided h5 file
                     print("Generating OSM files from H5 ...")
@@ -1244,7 +1295,14 @@ class BTAnalysisPipeline(object):
                     # IF we want to skip generating the osm file AND a use a specified already-complete osm file
                     subprocess.run(["cp", file, osm_output], check=True)
 
-                    _, dynamic_settings = Regrid.convert_osm_file_to_arrays(osm_output, generate_dynamic_settings=True)
+                    _, dynamic_settings = Regrid.convert_osm_file_to_arrays(
+                        osm_output,
+                        generate_dynamic_settings=True,
+                        ref_time=ref_time,
+                        ref_location=ref_location,
+                        observation_length=observation_length,
+                        save_dynamic_settings=ini_output
+                        )
 
         # Configure the OSKAR settings
         dynamic_settings = BTAnalysisPipeline.configure_oskar_settings(
@@ -1277,14 +1335,17 @@ class BTAnalysisPipeline(object):
 # Testing stage
 # pylint: disable=line-too-long
 
-for template_preset in Regrid.TEMPLATE_PRESETS:
-    if "coeval" in template_preset:
-        template_value = Regrid.mock_values(template_preset, scale=20, d=(400, 400, 400))
-    else:
-        continue
+#for template_presett in Regrid.TEMPLATE_PRESETS:
+#    if "coeval" in template_presett:
+#        template_value = Regrid.mock_values(template_presett, scale=20, d=(400, 400, 400))
+#    else:
+#        continue
+#
+#    Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_presett+"_sky_model.osm"), save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_presett+"_general_settings.ini"))
 
-    Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"))
+# FIXME: Test refactored code
 
 #BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
 
 #BTAnalysisPipeline.h5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
+
