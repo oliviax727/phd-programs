@@ -1039,7 +1039,6 @@ class Regrid():
                 )
     
     @staticmethod
-    # FIXME: Reverse-Read OSM
     def convert_osm_file_to_arrays(osm_file, generate_dynamic_settings = True, phase_ref_point_override = None, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR, save_dynamic_settings = "", d = None):
         """
         Reverse-engineer an osm file to retreive its values, voxels, sigma_f, f_ref, phase_ref_point, and dynamic settings.
