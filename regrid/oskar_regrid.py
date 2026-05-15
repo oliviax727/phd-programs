@@ -18,12 +18,11 @@ from astropy.time import Time, TimeDelta
 from astropy.cosmology import FlatLambdaCDM as fmodel
 from astropy.cosmology import z_at_value as getz
 from scipy.interpolate import make_interp_spline as misp
+from scipy.stats import circmean as circmean_radians
 
 # TODO: Turn into pip project (later)
 
 # TODO: Clean pylint errors
-# pylint: disable=missing-function-docstring
-# pylint: disable=unnecessary-lambda-assignment
 # pylint: disable=invalid-name
 
 # pylint: disable-next=unused-import
@@ -32,7 +31,7 @@ from matplotlib import pyplot as plt
 # Regrid helper functions
 class RegridHelper():
     """
-        Helper functions and constants for the Regridding process.
+        Helper functions and constants specific to the regridding and oskar handling process.
     """
 
     # Define Constants
@@ -118,27 +117,12 @@ class RegridHelper():
     LEGAL_INTERFEROMETER_HEADINGS = { "simulator", "sky", "telescope", "observation", "interferometer"}
     LEGAL_IMAGER_HEADINGS = { "image" }
 
-    # Angular distance calculation
-    norm = lambda t: (t % 360 + 360) % 360 - 180
-    delta = lambda a, b: RegridHelper.norm(a)-RegridHelper.norm(b)
-    diff = lambda a, b: min(abs(RegridHelper.delta(a, b)),360-abs(RegridHelper.delta(a, b)))
-    diff_sgn = lambda a, b: RegridHelper.delta(a, b) - 360 if RegridHelper.delta(a, b) > 180 else (RegridHelper.delta(a, b) + 360 if RegridHelper.delta(a, b) < -180 else RegridHelper.delta(a, b))
-
     # Load yuxiang's h5 data
     # Properties: size = (400, 400, 400) px; voxels = (1.5, 1.5, 1.5) cMPc; z_ref = ~7 (box #1), ~8 (box #2)
     COEVAL_TEMPLATE_1        = h5py.File('/home/olivia/.oskar/simulations/legacy_templates/yuxiang1.h5', 'r')
     COEVAL_TEMPLATE_2        = h5py.File('/home/olivia/.oskar/simulations/legacy_templates/yuxiang2.h5', 'r')
     COEVAL_TEMPLATE_VALUES_1 = np.array(COEVAL_TEMPLATE_1.get('BrightnessTemp')['brightness_temp'])
     COEVAL_TEMPLATE_VALUES_2 = np.array(COEVAL_TEMPLATE_2.get('BrightnessTemp')['brightness_temp'])
-
-    # Normal, sinusoid, and sinc functions for convenienve
-    normal   = lambda x, mean=0, var=1, norm=1/np.sqrt(2*np.pi): norm * np.exp(-(x-mean)**2/(2*var))/np.sqrt(2*np.pi*var)
-    sinusoid = lambda x, f=1, ph=0, amp=1:                       amp * np.cos(2*np.pi*f*x+ph)
-    sinc     = lambda x, f=1, ph=0, amp=1:                       amp * np.nan_to_num(np.sin(2*np.pi*f*x+ph)/(2*np.pi*f*x+ph), nan=1, posinf=1, neginf=1)
-    
-    # Convert FWHM to Variance and vice versa
-    FWHM  = lambda x: x * 2 * np.sqrt(2*np.log(2))
-    STDEV = lambda x: x / (2 * np.sqrt(2*np.log(2)))
 
     @staticmethod
     def select_option(options, selection):
@@ -188,18 +172,6 @@ class RegridHelper():
             print("============")
             
         return options
-
-    # l, m, n to RA, Dec
-    @staticmethod
-    def lm_to_radec(l, m, phase_centre=ZERO_RADEC):
-        d0 = phase_centre.dec.to_value(u.rad)
-        a0 = phase_centre.ra.to_value(u.rad)
-        n = np.sqrt(1-l**2-m**2)
-
-        Dec = np.arcsin(m*np.cos(d0)+n*np.sin(d0))
-        Ra = a0 + np.arctan(l/(n*np.cos(d0)-m*np.sin(d0)))
-
-        return [Ra, Dec]
 
     @staticmethod
     def expand_path(path):
@@ -275,7 +247,103 @@ class RegridHelper():
 
         with open(file, 'w', encoding='utf-8') as settings_file:
             config.write(settings_file)
+
+class Maths():
+    """
+    Mathematical helper functions for various calculations used throughout the document. All angle units are in radians unless if otherwise specified.
+    """
+
+    # Angular distance calculations in degrees
+    @staticmethod
+    def normalise_angle(t):
+        """ Calculate the normalised angle """
+        return (t % 360 + 180) % 360 - 180
     
+    normalise = normalise_angle
+    norm = normalise_angle
+
+    @staticmethod
+    def denormalise_angle(t):
+        """ Denormalise an angle i.e. convert to [0, 360). """
+        return (t % 360 + 360) % 360
+    
+    denormalise = denormalise_angle
+    denorm = denormalise_angle
+
+    @staticmethod
+    def angle_delta(a, b):
+        """ Calculate the unnormalised difference between two angles. """
+        return Maths.norm(a)-Maths.norm(b)
+
+    delta = angle_delta
+
+    @staticmethod
+    def angle_difference(a, b):
+        """ Calculate the true difference between two angles. """
+        return min(abs(Maths.delta(a, b)),360-abs(Maths.delta(a, b)))
+
+    angle_difference = np.vectorize(angle_difference)
+    diff = angle_difference
+
+    @staticmethod
+    def signed_angle_difference(a, b):
+        """ Calculate the signed difference between two angles. """
+        return Maths.norm(Maths.delta(a, b) - 360) if (Maths.delta(a, b)) > 180 else ((Maths.delta(a, b) + 360) if Maths.delta(a, b) < -180 else Maths.delta(a, b))
+
+    signed_angle_difference = np.vectorize(signed_angle_difference)
+    diff_sgn = signed_angle_difference
+
+    # Scipy circmean function for degrees
+    @staticmethod
+    def circmean_deg(angles, bounds=(0, 360)):
+        return np.rad2deg(circmean_radians(np.deg2rad(angles), high=np.deg2rad(bounds[1]), low=np.deg2rad(bounds[0])))
+
+    circmean = circmean_deg
+
+    # Normal, sinusoid, and sinc functions for convenience
+    @staticmethod
+    def normal(x, mean=0, var=1, amp=1/np.sqrt(2*np.pi)):
+        """ A simple normal distribution function. """
+        return amp * np.exp(-(x-mean)**2/(2*var))/np.sqrt(2*np.pi*var)
+    
+    gaussian = normal
+    
+    @staticmethod
+    def sinusoid(x, f=1, ph=0, amp=1):
+        """ A simple sinusoid function. """
+        return amp * np.cos(2*np.pi*f*x+ph)
+
+    @staticmethod
+    def sinc(x, f=1, ph=0, amp=1):
+        """ A simple sinc function. """
+        return amp * np.nan_to_num(np.sin(2*np.pi*f*x+ph)/(2*np.pi*f*x+ph), nan=1, posinf=1, neginf=1)
+    
+    # Convert FWHM to Variance and vice versa
+    @staticmethod
+    def full_width_at_half_maximum(x):
+        """ Calculate the FWHM from the standard deviation. Distribution is assumed as gaussian. """
+        return x * 2 * np.sqrt(2*np.log(2))
+    
+    FWHM = full_width_at_half_maximum
+
+    @staticmethod
+    def standard_deviation(x):
+        """ Calculate the standard deviation from the FWHM. Distribution is assumed as gaussian. """
+        return x / (2 * np.sqrt(2*np.log(2)))
+    
+    STDEV = standard_deviation
+
+    # l, m, n to RA, Dec
+    @staticmethod
+    def lm_to_radec(l, m, phase_centre=RegridHelper.ZERO_RADEC):
+        d0 = phase_centre.dec.to_value(u.rad)
+        a0 = phase_centre.ra.to_value(u.rad)
+        n = np.sqrt(1-l**2-m**2)
+
+        Dec = np.arcsin(m*np.cos(d0)+n*np.sin(d0))
+        Ra = a0 + np.arctan(l/(n*np.cos(d0)-m*np.sin(d0)))
+
+        return [Ra, Dec]
 
 class Cosmo():
     """
@@ -319,7 +387,7 @@ class Regrid():
         "gaussian" : (
             { "normal", "gauss", "bell", "n", "g", "b" },
             "Rotationally symmetric centered gaussian plane with FWHM = d(t)/3.",
-            lambda p: RegridHelper.normal(p['r'], var=RegridHelper.STDEV(p['d'][2]/3)**2, norm=p['T_max'])
+            lambda p: Maths.gaussian(p['r'], var=Maths.STDEV(p['d'][2]/3)**2, amp=p['T_max'])
             ),
         "flat"     : (
             { "plane", "constant", "const", "c", "f" },
@@ -334,7 +402,7 @@ class Regrid():
         "sinusoid" : (
             { "sinc", "interference", "fringe", "i", "intf", "s" },
             "Rotationally symmetric centered sinc function with freq = 1/d(t).",
-            lambda p: np.abs(RegridHelper.sinc(p['r'], f=1/p['d'][2], amp=p['T_max']))
+            lambda p: np.abs(Maths.sinc(p['r'], f=1/p['d'][2], amp=p['T_max']))
             ),
         "point"    : (
             { "delta", "source", "p" },
@@ -683,13 +751,19 @@ class Regrid():
         :return: An array determining the specific central value of each voxel in its corresponding values array in units of (deg, deg, Hz).
         """
 
-        # RA, Dec centering function
+        # RA, Dec centering function and freq shift function
         # Add half the total and half the spaxel widths to centre the main point
-        centering = (lambda x: (x - np.max(x, axis=(0, 1))/2 + np.min(x, axis=(0, 1))/2))
+        centering = (lambda x: (x - np.max(x, axis=(0, 1), keepdims=True)/2 - np.min(x, axis=(0, 1), keepdims=True)/2))
 
+        # Add only half the cell bandwidth
+        shifting = (lambda x: (x - np.min(x, axis=2, keepdims=True)/2))
+
+        # Centre the cumulative RA and Dec sums so that the zero value is in the centre
         rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0))
         decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1))
-        freqsum = f_ref.to_value(u.Hz) - (np.cumsum(voxels[:,:,:,2], axis=2))
+
+        # Centre the frequency
+        freqsum = f_ref.to_value(u.Hz) - shifting(np.cumsum(voxels[:,:,:,2], axis=2))
 
         # Calculate phase centre offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
@@ -840,7 +914,7 @@ class Regrid():
         dynamic_settings['image']['size'] = max(d[0], d[1])
 
         # Set the frequency increment
-        dynamic_settings['observation']['start_frequency_hz'] = np.mean(voxels[:,:,:,2])
+        dynamic_settings['observation']['frequency_inc_hz'] = np.mean(voxels[:,:,:,2])
 
         # Set phase centre RA and Dec
         dynamic_settings['observation']['phase_centre_ra_deg'] = phase_ref_point.ra.deg
@@ -850,11 +924,11 @@ class Regrid():
         # Set image field of view and size
         ref_time, _ = Regrid.calculate_observation_time_from_date(phase_ref_point=phase_ref_point, ref_time=ref_time, ref_location=ref_location, observation_length=observation_length)
 
-        # Calculate RA dimension
-        rac = RegridHelper.diff(np.mean(RAs[-1,:,:]), np.mean(RAs[0,:,:]))
+        # Calculate RA dimension - use circular mean for angular averages
+        rac = Maths.diff(Maths.circmean(RAs[-1,:,:]), Maths.circmean(RAs[0,:,:]))
 
-        # Calculate Dec dimension
-        decc = RegridHelper.diff(np.mean(Dcs[-1,:,:]), np.mean(Dcs[0,:,:]))
+        # Calculate Dec dimension - use circular mean for angular averages
+        decc = Maths.diff(Maths.circmean(Dcs[-1,:,:], (-180, 180)), Maths.circmean(Dcs[0,:,:], (-180, 180)))
 
         # Set the field of view
         dynamic_settings['image']['fov_deg'] = max(rac, decc)
@@ -966,7 +1040,7 @@ class Regrid():
     
     @staticmethod
     # FIXME: Reverse-Read OSM
-    def convert_osm_file_to_arrays(osm_file, generate_dynamic_settings = True, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR, save_dynamic_settings = "", d = None):
+    def convert_osm_file_to_arrays(osm_file, generate_dynamic_settings = True, phase_ref_point_override = None, ref_time = RegridHelper.REF_TIME, ref_location = RegridHelper.SKA_REF_LOC, observation_length = RegridHelper.OBS_LEN_4HR, save_dynamic_settings = "", d = None):
         """
         Reverse-engineer an osm file to retreive its values, voxels, sigma_f, f_ref, phase_ref_point, and dynamic settings.
 
@@ -974,6 +1048,7 @@ class Regrid():
 
         :param osm_file: The OSM file to analyse.
         :param generate_dynamic_settings: Whether or not to reverse-engineer the dynamic settings as well.
+        :param phase_ref_point_override: If the phase refrence point is already known, override what the calculated phase refrence point would be.
         :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
@@ -996,18 +1071,56 @@ class Regrid():
 
         # Get dimensions of box
         if d is None:
-            d = np.ones(3, dtype=np.int32) * int(np.floor(df.shape[0] ** (1/3)))
+            d = tuple((np.ones(3, dtype=np.int32) * int(np.floor(np.cbrt(df.shape[0])))).tolist())
 
         # Extract values
         output_data["values"] = np.array(df["Stokes I"]).reshape(d)
 
+        # Extract cumulative voxels
+        output_data["cumulative_voxels"] = (np.array(df["RA"]).reshape(d), np.array(df["Dec"]).reshape(d), np.array(df["Freq0"]).reshape(d))
+
+        # Create temporary values from the cumulative voxels
+        temp_values = np.moveaxis(np.array(output_data["cumulative_voxels"]), 0, -1)
+
+        # If the phase refrence point is given, override the calculation of the phase refrence point
+        if phase_ref_point_override is None:
+            output_data["phase_ref_point"] = SkyCoord(ra=Maths.denorm(Maths.circmean(temp_values[:,:,:,0]))*u.deg, dec=Maths.norm(Maths.circmean(temp_values[:,:,:,1], (-180, 180)))*u.deg, frame='icrs') 
+        else:
+            output_data["phase_ref_point"] = phase_ref_point_override
+
+        # Calculate the frequency bin step
+        step = np.mean(temp_values[:,:,0, 2] - temp_values[:,:,1, 2])/2
+
+        # Calculate the refrence frequency
+        output_data["f_ref"] = np.mean(temp_values[:,:,0, 2]) + step
+
+        # Begin mutating temp_values
+
+        # Shift values based on refrence points
+        temp_values[:,:,:,0] = Maths.diff_sgn(temp_values[:,:,:,0], output_data["phase_ref_point"].ra.deg)
+        temp_values[:,:,:,1] = Maths.diff_sgn(temp_values[:,:,:,1], output_data["phase_ref_point"].dec.deg)
+        temp_values[:,:,:,2] = output_data["f_ref"] - temp_values[:,:,:,2]
+
+        # Calculate the inverse cumulative sum
+        temp_values[:,:,:,0] = np.diff(temp_values[:,:,:,0], prepend=0, axis=0)
+        temp_values[:,:,:,1] = np.diff(temp_values[:,:,:,1], prepend=0, axis=1)
+        temp_values[:,:,:,2] = np.diff(temp_values[:,:,:,2], prepend=-step, axis=2)
+
+        # Extract voxels
+        output_data["voxels"] = temp_values
+
+        # Create temporary values from the cumulative voxels
+        temp_values = np.moveaxis(np.array(output_data["cumulative_voxels"]), 0, -1)
+        output_data["voxels"] = temp_values
+
+        # Generate the dynamic settings
         if generate_dynamic_settings:
             dynamic_settings = Regrid.generate_dynamic_settings(
                 values = output_data["values"],
                 voxels = output_data["voxels"],
                 cumulative_voxels = output_data["cumulative_voxels"],
                 phase_ref_point = output_data["phase_ref_point"],
-                f_ref = output_data["f_ref"],
+                f_ref = output_data["f_ref"] * u.Hz,
                 ref_time=ref_time,
                 ref_location=ref_location,
                 observation_length=observation_length,
@@ -1298,6 +1411,7 @@ class BTAnalysisPipeline(object):
                     _, dynamic_settings = Regrid.convert_osm_file_to_arrays(
                         osm_output,
                         generate_dynamic_settings=True,
+                        phase_ref_point_override=phase_ref_point,
                         ref_time=ref_time,
                         ref_location=ref_location,
                         observation_length=observation_length,
@@ -1335,17 +1449,22 @@ class BTAnalysisPipeline(object):
 # Testing stage
 # pylint: disable=line-too-long
 
-#for template_presett in Regrid.TEMPLATE_PRESETS:
-#    if "coeval" in template_presett:
-#        template_value = Regrid.mock_values(template_presett, scale=20, d=(400, 400, 400))
-#    else:
-#        continue
-#
-#    Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_presett+"_sky_model.osm"), save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_presett+"_general_settings.ini"))
+def load_defaults():
+    """
+    (Re)load default values
+    """
+    for template_presett in Regrid.TEMPLATE_PRESETS:
+        if "coeval" in template_presett:
+            template_value = Regrid.mock_values(template_presett, d=(400, 400, 400))
+        else:
+            template_value = Regrid.mock_values(template_presett, scale=20)
+
+        Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_presett+"_sky_model.osm"), save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_presett+"_general_settings.ini"))
+
+#load_defaults()
 
 # FIXME: Test refactored code
 
 #BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
 
 #BTAnalysisPipeline.h5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
-
