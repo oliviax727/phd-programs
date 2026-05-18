@@ -170,8 +170,8 @@ class Reformat():
 
         # Define cosmology with H0=100h
         cosmology = Cosmo(
-            Om0 = file.get('cosmo_params').attrs['OMm'],
-            Ob0 = file.get('cosmo_params').attrs['OMb']
+            omega_m_0 = file.get('cosmo_params').attrs['OMm'],
+            omega_b_0 = file.get('cosmo_params').attrs['OMb']
         )
 
         # Transform intitial redshift
@@ -203,8 +203,8 @@ class Reformat():
 
         # Define cosmology with H0=100h
         cosmology = Cosmo(
-            Om0 = file.get('cosmo_params').attrs['OMm'],
-            Ob0 = file.get('cosmo_params').attrs['OMb']
+            omega_m_0 = file.get('cosmo_params').attrs['OMm'],
+            omega_b_0 = file.get('cosmo_params').attrs['OMb']
         )
 
         # Get Box and Voxel dimensions
@@ -433,6 +433,7 @@ class Reformat():
 
         
     @staticmethod
+    # TODO: Gaussian source?
     def save_datacube_to_osm(values, voxels = None, cumulative_voxels = None, sigma_f = None, f_ref = 200 * u.MHz, phase_ref_point = OSKARHelper.ZENITH_530, osm_output="reformat/osm_output/osm_output.osm"):
         """
         Saves a given datacube of flux values and voxel dimensions (RA, Dec, Freq.) to a master OSM file.

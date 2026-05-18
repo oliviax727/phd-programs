@@ -11,6 +11,7 @@ from oskar_helpers import OSKARHelper
 from reformatter import Reformat
 
 # TODO: Turn into pip project (later)
+# TODO: Pydoc types and return values
 
 # FIXME: Test refactored code
 
@@ -96,7 +97,6 @@ class BTAnalysisPipeline(object):
         return (interf_settings_path, interf_settings_dict), (imager_settings_path, imager_settings_dict)
 
     @staticmethod
-    # FIXME: Read interferometer and imager settings files
     def run_oskar_on_osms(osm_file, interferometer_settings = ("", OSKARHelper.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", OSKARHelper.DEFAULT_IMAGER_SETTINGS), fits_output="./fits_output.fits", oskar_exec=None, oskar_mode="python", use_imager=True):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the Reformat object.
@@ -123,9 +123,9 @@ class BTAnalysisPipeline(object):
         try:
             print("Running interferometer on "+osm_file)
             if oskar_mode == "singularity":
-                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer","sim_intif.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer",interferometer_settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
             elif oskar_mode == "binary":
-                subprocess.run([oskar_exec+"/oskar_sim_interferometer","sim_intif.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                subprocess.run([oskar_exec+"/oskar_sim_interferometer",interferometer_settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
         except subprocess.CalledProcessError as e:
             print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
             print(f"Error output: {e.stderr.decode()}")
@@ -135,9 +135,9 @@ class BTAnalysisPipeline(object):
             try:
                 print("Running imager on "+osm_file)
                 if oskar_mode == "singularity":
-                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager",imager_settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
                 elif oskar_mode == "binary":
-                    subprocess.run([oskar_exec+"/oskar_imager","test_img.ini"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                    subprocess.run([oskar_exec+"/oskar_imager",imager_settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
             except subprocess.CalledProcessError as e:
                 print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
