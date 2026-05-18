@@ -22,6 +22,8 @@ from scipy.stats import circmean as circmean_radians
 
 # TODO: Turn into pip project (later)
 
+# FIXME: Test refactored code
+
 # TODO: Clean pylint errors
 # pylint: disable=invalid-name
 
@@ -175,16 +177,12 @@ class RegridHelper():
 
     @staticmethod
     def expand_path(path):
+        """ Expands a filepath to produce an absolute path. """
         return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
 
     @staticmethod
     def dir_list_sorted(dir_):
-        """
-        Retreives a frequency-sorted list of OSM or FITS file names from a given directory.
-
-        :param dir_: The directory to pull the files from.
-        :return: The sorted list of files.
-        """
+        """ Retreives a frequency-sorted list of OSM or FITS file names from a given directory. """
 
         files = np.array(os.listdir(dir_))
 
@@ -193,9 +191,11 @@ class RegridHelper():
                 files = files[files != file]
 
         sort_type = [('file', 'O'), ('num', int)]
-        sort_prep = lambda x: (x, int(x.split('.')[1].split("_")[0]))
 
-        sorted_files, _ = zip(*np.sort(np.array(list(map(sort_prep, files)), dtype=sort_type), order="num"))
+        sorted_files, _ = zip(*np.sort(np.array(list(map(
+                lambda x: (x, int(x.split('.')[1].split("_")[0])),
+                files
+                )), dtype=sort_type), order="num"))
 
         return sorted_files
     
@@ -296,6 +296,7 @@ class Maths():
     # Scipy circmean function for degrees
     @staticmethod
     def circmean_deg(angles, bounds=(0, 360)):
+        """ Calculate the mean using modular arithmetic, a modified version of scipy.stats.circmean. """
         return np.rad2deg(circmean_radians(np.deg2rad(angles), high=np.deg2rad(bounds[1]), low=np.deg2rad(bounds[0])))
 
     circmean = circmean_deg
@@ -336,6 +337,7 @@ class Maths():
     # l, m, n to RA, Dec
     @staticmethod
     def lm_to_radec(l, m, phase_centre=RegridHelper.ZERO_RADEC):
+        """ Convert the l, m plane coordinates to RA and Dec. """
         d0 = phase_centre.dec.to_value(u.rad)
         a0 = phase_centre.ra.to_value(u.rad)
         n = np.sqrt(1-l**2-m**2)
@@ -347,7 +349,12 @@ class Maths():
 
 class Cosmo():
     """
-    Define a static cosmology method for other classes to use.
+    Defines a specific cosmological model for other classes to refer to. Assumes a flat universe.
+
+    :param H0: The Hubble constant.
+    :param Om0: The dimensionless matter density.
+    :param Ob0: The dimensionless baryonic matter density.
+    :param cosmo: The cosmological ΛCDM model.
     """
 
     def __init__(self, H0=100, Om0=0.31, Ob0=0.048):
@@ -357,14 +364,26 @@ class Cosmo():
         self.cosmo = fmodel(H0=H0, Om0=Om0, Ob0=Ob0) # Flat ΛCDM means Dark Energy density is 0.69
 
     # Redshift to comoving distance
-    def z_to_Dz(self, z): return self.cosmo.comoving_distance(z)
+    def z_to_Dz(self, z):
+        """ Convert redshift to comoving distance. """
+        return self.cosmo.comoving_distance(z)
 
     # Comoving distance to redshift
-    def Dz_to_z(self, Dz): return getz(self.cosmo.comoving_distance, Dz)
+    def Dz_to_z(self, Dz):
+        """ Convert comoving distance to redshift. """
+        return getz(self.cosmo.comoving_distance, Dz)
 
     # Redshift to frequency in GHz
     @staticmethod
-    def z_to_f(z): return 1.42e9 * u.Hz / (z + 1)
+    def z_to_f(z, f0 = 1.420e9 * u.Hz):
+        """ Convert redshift to frequency. By default it assumes that the start frequency is the 21 cm line. """
+        return f0 / (z + 1)
+    
+    # Frequency in GHz to redshift
+    @staticmethod
+    def f_to_z(f, f0 = 1.420e9 * u.Hz):
+        """ Convert frequency to redshift. By default it assumes that the start frequency is the 21 cm line. """
+        return (f0 / f) - 1
 
 class Regrid():
     """
@@ -373,6 +392,7 @@ class Regrid():
 
     @staticmethod
     def brightness_temperature_to_flux(Tb, fxy, dtheta, dphi):
+        """ Given the temperature, frequency, and angular size in both sky directions, calculate the luminosity in Jy. """
         # Calculate pixelated luminosity
         Fv = 2 * c.k_B.value * fxy**2 * Tb * (dtheta * dphi) / c.c.value ** 2
         Fv = Fv * 1e26 # Converts to Jansky
@@ -380,6 +400,7 @@ class Regrid():
     
     @staticmethod
     def brightness_temperature_to_linewidth(Tb):
+        """ Takes the brightness temperature emission. Assumes that the kinetic gas temperature is coupled with the spin temperature and the brightness temperature (generally correct for z < 25). """
         # Calculate linewidth in Hz
         return (Tb ** 0.5) * RegridHelper.SIGMA_F
     
@@ -752,11 +773,13 @@ class Regrid():
         """
 
         # RA, Dec centering function and freq shift function
-        # Add half the total and half the spaxel widths to centre the main point
-        centering = (lambda x: (x - np.max(x, axis=(0, 1), keepdims=True)/2 - np.min(x, axis=(0, 1), keepdims=True)/2))
+        def centering(x):
+            """ Add half the total and half the spaxel widths to centre the main point. """
+            return x - np.max(x, axis=(0, 1), keepdims=True)/2 - np.min(x, axis=(0, 1), keepdims=True)/2
 
-        # Add only half the cell bandwidth
-        shifting = (lambda x: (x - np.min(x, axis=2, keepdims=True)/2))
+        def shifting(x):
+            """ Add only half the cell bandwidth, do not center. """
+            return x - np.min(x, axis=2, keepdims=True)/2
 
         # Centre the cumulative RA and Dec sums so that the zero value is in the centre
         rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0))
@@ -1444,26 +1467,44 @@ class BTAnalysisPipeline(object):
         print("Cleaning up ...")
         BTAnalysisPipeline.clean_bta_dir(outdir=outdir, fits_output=fits_output, clean=clean)
 
-
-# Testing stage
-# pylint: disable=line-too-long
-
-def load_defaults():
+class LoadDefaults:
     """
-    (Re)load default values
+    A module for refreshing default sky models and measurement sets.
     """
-    for template_presett in Regrid.TEMPLATE_PRESETS:
-        if "coeval" in template_presett:
-            template_value = Regrid.mock_values(template_presett, d=(400, 400, 400))
-        else:
-            template_value = Regrid.mock_values(template_presett, scale=20)
 
-        Regrid.generate_osm_from_simulation(template_value, osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_presett+"_sky_model.osm"), save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_presett+"_general_settings.ini"))
+    @staticmethod
+    def load_default_sky_models():
+        """
+        (Re)load all default sky models and update corresponding ini and osm files.
+        """
 
-#load_defaults()
+        for template_presett in Regrid.TEMPLATE_PRESETS:
+            if "coeval" in template_presett:
+                template_value = Regrid.mock_values(template_presett, d=(400, 400, 400))
+            else:
+                template_value = Regrid.mock_values(template_presett, scale=20)
 
-# FIXME: Test refactored code
+            Regrid.generate_osm_from_simulation(
+                template_value,
+                osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_presett+"_sky_model.osm"),
+                save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_presett+"_general_settings.ini")
+                )
+    
+    @staticmethod
+    def load_default_oskar():
+        """
+        (Re)load all default sky models and update corresponding fits image and simulation .ms files.
+        """
 
-#BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
+        for template_presett in Regrid.TEMPLATE_PRESETS:
+            if "coeval" in template_presett:
+                template_value = Regrid.mock_values(template_presett, d=(400, 400, 400))
+            else:
+                template_value = Regrid.mock_values(template_presett, scale=20)
 
-#BTAnalysisPipeline.h5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
+            Regrid.generate_osm_from_simulation(
+                template_value,
+                osm_output=RegridHelper.expand_path("~/.oskar/osm_templates/"+template_presett+"_sky_model.osm"),
+                save_dynamic_settings=RegridHelper.expand_path("~/.oskar/ini_templates/"+template_presett+"_general_settings.ini")
+                )
+
