@@ -14,9 +14,6 @@ from reformatter import Reformat
 
 # FIXME: Test refactored code
 
-# TODO: Clean pylint errors
-# pylint: disable=invalid-name
-
 class BTAnalysisPipeline(object):
     """
     A broader class that combines all components of the individual components of the simulated IGM to simulated observation pipeline together.
@@ -149,17 +146,17 @@ class BTAnalysisPipeline(object):
         subprocess.run(["cp","BTA/oskar_output/sim_image_I.fits",fits_output], check=True)
 
     @staticmethod
-    def setup_bta_dir(h5_file, interferometer_settings_override="./Reformat/test_intif_inis/test_img_gen.ini", imager_settings_override="./Reformat/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
+    def setup_bta_dir(h5_file, interferometer_settings_override="./reformat/test_intif_inis/test_img_gen.ini", imager_settings_override="./reformat/test_intif_inis/test_intif_gen.ini", oskar_telescope_model="./oskar_run_stage/telescope_model_AAstar", template=False):
         """
         Sets up the operating directory from which all anaysis will be done.
 
-        :param h5_file: The location of the H5 file.
+        :param h5_file: The location of the h5 file.
         :param cd_in: Whether to cd into the directory once finished or not.
         :param interferometer_settings_override: The file location of the OSKAR imager settings file. Leave blank if no override.
         :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param template: If true, handle and return no h5 data.
-        :return: The new location of the H5, imager ini, and interterometer template ini files, as well as the telescope model location. Also returns the PWD if cd_in is True.
+        :return: The new location of the h5, imager ini, and interterometer template ini files, as well as the telescope model location. Also returns the PWD if cd_in is True.
         """
 
         cwd = os.getcwd()
@@ -167,7 +164,7 @@ class BTAnalysisPipeline(object):
         # 1. Create Directory
         subprocess.run(["mkdir","-p","BTA"], check=True)
 
-        # 2. Move H5 file and INIs to directory
+        # 2. Move h5 file and INIs to directory
         if not template: subprocess.run(["cp",h5_file,"BTA/analysis.h5"], check=True)
         subprocess.run(["cp",interferometer_settings_override,"BTA/interferometer_override.ini"], check=True)
         subprocess.run(["cp",imager_settings_override,"BTA/imager_override.ini"], check=True)
@@ -193,13 +190,13 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def h5_box_to_datacube(file, phase_ref_point = OSKARHelper.ZENITH_530, require_Reformat = True, max_freq_res = 100e6, interferometer_settings_override = "./Reformat/test_intif_inis/test_img_gen.ini", imager_settings_override = "./Reformat/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = OSKARHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = OSKARHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = OSKARHelper.REF_TIME, ref_location = OSKARHelper.SKA_REF_LOC, observation_length = OSKARHelper.OBS_LEN_4HR, use_imager = True):
+    def h5_box_to_datacube(file, phase_ref_point = OSKARHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, interferometer_settings_override = "./reformat/test_intif_inis/test_img_gen.ini", imager_settings_override = "./reformat/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = OSKARHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = OSKARHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = OSKARHelper.REF_TIME, ref_location = OSKARHelper.SKA_REF_LOC, observation_length = OSKARHelper.OBS_LEN_4HR, use_imager = True):
         """
-        Full pipeline function for transforming a H5 simulation box output into a FITS datacube.
+        Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
 
-        :param file: Location of the H5 file.
+        :param file: Location of the h5 file.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
-        :param require_Reformat: If true then always Reformat frequency bins, if false, Reformat only when max frequency resolution is met.
+        :param require_regrid: If true then always reformat frequency bins, if false, reformat only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
         :param interferometer_settings_override: The file location of the OSKAR imager settings file.
         :param imager_settings_override: The file location of the OSKAR interferometer settings template file.
@@ -208,7 +205,7 @@ class BTAnalysisPipeline(object):
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param template_preset: Use a mock values array instead of a h5 file. Ignores any provided h5 file.
-        :param coeval: If the H5 box is coeval or lightcone based.
+        :param coeval: If the h5 box is coeval or lightcone based.
         :param load_osm: If true load treat the file variable as if it were an OSM file.
         :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
@@ -258,7 +255,7 @@ class BTAnalysisPipeline(object):
                     dynamic_settings = Reformat.generate_osm_from_simulation(
                         template_values,
                         phase_ref_point=phase_ref_point,
-                        require_Reformat=require_Reformat,
+                        require_regrid=require_regrid,
                         max_freq_res=max_freq_res,
                         osm_output=osm_output,
                         ref_time=ref_time,
@@ -268,11 +265,11 @@ class BTAnalysisPipeline(object):
                         )
                 else:
                     # IF we want to generate a fresh osm file AND its from a provided h5 file
-                    print("Generating OSM files from H5 ...")
-                    dynamic_settings = Reformat.generate_osm_from_H5(
+                    print("Generating OSM files from h5 ...")
+                    dynamic_settings = Reformat.generate_osm_from_h5(
                         h5_file,
                         phase_ref_point=phase_ref_point,
-                        require_Reformat=require_Reformat,
+                        require_regrid=require_regrid,
                         max_freq_res=max_freq_res,
                         osm_output=osm_output,
                         coeval=coeval,

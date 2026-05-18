@@ -21,26 +21,24 @@ from astropy.coordinates import SkyCoord
 # Local imports
 from oskar_helpers import OSKARHelper, Cosmo, Maths
 
-# pylint: disable=invalid-name
-
 class Reformat():
     """
     The reformatter class contains functions relating to translating simulation data to OSKAR output data.
     """
 
     @staticmethod
-    def brightness_temperature_to_flux(Tb, fxy, dtheta, dphi):
+    def brightness_temperature_to_flux(tb, fxy, dtheta, dphi):
         """ Given the temperature, frequency, and angular size in both sky directions, calculate the luminosity in Jy. """
         # Calculate pixelated luminosity
-        Fv = 2 * c.k_B.value * fxy**2 * Tb * (dtheta * dphi) / c.c.value ** 2
-        Fv = Fv * 1e26 # Converts to Jansky
-        return Fv
+        fv = 2 * c.k_B.value * fxy**2 * tb * (dtheta * dphi) / c.c.value ** 2
+        fv = fv * 1e26 # Converts to Jansky
+        return fv
     
     @staticmethod
-    def brightness_temperature_to_linewidth(Tb):
+    def brightness_temperature_to_linewidth(tb):
         """ Takes the brightness temperature emission. Assumes that the kinetic gas temperature is coupled with the spin temperature and the brightness temperature (generally correct for z < 25). """
         # Calculate linewidth in Hz
-        return (Tb ** 0.5) * OSKARHelper.SIGMA_F
+        return (tb ** 0.5) * OSKARHelper.SIGMA_F
     
     TEMPLATE_PRESETS = {
         "gaussian" : (
@@ -149,7 +147,7 @@ class Reformat():
         return values.astype(np.float64)
 
     @staticmethod
-    def convert_H5_coeval_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
+    def convert_h5_coeval_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
         """
         Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
 
@@ -178,7 +176,7 @@ class Reformat():
 
         # Transform intitial redshift
         z_mid = file.attrs['redshift']
-        z_ref = cosmology.Dz_to_z(cosmology.z_to_Dz(z_mid) - u.Mpc*box_len/2)
+        z_ref = cosmology.dz_to_z(cosmology.z_to_dz(z_mid) - u.Mpc*box_len/2)
 
         if save_data:
             np.savetxt(outdir+'/'+name+'.csv', bt_data, delimiter=", ")
@@ -187,7 +185,7 @@ class Reformat():
         return bt_data, bt_data.shape, z_ref, vox, cosmology
     
     @staticmethod
-    def convert_H5_lightcone_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
+    def convert_h5_lightcone_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
         """
         Extract h5 data from Yuxiang Qin's lightcone simulations and either return the data objects or save to a seperate CSV.
 
@@ -212,7 +210,7 @@ class Reformat():
         # Get Box and Voxel dimensions
         box_len = file.get('user_params').attrs['BOX_LEN'] * file.get('cosmo_params').attrs['hlittle']
         rs = np.array(list(file.get('node_redshifts')))
-        vox = np.array([box_len, box_len, abs(cosmology.z_to_Dz(rs[0])-cosmology.z_to_Dz(rs[-1])).to_value(u.Mpc)]) / bt_data.shape
+        vox = np.array([box_len, box_len, abs(cosmology.z_to_dz(rs[0])-cosmology.z_to_dz(rs[-1])).to_value(u.Mpc)]) / bt_data.shape
         
         # Transform intitial redshift
         z_ref = np.min(rs)
@@ -224,7 +222,7 @@ class Reformat():
         return bt_data, bt_data.shape, z_ref, vox, cosmology
     
     @staticmethod
-    def convert_H5_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data", coeval=True):
+    def convert_h5_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data", coeval=True):
         """
         Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
 
@@ -237,19 +235,19 @@ class Reformat():
         """
 
         if coeval:
-            return Reformat.convert_H5_coeval_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
+            return Reformat.convert_h5_coeval_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
         else:
-            return Reformat.convert_H5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
+            return Reformat.convert_h5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
         
     @staticmethod
-    def transform_datacube_units(values, voxels, z_ref = 7, require_Reformat = True, max_freq_res = 100 * u.MHz, cosmology=Cosmo()):
+    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, cosmology=Cosmo()):
         """
         Transform a datacube with dimensions x, y, t (cMpc x cMpc x cMpc) to ⍺, δ, f (rad x rad x Hz),
 
         :param values: The simulation datacube in units of Kelvin.
         :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element in units of (cMpc, cMpc, cMps).
         :param z_ref: Refrence redshift, the ending redshift of the simulation.
-        :param require_Reformat: If true then always Reformat frequency bins, if false, Reformat only when max frequency resolution is met.
+        :param require_regrid: If true then always reformat frequency bins, if false, reformat only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution.
         :param v: If all voxels are the same, provides the initial voxel dimensions in cMpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param osm_output: The relative path to save the osm file to.
@@ -259,18 +257,18 @@ class Reformat():
         # Configure d variable
         d = np.shape(values)
 
-        # Set Reformat flag
-        Reformat_flag = require_Reformat
+        # Set regrid flag
+        regrid_flag = require_regrid
 
         # Calculate refrence comoving dist.
-        Dz_ref = cosmology.z_to_Dz(z_ref)
+        dz_ref = cosmology.z_to_dz(z_ref)
         f_ref = cosmology.z_to_f(z_ref)
 
         # Set cosmological redshift parameters
-        Dz = Dz_ref
+        dz = dz_ref
         z_prev = z_ref
         fq = f_ref.to_value(u.Hz)
-        Dz_val = Dz_ref.to_value(u.Mpc)
+        dz_val = dz_ref.to_value(u.Mpc)
 
         # Set maximum frequency resolution
         max_freq_res_hz = max_freq_res.to_value(u.Hz)
@@ -288,14 +286,14 @@ class Reformat():
                     dx = voxels[x, y, t, 0]
                     dy = voxels[x, y, t, 1]
                     dt = voxels[x, y, t, 2] 
-                    Tb = values[x, y, t]
+                    tb = values[x, y, t]
 
                     # STEP 1 - Convert transverse comoving distances to flat angular resolution
-                    Dz_pix = Dz_val+dt/2 # Alter it by the CENTRAL pixel value
+                    dz_pix = dz_val+dt/2 # Alter it by the CENTRAL pixel value
 
                     # Calculate transformed dimensions
-                    dtheta = np.arctan(dx/Dz_pix)
-                    dphi = np.arctan(dy/Dz_pix)
+                    dtheta = np.arctan(dx/dz_pix)
+                    dphi = np.arctan(dy/dz_pix)
 
                     # STEPS 2 & 3 - Convert line-of-sight comoving distance to frequency
                     df = 0
@@ -303,7 +301,7 @@ class Reformat():
                     if x == y == 0:
                         # Determine corresponding redshifts
                         z_bot = z_prev
-                        z_top = cosmology.Dz_to_z(Dz+dt*u.Mpc)
+                        z_top = cosmology.dz_to_z(dz+dt*u.Mpc)
 
                         # Convert to frequency
                         f_bot = cosmology.z_to_f(z_bot)
@@ -312,9 +310,9 @@ class Reformat():
                         # Store altered frequency bandwidth
                         df = np.abs((f_bot-f_top).to_value(u.Hz))
 
-                        # STEP 7.1 - Check if Reformatding is needed
+                        # STEP 7.1 - Check if Regridding is needed
                         if df > max_freq_res_hz:
-                            Reformat_flag = Reformat_flag or True
+                            regrid_flag = regrid_flag or True
 
                     else:
                         df = voxels[0, 0, t, 2]
@@ -323,30 +321,30 @@ class Reformat():
                     fxy = fq + df/2
                       
                     # Calculate pixelated luminosity
-                    Fv = Reformat.brightness_temperature_to_flux(Tb=Tb, fxy=fxy, dtheta=dtheta, dphi=dphi)
+                    fv = Reformat.brightness_temperature_to_flux(tb=tb, fxy=fxy, dtheta=dtheta, dphi=dphi)
                 
                     # Save values
                     voxels[x, y, t, 0] = dtheta
                     voxels[x, y, t, 1] = dphi
                     voxels[x, y, t, 2] = df
-                    values[x, y, t] = Fv
+                    values[x, y, t] = fv
             
             # Increment distance and frequency parameters
-            Dz = Dz + dt*u.Mpc # Increment the value of Dz by voxel dimension
+            dz = dz + dt*u.Mpc # Increment the value of dz by voxel dimension
             z_prev = z_top # Top z in current box = bottom z in next box
-            Dz_val = Dz_val + dt # Increment the value of Dz by voxel dimension
+            dz_val = dz_val + dt # Increment the value of dz by voxel dimension
             fq = fq + df # Increment cumulative frequency
 
             print("\rTime step #", t, end="")
 
         print("\nTransforming complete.")
 
-        return values, voxels, sigma_f, f_ref, Reformat_flag
+        return values, voxels, sigma_f, f_ref, regrid_flag
         
     @staticmethod
-    def Reformat_datacube(values, voxels, d = None, sigma_f = None, max_freq_res=100 * u.MHz):
+    def regrid_datacube(values, voxels, d = None, sigma_f = None, max_freq_res=100 * u.MHz):
         """
-        Reformats each spaxel of a sky model given a maximum frequency resolution.
+        Regrids each spaxel of a sky model given a maximum frequency resolution.
 
         :param values: The simulation datacube.
         :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element in units of (rad, rad, Hz).
@@ -354,7 +352,7 @@ class Reformat():
         :param max_freq_res: Maximum allowable voxel frequency resolution.
         """
 
-        print("Performing Reformat ...")
+        print("Performing regrid ...")
 
         # Set maximum frequency resolution
         max_freq_res_hz = max_freq_res.to_value(u.Hz)
@@ -382,7 +380,7 @@ class Reformat():
                 # Generate evenly-distributed frequency array
                 new_freq, freq_bandw = np.linspace(freq_values[0], freq_values[-1], d[2], retstep=True)
 
-                # Perform Reformatding
+                # Perform Regrid
                 new_flux = np.clip(bspline(new_freq), 0, None)
                 new_sigf = np.clip(dspline(new_freq), 0, None)
 
@@ -394,7 +392,7 @@ class Reformat():
                 values[x, y, :] = new_flux
                 sigma_f[x, y, :] = new_sigf
 
-        print("\nReformat complete.")
+        print("\nRegrid complete.")
         
         return values, voxels, sigma_f
     
@@ -428,14 +426,14 @@ class Reformat():
 
         # Calculate phase centre offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
-        RAs = source_pos.ra.to_value(u.deg)
-        Dcs = source_pos.dec.to_value(u.deg)
+        ras = source_pos.ra.to_value(u.deg)
+        dcs = source_pos.dec.to_value(u.deg)
 
-        return (RAs, Dcs, freqsum)
+        return (ras, dcs, freqsum)
 
         
     @staticmethod
-    def save_datacube_to_osm(values, voxels = None, cumulative_voxels = None, sigma_f = None, f_ref = 200 * u.MHz, phase_ref_point = OSKARHelper.ZENITH_530, osm_output="Reformat/osm_output/osm_output.osm"):
+    def save_datacube_to_osm(values, voxels = None, cumulative_voxels = None, sigma_f = None, f_ref = 200 * u.MHz, phase_ref_point = OSKARHelper.ZENITH_530, osm_output="reformat/osm_output/osm_output.osm"):
         """
         Saves a given datacube of flux values and voxel dimensions (RA, Dec, Freq.) to a master OSM file.
 
@@ -445,7 +443,7 @@ class Reformat():
         :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
         :param f_ref: Refrence frequency, the ending frequency of the model.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
-        :param require_Reformat: If true then always Reformat frequency bins, if false, Reformat only when max frequency resolution is met.
+        :param require_regrid: If true then always reformat frequency bins, if false, reformat only when max frequency resolution is met.
         :param osm_output: The relative path to save the osm file to.
         """
 
@@ -455,13 +453,13 @@ class Reformat():
         d = np.shape(values)
 
         # Cumulative sums are more important than voxel bins now
-        (RAs, Dcs, freqsum) = (None, None, None) # Keep Pylint Happy
+        (ras, dcs, freqsum) = (None, None, None) # Keep Pylint Happy
         if cumulative_voxels is None and voxels is None:
             raise ValueError("Either an array of voxels or cumulative voxes must be provided!")
         elif voxels is None:
-            (RAs, Dcs, freqsum) = cumulative_voxels
+            (ras, dcs, freqsum) = cumulative_voxels
         elif cumulative_voxels is None:
-            (RAs, Dcs, freqsum) = Reformat.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
+            (ras, dcs, freqsum) = Reformat.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
             
         # Record data to file
         print("Recording data to .osm file")
@@ -482,14 +480,14 @@ class Reformat():
                     for t in range(d[2]):
 
                         # Format data
-                        rascn = np.char.zfill(np.format_float_positional(RAs[x, y, t], 6, False), 10)
-                        decln = np.char.zfill(np.format_float_positional(np.abs(Dcs[x, y, t]), 6, False), 9)
+                        rascn = np.char.zfill(np.format_float_positional(ras[x, y, t], 6, False), 10)
+                        decln = np.char.zfill(np.format_float_positional(np.abs(dcs[x, y, t]), 6, False), 9)
                         value = np.format_float_scientific(values[x, y, t], 4, False)
                         freq0 = np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False)
                         linew = np.format_float_scientific(sigma_f[x, y, t], 4, False)
 
                         # Add +/- value to Declinations
-                        if Dcs[x, y, t] >= 0: decln = "+" + str(decln)
+                        if dcs[x, y, t] >= 0: decln = "+" + str(decln)
                         else:                 decln = "-" + str(decln)
 
                         # Write to OSM
@@ -552,13 +550,13 @@ class Reformat():
 
         # SETUP
         # Cumulative sums are more important than voxel bins now
-        (RAs, Dcs, freqsum) = (None, None, None) # Keep Pylint Happy
+        (ras, dcs, freqsum) = (None, None, None) # Keep Pylint Happy
         if cumulative_voxels is None and voxels is None:
             raise ValueError("Either an array of voxels or cumulative voxes must be provided!")
         elif voxels is None:
-            (RAs, Dcs, freqsum) = cumulative_voxels
+            (ras, dcs, freqsum) = cumulative_voxels
         elif cumulative_voxels is None:
-            (RAs, Dcs, freqsum) = Reformat.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
+            (ras, dcs, freqsum) = Reformat.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
 
         # Configure d variable
         d = np.shape(values)
@@ -586,10 +584,10 @@ class Reformat():
         ref_time, _ = Reformat.calculate_observation_time_from_date(phase_ref_point=phase_ref_point, ref_time=ref_time, ref_location=ref_location, observation_length=observation_length)
 
         # Calculate RA dimension - use circular mean for angular averages
-        rac = Maths.diff(Maths.circmean(RAs[-1,:,:]), Maths.circmean(RAs[0,:,:]))
+        rac = Maths.diff(Maths.circmean(ras[-1,:,:]), Maths.circmean(ras[0,:,:]))
 
         # Calculate Dec dimension - use circular mean for angular averages
-        decc = Maths.diff(Maths.circmean(Dcs[-1,:,:], (-180, 180)), Maths.circmean(Dcs[0,:,:], (-180, 180)))
+        decc = Maths.diff(Maths.circmean(dcs[-1,:,:], (-180, 180)), Maths.circmean(dcs[0,:,:], (-180, 180)))
 
         # Set the field of view
         dynamic_settings['image']['fov_deg'] = max(rac, decc)
@@ -609,14 +607,14 @@ class Reformat():
         return dynamic_settings
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, z_ref = 7, phase_ref_point = OSKARHelper.ZENITH_530, require_Reformat = True, max_freq_res = 100 * u.MHz, v = (1.5, 1.5, 1.5), osm_output="Reformat/osm_output/osm_output.osm", cosmology=Cosmo(), save_dynamic_settings = "", ref_time = OSKARHelper.REF_TIME, ref_location = OSKARHelper.SKA_REF_LOC, observation_length = OSKARHelper.OBS_LEN_4HR):
+    def generate_osm_from_simulation(values, voxels = None, z_ref = 7, phase_ref_point = OSKARHelper.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1.5, 1.5, 1.5), osm_output="reformat/osm_output/osm_output.osm", cosmology=Cosmo(), save_dynamic_settings = "", ref_time = OSKARHelper.REF_TIME, ref_location = OSKARHelper.SKA_REF_LOC, observation_length = OSKARHelper.OBS_LEN_4HR):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
         :param values: The simulation datacube.
         :param z_ref: Refrence redshift, the ending redshift of the simulation.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
-        :param require_Reformat: If true then always Reformat frequency bins, if false, Reformat only when max frequency resolution is met.
+        :param require_regrid: If true then always reformat frequency bins, if false, reformat only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution.
         :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param osm_output: The relative path to save the osm file to.
@@ -639,13 +637,13 @@ class Reformat():
             voxels = np.full((*d, 3), v, dtype=np.float64)
 
         # Transform datacube
-        values, voxels, sigma_f, f_ref, Reformat_flag = Reformat.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_Reformat=require_Reformat, max_freq_res=max_freq_res, cosmology=cosmology)
+        values, voxels, sigma_f, f_ref, regrid_flag = Reformat.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, cosmology=cosmology)
 
-        # STEP 7 - Reformat frequency-dimension data if needed
-        if Reformat_flag:
-            values, voxels, sigma_f = Reformat.Reformat_datacube(values=values, voxels=voxels, sigma_f=sigma_f, max_freq_res=max_freq_res)
+        # STEP 7 - Regrid frequency-dimension data if needed
+        if regrid_flag:
+            values, voxels, sigma_f = Reformat.regrid_datacube(values=values, voxels=voxels, sigma_f=sigma_f, max_freq_res=max_freq_res)
         else:
-            print("No Reformat required!")
+            print("No Regrid required!")
 
         # STEP 8 - Write data to OSM file
         Reformat.save_datacube_to_osm(values=values, voxels=voxels, sigma_f=sigma_f, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
@@ -665,13 +663,13 @@ class Reformat():
         return dynamic_settings
         
     @staticmethod
-    def generate_osm_from_H5(file, phase_ref_point = OSKARHelper.ZENITH_530, require_Reformat = True, max_freq_res = 100e6, osm_output="Reformat/osm_output/osm_output.osm", coeval=True, ref_time = OSKARHelper.REF_TIME, ref_location = OSKARHelper.SKA_REF_LOC, observation_length = OSKARHelper.OBS_LEN_4HR, save_dynamic_settings = ""):
+    def generate_osm_from_h5(file, phase_ref_point = OSKARHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="reformat/osm_output/osm_output.osm", coeval=True, ref_time = OSKARHelper.REF_TIME, ref_location = OSKARHelper.SKA_REF_LOC, observation_length = OSKARHelper.OBS_LEN_4HR, save_dynamic_settings = ""):
         """
-        Combines both the convert_H5_to_csv and generate_osm_from_simulation functions.
+        Combines both the convert_h5_to_csv and generate_osm_from_simulation functions.
 
-        :param file: Location of the H5 file.
+        :param file: Location of the h5 file.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
-        :param require_Reformat: If true then always Reformat frequency bins, if false, Reformat only when max frequency resolution is met.
+        :param require_regrid: If true then always reformat frequency bins, if false, reformat only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution in Hz.
         :param osm_output: The directory to output the osm file.
         :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
@@ -682,13 +680,13 @@ class Reformat():
         :return: The dynamically defined settings dictionary.
         """
 
-        values, z_ref, vox, cosmology = Reformat.convert_H5_to_csv(file, coeval=coeval)
+        values, z_ref, vox, cosmology = Reformat.convert_h5_to_csv(file, coeval=coeval)
 
         if osm_output == "": osm_output = file.split('/')[-1][:-3] + "_osm.osm"
 
         return Reformat.generate_osm_from_simulation(values,
                 z_ref=z_ref,
-                require_Reformat=require_Reformat,
+                require_regrid=require_regrid,
                 max_freq_res=max_freq_res,
                 v=vox, osm_output=osm_output,
                 cosmology=cosmology,

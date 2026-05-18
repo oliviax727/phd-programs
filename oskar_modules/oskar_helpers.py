@@ -21,8 +21,6 @@ from astropy.time import Time, TimeDelta
 from astropy.cosmology import FlatLambdaCDM as fmodel
 from astropy.cosmology import z_at_value as getz
 
-# pylint: disable=invalid-name
-
 # Reformat helper functions
 class OSKARHelper():
     """
@@ -34,7 +32,7 @@ class OSKARHelper():
     OBS_LEN_4HR = TimeDelta(4 * u.hr)
     REF_TIME    = Time(val="2025-03-03T05:30:00.00", format='isot', scale='utc')
     ZENITH_530  = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # SKA-Low Zenith at 5:30 am 2025-03-03
-    ZERO_RADEC  = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/Dec
+    ZERO_RADEC  = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/dec
     OSKAR_SIF   = "~/.oskar/OSKAR-2.12.2-Python3.sif"
     OSKAR_BIN   = "~/.oskar/bin/"
     TELESCOPE   = "~/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
@@ -327,44 +325,44 @@ class Maths():
     
     STDEV = standard_deviation
 
-    # l, m, n to RA, Dec
+    # l, m, n to RA, dec
     @staticmethod
     def lm_to_radec(l, m, phase_centre=OSKARHelper.ZERO_RADEC):
-        """ Convert the l, m plane coordinates to RA and Dec. """
+        """ Convert the l, m plane coordinates to RA and dec. """
         d0 = phase_centre.dec.to_value(u.rad)
         a0 = phase_centre.ra.to_value(u.rad)
         n = np.sqrt(1-l**2-m**2)
 
-        Dec = np.arcsin(m*np.cos(d0)+n*np.sin(d0))
-        Ra = a0 + np.arctan(l/(n*np.cos(d0)-m*np.sin(d0)))
+        dec = np.arcsin(m*np.cos(d0)+n*np.sin(d0))
+        ra = a0 + np.arctan(l/(n*np.cos(d0)-m*np.sin(d0)))
 
-        return [Ra, Dec]
+        return [ra, dec]
 
 class Cosmo():
     """
     Defines a specific cosmological model for other classes to refer to. Assumes a flat universe.
 
-    :param H0: The Hubble constant.
-    :param Om0: The dimensionless matter density.
-    :param Ob0: The dimensionless baryonic matter density.
+    :param h0: The Hubble constant.
+    :param omega_m_0: The dimensionless matter density.
+    :param omega_b_0: The dimensionless baryonic matter density.
     :param cosmo: The cosmological ΛCDM model.
     """
 
-    def __init__(self, H0=100, Om0=0.31, Ob0=0.048):
-        self.H0    = H0 * u.km / u.s / u.Mpc # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
-        self.Om0   = Om0
-        self.Ob0   = Ob0
-        self.cosmo = fmodel(H0=H0, Om0=Om0, Ob0=Ob0) # Flat ΛCDM means Dark Energy density is 0.69
+    def __init__(self, h0=100, omega_m_0=0.31, omega_b_0=0.048):
+        self.h0        = h0 * u.km / u.s / u.Mpc # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
+        self.omega_m_0 = omega_m_0
+        self.omega_b_0 = omega_b_0
+        self.cosmo     = fmodel(h0=h0, omega_m_0=omega_m_0, omega_b_0=omega_b_0) # Flat ΛCDM means Dark Energy density is 0.69
 
     # Redshift to comoving distance
-    def z_to_Dz(self, z):
+    def z_to_dz(self, z):
         """ Convert redshift to comoving distance. """
         return self.cosmo.comoving_distance(z)
 
     # Comoving distance to redshift
-    def Dz_to_z(self, Dz):
+    def dz_to_z(self, dz):
         """ Convert comoving distance to redshift. """
-        return getz(self.cosmo.comoving_distance, Dz)
+        return getz(self.cosmo.comoving_distance, dz)
 
     # Redshift to frequency in GHz
     @staticmethod
