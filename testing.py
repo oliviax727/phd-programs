@@ -4,8 +4,8 @@ Testing stage for OSKAR Regrid.
 """
 
 # pylint: disable=line-too-long, unused-import
-
-from regrid.oskar_regrid import LoadDefaults, BTAnalysisPipeline
+from matplotlib import pyplot as plt
+from oskar_modules.oskar_exec import LoadDefaults, BTAnalysisPipeline
 
 # Testing stage
 
