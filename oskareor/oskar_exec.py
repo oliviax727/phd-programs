@@ -6,16 +6,21 @@ The oskar_exec module contains all funtions that help to automate the execution 
 import os
 import subprocess
 
+# Mathematics and calculations
+import astropy.units as u
+
+# Astropy Extras
+from astropy.units import Quantity
+
 # Local imports
 from oskar_helpers import OSKARHelper
 from reformatter import Reformat
 
 # TODO: Turn into pip project (later)
-# TODO: Pydoc types and return values
 
 # FIXME: Test refactored code
 
-class BTAnalysisPipeline(object):
+class BTAnalysisPipeline():
     """
     A broader class that combines all components of the individual components of the simulated IGM to simulated observation pipeline together.
     """
@@ -32,7 +37,7 @@ class BTAnalysisPipeline(object):
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
         :param save_ini: File path to save the compiled ini file. If blank, pass the settings only as a return.
 
-        :return: The updated settings dictionary.
+        :return dynamic_settings: The updated settings dictionary.
         """
 
         # Function to mutate the existing dynamic settings dictionary
@@ -62,7 +67,7 @@ class BTAnalysisPipeline(object):
         :param use_imager: Whether to create a seperate imager file path and settings dictionary pair.
         :param save_file: If true, save to a file with a path and base name given by settings.
 
-        :return: The two tuples containing the split settings (settings file location, settings dictionary)
+        :return (interferometer_settings, imager_settings): The two tuples containing the split settings (settings file location, settings dictionary)
         """
 
         # Declare default return values
@@ -156,7 +161,10 @@ class BTAnalysisPipeline(object):
         :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param template: If true, handle and return no h5 data.
-        :return: The new location of the h5, imager ini, and interterometer template ini files, as well as the telescope model location. Also returns the PWD if cd_in is True.
+
+        :return (h5_file, interf_override_ini, imager_override_ini, telescope_model, cwd): The new location of the h5, imager ini, and interterometer template ini files, as well as the telescope model location.
+        
+        Also returns the PWD if cd_in is True.
         """
 
         cwd = os.getcwd()
@@ -190,7 +198,7 @@ class BTAnalysisPipeline(object):
             subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def h5_box_to_datacube(file, phase_ref_point = OSKARHelper.ZENITH_530, require_regrid = True, max_freq_res = 100e6, interferometer_settings_override = "./reformat/test_intif_inis/test_img_gen.ini", imager_settings_override = "./reformat/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = OSKARHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = OSKARHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = OSKARHelper.REF_TIME, ref_location = OSKARHelper.SKA_REF_LOC, observation_length = OSKARHelper.OBS_LEN_4HR, use_imager = True):
+    def h5_box_to_datacube(file, phase_ref_point = OSKARHelper.ZENITH_530, require_regrid = True, max_freq_res: Quantity = 100e6 * u.MHz, interferometer_settings_override = "./reformat/test_intif_inis/test_img_gen.ini", imager_settings_override = "./reformat/test_intif_inis/test_intif_gen.ini", outdir = ".", clean = True, oskar_exec = OSKARHelper.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = OSKARHelper.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = OSKARHelper.REF_TIME, ref_location = OSKARHelper.SKA_REF_LOC, observation_length = OSKARHelper.OBS_LEN_4HR, use_imager = True):
         """
         Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
 

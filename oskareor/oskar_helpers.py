@@ -14,6 +14,7 @@ import numpy as np
 
 # Astropy extras
 from astropy.coordinates import EarthLocation, SkyCoord
+from astropy.coordinates.errors import UnknownSiteException as USE
 from astropy.cosmology import FlatLambdaCDM as fmodel
 from astropy.cosmology import z_at_value as getz
 from astropy.time import Time, TimeDelta
@@ -29,19 +30,40 @@ class OSKARHelper():
         Helper functions and constants specific to the Reformatding and oskar handling process.
     """
 
+    # Retreive SKA Location from astropy server, if it fails, return the default Earth Location
+    @staticmethod
+    def get_ska_location() -> EarthLocation:
+        """
+        Gets the EarthLocation object for the SKA (or MWA).
+        """
+
+        ska_location = None
+
+        try:
+            ska_location = EarthLocation.of_site("SKA-LOW")
+        except USE:
+            try:
+                ska_location = EarthLocation.of_site("MWA")
+            except USE:
+                ska_location = EarthLocation.from_geodetic(lon=-117*u.deg, lat=-27*u.deg)
+        
+        return ska_location
+
     # Define Constants
-    SKA_REF_LOC = EarthLocation.of_site("SKA-LOW")
-    OBS_LEN_4HR = TimeDelta(4 * u.hr)
-    REF_TIME    = Time(val="2025-03-03T05:30:00.00", format='isot', scale='utc')
-    ZENITH_530  = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # SKA-Low Zenith at 5:30 am 2025-03-03
-    ZERO_RADEC  = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/dec
-    OSKAR_SIF   = "~/.oskar/OSKAR-2.12.2-Python3.sif"
-    OSKAR_BIN   = "~/.oskar/bin/"
-    TELESCOPE   = "~/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
-    SIGMA_F     = (np.sqrt(c.k_B / (1.008 * c.u * (21.106 * u.cm)**2))).to(u.Hz*u.K**-0.5).value
+    SKA_REF_LOC: EarthLocation  = get_ska_location()
+    OBS_LEN_4HR: TimeDelta      = TimeDelta(4 * u.hr)
+    REF_TIME: Time              = Time(val="2025-03-03T05:30:00.00", format='isot', scale='utc')
+    ZENITH_530: SkyCoord        = SkyCoord(ra=0*u.deg, dec=-27*u.deg, frame='icrs') # SKA-Low Zenith at 5:30 am 2025-03-03
+    ZERO_RADEC: SkyCoord        = SkyCoord(ra=0*u.deg, dec=0*u.deg, frame='icrs') # Centre RA/dec
+    OSKAR_SIF: str              = "~/.oskar/OSKAR-2.12.2-Python3.sif"
+    OSKAR_BIN: str              = "~/.oskar/bin/"
+    TELESCOPE: str              = "~/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
+    FREQ_21CM: Quantity         = 1.420405751768e9 * u.Hz
+    WLEN_21CM: Quantity         = (c.c / FREQ_21CM).to(u.cm)
+    SIGMA_F: Quantity           = (np.sqrt(c.k_B / (1.008 * c.u * WLEN_21CM**2))).to(u.Hz*u.K**-0.5)
 
     # Define default settings
-    DEFAULT_INTERFEROMETER_SETTINGS = {
+    DEFAULT_INTERFEROMETER_SETTINGS: dict = {
         "General": {
             "app": "oskar_sim_interferometer"
         },
@@ -74,7 +96,7 @@ class OSKARHelper():
         "sky": {}
     }
 
-    DEFAULT_IMAGER_SETTINGS = {
+    DEFAULT_IMAGER_SETTINGS: dict = {
         "General": {
             "app": "oskar_imager"
         },
@@ -88,7 +110,7 @@ class OSKARHelper():
 
     # Calculated settings: [observation] start_frequency_hz, num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, length, start_time_utc
     # Calculated settings: [image] fov_deg, size
-    DEFAULT_DYNAMIC_GENERAL_SETTINGS = {
+    DEFAULT_DYNAMIC_GENERAL_SETTINGS: dict = {
         "observation" : {
             "start_frequency_hz": 200e6,
             "num_channels": 100,
@@ -104,20 +126,20 @@ class OSKARHelper():
         }
     }
 
-    PRIMARY_GENERAL_SETTINGS = { "General": {} }
+    PRIMARY_GENERAL_SETTINGS: dict = { "General": {} }
 
-    DEFAULT_GENERAL_SETTINGS = DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | DEFAULT_DYNAMIC_GENERAL_SETTINGS | PRIMARY_GENERAL_SETTINGS
+    DEFAULT_GENERAL_SETTINGS: dict = DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | DEFAULT_DYNAMIC_GENERAL_SETTINGS | PRIMARY_GENERAL_SETTINGS
 
     # Legal settings keywords
-    LEGAL_INTERFEROMETER_HEADINGS = { "simulator", "sky", "telescope", "observation", "interferometer"}
-    LEGAL_IMAGER_HEADINGS = { "image" }
+    LEGAL_INTERFEROMETER_HEADINGS: set   = { "simulator", "sky", "telescope", "observation", "interferometer"}
+    LEGAL_IMAGER_HEADINGS: set           = { "image" }
 
     # Load yuxiang's h5 data
     # Properties: size = (400, 400, 400) px; voxels = (1.5, 1.5, 1.5) cMPc; z_ref = ~7 (box #1), ~8 (box #2)
-    COEVAL_TEMPLATE_1        = h5py.File('/home/olivia/.oskar/simulations/legacy_templates/yuxiang1.h5', 'r')
-    COEVAL_TEMPLATE_2        = h5py.File('/home/olivia/.oskar/simulations/legacy_templates/yuxiang2.h5', 'r')
-    COEVAL_TEMPLATE_VALUES_1 = np.array(COEVAL_TEMPLATE_1.get('BrightnessTemp')['brightness_temp'])
-    COEVAL_TEMPLATE_VALUES_2 = np.array(COEVAL_TEMPLATE_2.get('BrightnessTemp')['brightness_temp'])
+    COEVAL_TEMPLATE_1: h5py.File            = h5py.File('/home/olivia/.oskar/simulations/legacy_templates/yuxiang1.h5', 'r')
+    COEVAL_TEMPLATE_2: h5py.File            = h5py.File('/home/olivia/.oskar/simulations/legacy_templates/yuxiang2.h5', 'r')
+    COEVAL_TEMPLATE_VALUES_1: np.ndarray    = np.array(COEVAL_TEMPLATE_1.get('BrightnessTemp')['brightness_temp'])
+    COEVAL_TEMPLATE_VALUES_2: np.ndarray    = np.array(COEVAL_TEMPLATE_2.get('BrightnessTemp')['brightness_temp'])
 
     @staticmethod
     def select_option(options: dict, selection: str) -> dict:
@@ -346,27 +368,27 @@ class Cosmo():
     """
     Defines a specific cosmological model for other classes to refer to. Assumes a flat universe.
 
-    :param h0 (float): The Hubble constant.
+    :param h0 (Quantity): The Hubble constant.
     :param omega_m_0 (float): The dimensionless matter density.
     :param omega_b_0 (float): The dimensionless baryonic matter density.
     :param cosmo (Cosmology): The cosmological ΛCDM model.
     """
 
-    def __init__(self, h0: float = 100, omega_m_0: float = 0.31, omega_b_0: float = 0.048):
-        self.h0        = h0 * u.km / u.s / u.Mpc # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
+    def __init__(self, h0: Quantity = 100 * u.km / u.s / u.Mpc, omega_m_0: float = 0.31, omega_b_0: float = 0.048):
+        self.h0        = h0 # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
         self.omega_m_0 = omega_m_0
         self.omega_b_0 = omega_b_0
         self.cosmo     = fmodel(h0=h0, omega_m_0=omega_m_0, omega_b_0=omega_b_0) # Flat ΛCDM means Dark Energy density is 0.69
 
     # Redshift to comoving distance
-    def z_to_dz(self, z: Quantity) -> Quantity:
+    def z_to_dz(self, z: float) -> Quantity:
         """ Convert redshift to comoving distance. """
         return self.cosmo.comoving_distance(z)
 
     # Comoving distance to redshift
-    def dz_to_z(self, dz: Quantity) -> Quantity:
+    def dz_to_z(self, dz: Quantity) -> float:
         """ Convert comoving distance to redshift. """
-        return getz(self.cosmo.comoving_distance, dz)
+        return getz(self.cosmo.comoving_distance, dz).value
 
     # Redshift to frequency in GHz
     @staticmethod

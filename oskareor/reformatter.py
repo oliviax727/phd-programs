@@ -17,6 +17,7 @@ from scipy.interpolate import make_interp_spline as misp
 
 # Astropy extras
 from astropy.coordinates import SkyCoord
+from astropy.units import Quantity
 
 # Local imports
 from oskar_helpers import OSKARHelper, Cosmo, Maths
@@ -27,18 +28,35 @@ class Reformat():
     """
 
     @staticmethod
-    def brightness_temperature_to_flux(tb, fxy, dtheta, dphi):
-        """ Given the temperature, frequency, and angular size in both sky directions, calculate the luminosity in Jy. """
+    def brightness_temperature_to_flux(tb: Quantity, fxy: Quantity, dtheta: Quantity, dphi: Quantity) -> Quantity:
+        """
+        Given the temperature, frequency, and angular size in both sky directions, calculate the luminosity in Jy.
+        
+        :param tb: The brightness temperature.
+        :param fxy: The frequency of emission.
+        :param dtheta: The first specified angular diameter. Perpendicular to the first.
+        :param dphi: The second specified angular diameter. Perpendicular to the first.
+
+        :return fv: The flux corresponding to the brightness temperature.
+        """
+
         # Calculate pixelated luminosity
-        fv = 2 * c.k_B.value * fxy**2 * tb * (dtheta * dphi) / c.c.value ** 2
-        fv = fv * 1e26 # Converts to Jansky
-        return fv
+        fv = 2 * c.k_B * fxy**2 * tb * (dtheta * dphi) / c.c ** 2 / u.sr
+
+        return fv.to(u.Jansky) # Converts to Jansky
     
     @staticmethod
-    def brightness_temperature_to_linewidth(tb):
-        """ Takes the brightness temperature emission. Assumes that the kinetic gas temperature is coupled with the spin temperature and the brightness temperature (generally correct for z < 25). """
+    def brightness_temperature_to_linewidth(tb: Quantity) -> Quantity:
+        """
+        Takes the brightness temperature emission. Assumes that the kinetic gas temperature is coupled with the spin temperature and the brightness temperature (generally correct for z < 25).
+
+        :param tb: The brightness temperature.
+
+        :return linewidth: The flux corresponding to the brightness temperature.
+        """
+
         # Calculate linewidth in Hz
-        return (tb ** 0.5) * OSKARHelper.SIGMA_F
+        return (tb.to(u.K) ** 0.5) * OSKARHelper.SIGMA_F
     
     TEMPLATE_PRESETS = {
         "gaussian" : (
@@ -86,20 +104,20 @@ class Reformat():
     }
 
     @staticmethod
-    def display_template_presets(print_presets=True, filter_preset=""):
+    def display_template_presets(print_presets: bool = True, filter_preset: str = "") -> dict:
         """
         Return and/or display all available templates, their names, and their descriptions. All templates except random, coeval1, and coeval2 are identical in all t-dimension voxels.
 
         :param print_presets: If true print the templates to console and return the dictionary. If false only return the dictionary.
         :param filter_preset: If true print/return the information for only one specific template entry, according to the given string.
         
-        :return: The dictionary containing all available templates or a dictionary of the specific desired template.
+        :return template_options: The dictionary containing all available templates or a dictionary of the specific desired template.
         """
 
         return OSKARHelper.display_options(Reformat.TEMPLATE_PRESETS, print_options=print_presets, selection=filter_preset)
 
     @staticmethod
-    def mock_values(preset, scale = 10, d = (100, 100, 100), special = None):
+    def mock_values(preset: str, scale: Quantity = 10 * u.K, d: tuple = (100, 100, 100), special = None):
         """
         Create an array of mock simulation values.
 
@@ -110,7 +128,7 @@ class Reformat():
         
         Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
 
-        :return: Mock brightness temperature values.
+        :return values: Mock brightness temperature values.
         """
 
         # Select specific template
@@ -134,7 +152,7 @@ class Reformat():
                         "d" : d, "i" : i, "j" : j, "t": t,
                         "x" : i - d[0]/2, "y" : j - d[1]/2,
                         "r": np.sqrt((i - d[0]/2)**2 + (j - d[1]/2)**2),
-                        "T_max" : scale
+                        "T_max" : scale.to_value(u.K)
                         }
                     
                     # Populate array cell
@@ -147,7 +165,7 @@ class Reformat():
         return values.astype(np.float64)
 
     @staticmethod
-    def convert_h5_coeval_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
+    def convert_h5_coeval_to_csv(h5_location, save_data = False, outdir = '', name = "out_h5_data"):
         """
         Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
 
@@ -156,7 +174,7 @@ class Reformat():
         :param outdir: The directory to output both CSV and text information.
         :param name: The file name template to be saved to.
 
-        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
 
         file = h5py.File(h5_location, 'r')
@@ -166,7 +184,7 @@ class Reformat():
 
         # Get Box and Voxel dimensions
         box_len = file.get('user_params').attrs['BOX_LEN']#* file.get('cosmo_params').attrs['hlittle']
-        vox = np.ones(3) * box_len / bt_data.shape[0]
+        vox = np.array(np.ones(3) * box_len / bt_data.shape[0])
 
         # Define cosmology with H0=100h
         cosmology = Cosmo(
@@ -185,7 +203,7 @@ class Reformat():
         return bt_data, bt_data.shape, z_ref, vox, cosmology
     
     @staticmethod
-    def convert_h5_lightcone_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data"):
+    def convert_h5_lightcone_to_csv(h5_location, save_data = False, outdir = '', name = "out_h5_data"):
         """
         Extract h5 data from Yuxiang Qin's lightcone simulations and either return the data objects or save to a seperate CSV.
 
@@ -193,7 +211,7 @@ class Reformat():
         :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
         :param outdir: The directory to output both CSV and text information.
         :param name: The file name template to be saved to.
-        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
 
         file = h5py.File(h5_location, 'r')
@@ -222,7 +240,7 @@ class Reformat():
         return bt_data, bt_data.shape, z_ref, vox, cosmology
     
     @staticmethod
-    def convert_h5_to_csv(h5_location, save_data=False, outdir='', name="out_h5_data", coeval=True):
+    def convert_h5_to_csv(h5_location: str, save_data: bool = False, outdir: str = '', name: str = "out_h5_data", coeval: bool = True):
         """
         Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
 
@@ -231,16 +249,16 @@ class Reformat():
         :param outdir: The directory to output both CSV and text information.
         :param name: The file name template to be saved to.
         :param coeval: whether or not the box is coeval or lightcone.
-        :return: The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
 
         if coeval:
             return Reformat.convert_h5_coeval_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
-        else:
-            return Reformat.convert_h5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
+        
+        return Reformat.convert_h5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
         
     @staticmethod
-    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, cosmology=Cosmo()):
+    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, cosmology = Cosmo()):
         """
         Transform a datacube with dimensions x, y, t (cMpc x cMpc x cMpc) to ⍺, δ, f (rad x rad x Hz),
 
@@ -321,7 +339,7 @@ class Reformat():
                     fxy = fq + df/2
                       
                     # Calculate pixelated luminosity
-                    fv = Reformat.brightness_temperature_to_flux(tb=tb, fxy=fxy, dtheta=dtheta, dphi=dphi)
+                    fv = Reformat.brightness_temperature_to_flux(tb=tb * u.K, fxy=fxy * u.Hz, dtheta=dtheta * u.rad, dphi=dphi * u.rad).to_value(u.Jy)
                 
                     # Save values
                     voxels[x, y, t, 0] = dtheta
@@ -405,7 +423,7 @@ class Reformat():
         :param f_ref: Refrence frequency, the ending frequency of the model.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
 
-        :return: An array determining the specific central value of each voxel in its corresponding values array in units of (deg, deg, Hz).
+        :return (rasum, decsum, freqsum): An array determining the specific central value of each voxel in its corresponding values array in units of (deg, deg, Hz).
         """
 
         # RA, Dec centering function and freq shift function
@@ -544,7 +562,7 @@ class Reformat():
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
         :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
 
-        :return: The dynamically defined settings dictionary.
+        :return dynamic_settings: The dynamically defined settings dictionary.
         """
         # Calculated settings: [observation] start_frequency_hz, num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, length, start_time_utc
         # Calculated settings: [image] fov_deg, size
@@ -678,7 +696,7 @@ class Reformat():
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
         :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
 
-        :return: The dynamically defined settings dictionary.
+        :return dynamic_settings: The dynamically defined settings dictionary.
         """
 
         values, z_ref, vox, cosmology = Reformat.convert_h5_to_csv(file, coeval=coeval)
@@ -714,7 +732,9 @@ class Reformat():
         :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
         :param d: The dimensions of the array, if none, the program will assume a cubic values array with side-lengths equal to the floor of the cube root of the number of entries in the OSM file.
 
-        :return: The values, voxels, cumulative voxels, sigma_f, f_ref, and phase_ref_point contained in a dictionary. If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
+        :return output_data: The values, voxels, cumulative voxels, sigma_f, f_ref, and phase_ref_point contained in a dictionary.
+        
+        If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
         """
 
         df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
