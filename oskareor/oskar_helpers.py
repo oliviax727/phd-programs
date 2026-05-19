@@ -2,24 +2,26 @@
 The oskar_helpers module contains a series of helper functions and variables for the entire simulation-to-power-spectra pipeline.
 """
 
+import configparser as cfp
 # System imports
 import os
-import configparser as cfp
 
 # Mathematics and calculations
 import astropy.constants as c
 import astropy.units as u
-import numpy as np
 import h5py
+import numpy as np
+
+# Astropy extras
+from astropy.coordinates import EarthLocation, SkyCoord
+from astropy.cosmology import FlatLambdaCDM as fmodel
+from astropy.cosmology import z_at_value as getz
+from astropy.time import Time, TimeDelta
+from astropy.units import Quantity
 
 # Data handling and statistics
 from scipy.stats import circmean as circmean_radians
 
-# Astropy extras
-from astropy.coordinates import SkyCoord, EarthLocation
-from astropy.time import Time, TimeDelta
-from astropy.cosmology import FlatLambdaCDM as fmodel
-from astropy.cosmology import z_at_value as getz
 
 # Reformat helper functions
 class OSKARHelper():
@@ -118,14 +120,14 @@ class OSKARHelper():
     COEVAL_TEMPLATE_VALUES_2 = np.array(COEVAL_TEMPLATE_2.get('BrightnessTemp')['brightness_temp'])
 
     @staticmethod
-    def select_option(options, selection):
+    def select_option(options: dict, selection: str) -> dict:
         """
         Select an option from an option dictionary.
 
-        :param options: The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
-        :param selection: The option to select. If empty return the whole option dictionary.
+        :param options (dict): The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
+        :param selection (str): The option to select. If empty return the whole option dictionary.
 
-        :return: A dictionary containing only the option or the entire option dictionary
+        :return option_dict (dict): A dictionary containing only the option or the entire option dictionary
         """
 
         if selection == "":
@@ -138,15 +140,15 @@ class OSKARHelper():
         raise ValueError("Option "+selection+" is not a valid option.")
 
     @staticmethod
-    def display_options(options, print_options=True, selection=""):
+    def display_options(options: dict, selection: str = "", print_options: bool = True) -> dict:
         """
         Select and/or display option(s) from an option dictionary.
 
-        :param options: The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
-        :param selection: The option to select. If empty return the whole option dictionary.
-        :param print_options: If true print the help for the option dictionary. If false return dictionary only.
+        :param options (dict): The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
+        :param selection (str): The option to select. If empty return the whole option dictionary.
+        :param print_options (bool): If true print the help for the option dictionary. If false return dictionary only.
 
-        :return: A dictionary containing only the option or the entire option dictionary.
+        :return options_dict (dict): A dictionary containing only the option or the entire option dictionary.
         """
 
         options = OSKARHelper.select_option(options, selection)
@@ -167,12 +169,12 @@ class OSKARHelper():
         return options
 
     @staticmethod
-    def expand_path(path):
+    def expand_path(path: str) -> str:
         """ Expands a filepath to produce an absolute path. """
         return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
 
     @staticmethod
-    def dir_list_sorted(dir_):
+    def dir_list_sorted(dir_: str) -> str:
         """ Retreives a frequency-sorted list of OSM or FITS file names from a given directory. """
 
         files = np.array(os.listdir(dir_))
@@ -191,13 +193,13 @@ class OSKARHelper():
         return sorted_files
     
     @staticmethod
-    def find_replace_line(file_name, find_line, replace_line):
+    def find_replace_line(file_name: str, find_line: str, replace_line: str):
         """
         Replace a given line in a settings.ini file given the line is equal to a special string.
         
-        :param file: The file to perform the find-and-replace.
-        :param find_line: The special keyword to trigger a replace.
-        :param replace_line: The line to replace the preset.
+        :param file (str): The file to perform the find-and-replace.
+        :param find_line (str): The special keyword to trigger a replace.
+        :param replace_line (str): The line to replace the preset.
         """
 
         with open(file_name, 'r', encoding='utf-8') as file:
@@ -211,26 +213,28 @@ class OSKARHelper():
                     file.write(line)
 
     @staticmethod
-    def read_settings_to_dictionary(file):
+    def read_settings_to_dictionary(file: str) -> dict:
         """
         Convert a settings ini file into a dictionary using configparser.
 
-        :param file: The specific ini file to read.
+        :param file (str): The specific ini file to read.
 
-        :return: The settings in the form of a dictionary.
+        :return settings_dict (dict): The settings in the form of a dictionary.
         """
 
         config = cfp.ConfigParser()
-        config.read_file(open(file, encoding='utf-8'))
+        with open(file, encoding='utf-8') as filestream:
+            config.read_file(filestream)
 
         return { s: dict(config.items(s)) for s in config.sections() }
     
     @staticmethod
-    def save_settings_from_dictionary(file, settings_dict):
+    def save_settings_from_dictionary(file: str, settings_dict: dict):
         """
         Save a dictionary contents as an ini file using configparser.
 
-        :param file: The specific ini file to save the data to.
+        :param file (str): The specific ini file to save the data to.
+        :param settings_dict (dict): The settings in the form of a dictionary.
         """
 
         config = cfp.ConfigParser()
@@ -246,7 +250,7 @@ class Maths():
 
     # Angular distance calculations in degrees
     @staticmethod
-    def normalise_angle(t):
+    def normalise_angle(t: float) -> float:
         """ Calculate the normalised angle """
         return (t % 360 + 180) % 360 - 180
     
@@ -254,7 +258,7 @@ class Maths():
     norm = normalise_angle
 
     @staticmethod
-    def denormalise_angle(t):
+    def denormalise_angle(t: float) -> float:
         """ Denormalise an angle i.e. convert to [0, 360). """
         return (t % 360 + 360) % 360
     
@@ -262,14 +266,14 @@ class Maths():
     denorm = denormalise_angle
 
     @staticmethod
-    def angle_delta(a, b):
+    def angle_delta(a: float, b: float) -> float:
         """ Calculate the unnormalised difference between two angles. """
         return Maths.norm(a)-Maths.norm(b)
 
     delta = angle_delta
 
     @staticmethod
-    def angle_difference(a, b):
+    def angle_difference(a: float, b: float) -> float:
         """ Calculate the true difference between two angles. """
         return min(abs(Maths.delta(a, b)),360-abs(Maths.delta(a, b)))
 
@@ -277,7 +281,7 @@ class Maths():
     diff = angle_difference
 
     @staticmethod
-    def signed_angle_difference(a, b):
+    def signed_angle_difference(a: float, b: float) -> float:
         """ Calculate the signed difference between two angles. """
         return Maths.norm(Maths.delta(a, b) - 360) if (Maths.delta(a, b)) > 180 else ((Maths.delta(a, b) + 360) if Maths.delta(a, b) < -180 else Maths.delta(a, b))
 
@@ -286,7 +290,7 @@ class Maths():
 
     # Scipy circmean function for degrees
     @staticmethod
-    def circmean_deg(angles, bounds=(0, 360)):
+    def circmean_deg(angles: float, bounds: tuple[float] = (0, 360)) -> float:
         """ Calculate the mean using modular arithmetic, a modified version of scipy.stats.circmean. """
         return np.rad2deg(circmean_radians(np.deg2rad(angles), high=np.deg2rad(bounds[1]), low=np.deg2rad(bounds[0])))
 
@@ -294,32 +298,32 @@ class Maths():
 
     # Normal, sinusoid, and sinc functions for convenience
     @staticmethod
-    def normal(x, mean=0, var=1, amp=1/np.sqrt(2*np.pi)):
+    def normal(x: float, mean: float = 0, var: float = 1, amp: float = np.sqrt(2*np.pi)) -> float:
         """ A simple normal distribution function. """
         return amp * np.exp(-(x-mean)**2/(2*var))/np.sqrt(2*np.pi*var)
     
     gaussian = normal
     
     @staticmethod
-    def sinusoid(x, f=1, ph=0, amp=1):
+    def sinusoid(x: float, f: float = 1, ph: float = 0, amp: float = 1) -> float:
         """ A simple sinusoid function. """
         return amp * np.cos(2*np.pi*f*x+ph)
 
     @staticmethod
-    def sinc(x, f=1, ph=0, amp=1):
+    def sinc(x: float, f: float = 1, ph: float = 0, amp: float = 1) -> float:
         """ A simple sinc function. """
         return amp * np.nan_to_num(np.sin(2*np.pi*f*x+ph)/(2*np.pi*f*x+ph), nan=1, posinf=1, neginf=1)
     
     # Convert FWHM to Variance and vice versa
     @staticmethod
-    def full_width_at_half_maximum(x):
+    def full_width_at_half_maximum(x: float) -> float:
         """ Calculate the FWHM from the standard deviation. Distribution is assumed as gaussian. """
         return x * 2 * np.sqrt(2*np.log(2))
     
     FWHM = full_width_at_half_maximum
 
     @staticmethod
-    def standard_deviation(x):
+    def standard_deviation(x: float) -> float:
         """ Calculate the standard deviation from the FWHM. Distribution is assumed as gaussian. """
         return x / (2 * np.sqrt(2*np.log(2)))
     
@@ -327,7 +331,7 @@ class Maths():
 
     # l, m, n to RA, dec
     @staticmethod
-    def lm_to_radec(l, m, phase_centre=OSKARHelper.ZERO_RADEC):
+    def lm_to_radec(l: float, m: float, phase_centre: SkyCoord = OSKARHelper.ZERO_RADEC) -> list[float]:
         """ Convert the l, m plane coordinates to RA and dec. """
         d0 = phase_centre.dec.to_value(u.rad)
         a0 = phase_centre.ra.to_value(u.rad)
@@ -336,42 +340,42 @@ class Maths():
         dec = np.arcsin(m*np.cos(d0)+n*np.sin(d0))
         ra = a0 + np.arctan(l/(n*np.cos(d0)-m*np.sin(d0)))
 
-        return [ra, dec]
+        return (ra, dec)
 
 class Cosmo():
     """
     Defines a specific cosmological model for other classes to refer to. Assumes a flat universe.
 
-    :param h0: The Hubble constant.
-    :param omega_m_0: The dimensionless matter density.
-    :param omega_b_0: The dimensionless baryonic matter density.
-    :param cosmo: The cosmological ΛCDM model.
+    :param h0 (float): The Hubble constant.
+    :param omega_m_0 (float): The dimensionless matter density.
+    :param omega_b_0 (float): The dimensionless baryonic matter density.
+    :param cosmo (Cosmology): The cosmological ΛCDM model.
     """
 
-    def __init__(self, h0=100, omega_m_0=0.31, omega_b_0=0.048):
+    def __init__(self, h0: float = 100, omega_m_0: float = 0.31, omega_b_0: float = 0.048):
         self.h0        = h0 * u.km / u.s / u.Mpc # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
         self.omega_m_0 = omega_m_0
         self.omega_b_0 = omega_b_0
         self.cosmo     = fmodel(h0=h0, omega_m_0=omega_m_0, omega_b_0=omega_b_0) # Flat ΛCDM means Dark Energy density is 0.69
 
     # Redshift to comoving distance
-    def z_to_dz(self, z):
+    def z_to_dz(self, z: Quantity) -> Quantity:
         """ Convert redshift to comoving distance. """
         return self.cosmo.comoving_distance(z)
 
     # Comoving distance to redshift
-    def dz_to_z(self, dz):
+    def dz_to_z(self, dz: Quantity) -> Quantity:
         """ Convert comoving distance to redshift. """
         return getz(self.cosmo.comoving_distance, dz)
 
     # Redshift to frequency in GHz
     @staticmethod
-    def z_to_f(z, f0 = 1.420e9 * u.Hz):
+    def z_to_f(z: Quantity, f0: Quantity = 1.420e9 * u.Hz) -> Quantity:
         """ Convert redshift to frequency. By default it assumes that the start frequency is the 21 cm line. """
         return f0 / (z + 1)
     
     # Frequency in GHz to redshift
     @staticmethod
-    def f_to_z(f, f0 = 1.420e9 * u.Hz):
+    def f_to_z(f: Quantity, f0: Quantity = 1.420e9 * u.Hz) -> Quantity:
         """ Convert frequency to redshift. By default it assumes that the start frequency is the 21 cm line. """
         return (f0 / f) - 1
