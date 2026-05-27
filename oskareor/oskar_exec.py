@@ -13,8 +13,8 @@ import astropy.units as u
 from astropy.units import Quantity
 
 # Local imports
-from oskar_helpers import OSKARHelper
-from reformatter import Reformat
+from oskareor.oskar_helpers import OSKARHelper
+from oskareor.reformatter import Reformat
 
 # TODO: Turn into pip project (later)
 

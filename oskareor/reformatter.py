@@ -17,46 +17,53 @@ from scipy.interpolate import make_interp_spline as misp
 
 # Astropy extras
 from astropy.coordinates import SkyCoord
-from astropy.units import Quantity
 
 # Local imports
-from oskar_helpers import OSKARHelper, Cosmo, Maths
+from oskareor.oskar_helpers import OSKARHelper, Cosmo, Maths
 
 class Reformat():
     """
     The reformatter class contains functions relating to translating simulation data to OSKAR output data.
+
+    NB: all units are assumed SI unless explicitly stated as an astropy quantity. Exceptions to this rule include:
+    - Flux (in Jansky)
+    - Distance (in Mpc)
+    
+    Sky coordinate locations are given in Degrees, whereas angular diameters are given in radians.
     """
 
     @staticmethod
-    def brightness_temperature_to_flux(tb: Quantity, fxy: Quantity, dtheta: Quantity, dphi: Quantity) -> Quantity:
+    def brightness_temperature_to_flux(tb: float, fxy: float, dtheta: float, dphi: float) -> float:
         """
         Given the temperature, frequency, and angular size in both sky directions, calculate the luminosity in Jy.
         
-        :param tb: The brightness temperature.
-        :param fxy: The frequency of emission.
-        :param dtheta: The first specified angular diameter. Perpendicular to the first.
-        :param dphi: The second specified angular diameter. Perpendicular to the first.
+        :param tb: The brightness temperature. Must be provided in Kelvin.
+        :param fxy: The frequency of emission. Must be provided in units of Hertz.
+        :param dtheta: The first specified angular diameter. Perpendicular to the first. Must be provided in units of Radians.
+        :param dphi: The second specified angular diameter. Perpendicular to the first. Must be provided in units of Radians.
 
-        :return fv: The flux corresponding to the brightness temperature.
+        :return fv: The flux corresponding to the brightness temperature. In units of Jansky.
         """
 
         # Calculate pixelated luminosity
-        fv = 2 * c.k_B * fxy**2 * tb * (dtheta * dphi) / c.c ** 2 / u.sr
+        fv = 2 * c.k_B.si.value * fxy**2 * tb * (dtheta * dphi) / c.c.si.value ** 2
 
-        return fv.to(u.Jansky) # Converts to Jansky
+        return fv * 1e26 # Converts to Jansky
+    
+    SIGMA_F_FLOAT = OSKARHelper.SIGMA_F.to_value(u.Hz * u.K ** (-1/2))
     
     @staticmethod
-    def brightness_temperature_to_linewidth(tb: Quantity) -> Quantity:
+    def brightness_temperature_to_linewidth(tb: float) -> float:
         """
         Takes the brightness temperature emission. Assumes that the kinetic gas temperature is coupled with the spin temperature and the brightness temperature (generally correct for z < 25).
 
-        :param tb: The brightness temperature.
+        :param tb: The brightness temperature. Must be provided in Kelvin.
 
-        :return linewidth: The flux corresponding to the brightness temperature.
+        :return linewidth: The flux corresponding to the brightness temperature. In units of Jansky.
         """
 
         # Calculate linewidth in Hz
-        return (tb.to(u.K) ** 0.5) * OSKARHelper.SIGMA_F
+        return (tb ** 0.5) * Reformat.SIGMA_F_FLOAT
     
     TEMPLATE_PRESETS = {
         "gaussian" : (
@@ -117,7 +124,7 @@ class Reformat():
         return OSKARHelper.display_options(Reformat.TEMPLATE_PRESETS, print_options=print_presets, selection=filter_preset)
 
     @staticmethod
-    def mock_values(preset: str, scale: Quantity = 10 * u.K, d: tuple = (100, 100, 100), special = None):
+    def mock_values(preset: str, scale: float = 10, d: tuple = (100, 100, 100), special = None):
         """
         Create an array of mock simulation values.
 
@@ -152,13 +159,13 @@ class Reformat():
                         "d" : d, "i" : i, "j" : j, "t": t,
                         "x" : i - d[0]/2, "y" : j - d[1]/2,
                         "r": np.sqrt((i - d[0]/2)**2 + (j - d[1]/2)**2),
-                        "T_max" : scale.to_value(u.K)
+                        "T_max" : scale
                         }
                     
                     # Populate array cell
                     values[i, j, t] = func(params)
 
-            print("\rTime step #", t, end="")
+            print("\rCreating values for t-dim slice #", t, "of", d[2], end="")
         
         print("\nValues created!")
 
@@ -339,7 +346,7 @@ class Reformat():
                     fxy = fq + df/2
                       
                     # Calculate pixelated luminosity
-                    fv = Reformat.brightness_temperature_to_flux(tb=tb * u.K, fxy=fxy * u.Hz, dtheta=dtheta * u.rad, dphi=dphi * u.rad).to_value(u.Jy)
+                    fv = Reformat.brightness_temperature_to_flux(tb=tb, fxy=fxy, dtheta=dtheta, dphi=dphi)
                 
                     # Save values
                     voxels[x, y, t, 0] = dtheta
@@ -353,7 +360,7 @@ class Reformat():
             dz_val = dz_val + dt # Increment the value of dz by voxel dimension
             fq = fq + df # Increment cumulative frequency
 
-            print("\rTime step #", t, end="")
+            print("\rTransforming t-dim slice #", t, "of", d[2], end="")
 
         print("\nTransforming complete.")
 
@@ -381,7 +388,7 @@ class Reformat():
         for x in range(d[0]):
             for y in range(d[1]):
 
-                print("\rSpaxel # (", x, ",", y, ")", end="")
+                print("\rRegridding spaxel # (", x, ",", y, ")", "of", "(", d[0], ",", d[1], ")", end="")
 
                 # Set the values as being in the middle of each bin
                 freq_values = np.cumsum(voxels[x, y, :, 2]) - voxels[x, y, :, 2]/2
@@ -520,7 +527,7 @@ class Reformat():
                             "\n"
                         )
 
-                    print("\rSpaxel # (", x, ",", y, ")", end="")
+                    print("\rSaving data for spaxel # (", x, ",", y, ")", "of", "(", d[0], ",", d[1], ")", end="")
 
         print("\nProcess complete, data saved to "+osm_output)
 

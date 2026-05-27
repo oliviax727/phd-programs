@@ -378,7 +378,7 @@ class Cosmo():
         self.h0        = h0 # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
         self.omega_m_0 = omega_m_0
         self.omega_b_0 = omega_b_0
-        self.cosmo     = fmodel(h0=h0, omega_m_0=omega_m_0, omega_b_0=omega_b_0) # Flat ΛCDM means Dark Energy density is 0.69
+        self.cosmo     = fmodel(H0=h0, Om0=omega_m_0, Ob0=omega_b_0) # Flat ΛCDM model
 
     # Redshift to comoving distance
     def z_to_dz(self, z: float) -> Quantity:
