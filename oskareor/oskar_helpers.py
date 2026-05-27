@@ -86,7 +86,7 @@ class OSKARHelper():
             "apeture_array/array_pattern/element/y_phase_error_time_deg": 0.0015057
         },
         "interferometer": {
-            "oskar_vis_filename": "oskar_output/vis.vis",
+            "oskar_vis_filename": "oskar_output/vis",
             "ms_filename": "oskar_output/sim.ms",
             "channel_bandwidth_hz": 5e4,
             "time_average_sec": 10.0,
@@ -103,8 +103,8 @@ class OSKARHelper():
         "image": {
             "use_gpus": False,
             "channel_snapshots": "false",
-            "input_vis_data": "output/sim.ms",
-            "root_path": "output/sim_image"
+            "input_vis_data": "oskar_output/sim.ms",
+            "root_path": "oskar_output/sim_image"
         }
     }
 
