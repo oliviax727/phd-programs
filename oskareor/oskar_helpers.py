@@ -112,7 +112,7 @@ class OSKARHelper():
         if selection == "":
             return options
 
-        for option in ofc.recase_iterable(options):
+        for option in ofc.recase_iterable(set(options.keys())):
             if selection.lower() == option or selection.lower() in options[option][0]:
                 return { option : options[option] }
           
