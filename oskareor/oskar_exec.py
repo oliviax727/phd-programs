@@ -106,7 +106,7 @@ class BTAnalysisPipeline():
         return (interf_settings_path, interf_settings_dict), (imager_settings_path, imager_settings_dict)
 
     @staticmethod
-    def run_oskar_on_osms(osm_file, interferometer_settings = ("", ohelp.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", ohelp.DEFAULT_IMAGER_SETTINGS), oskar_exec=None, oskar_mode="python", use_imager=True):
+    def run_oskar_on_osm(osm_file, interferometer_settings = ("", ohelp.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", ohelp.DEFAULT_IMAGER_SETTINGS), oskar_exec=None, oskar_mode="python", use_imager=True):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the SimulationReformatter object.
 
@@ -135,7 +135,6 @@ class BTAnalysisPipeline():
             if use_imager:
                 imager_settings[0] = ofc.expand_path(imager_settings[0])
             
-
         # Run OSKAR's interferometer simulation
         try:
             print("Running interferometer on "+osm_file)
@@ -344,7 +343,7 @@ class BTAnalysisPipeline():
 
         # Run OSKAR
         print("Running OSKAR ...")
-        BTAnalysisPipeline.run_oskar_on_osms(
+        BTAnalysisPipeline.run_oskar_on_osm(
             osm_file=osm_output,
             interferometer_settings=interferometer_settings,
             imager_settings=imager_settings,
