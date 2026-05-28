@@ -111,11 +111,9 @@ class OSKARHelper():
 
         if selection == "":
             return options
-        
-        selection = ofc.recase_iterable(selection)
 
-        for option in options:
-            if selection == option or selection in options[option][0]:
+        for option in ofc.recase_iterable(options):
+            if selection.lower() == option or selection.lower() in options[option][0]:
                 return { option : options[option] }
           
         raise ValueError("Option "+selection+" is not a valid option.")

@@ -367,7 +367,7 @@ class LoadDefaults:
     """
 
     # Update Settings
-    TEMPLATES = set(simref.TEMPLATE_PRESETS.keys)
+    TEMPLATES = set(simref.TEMPLATE_PRESETS.keys())
     FILETYPES = { "osm", "ini", "ms", "vis", "fits" }
 
     @staticmethod

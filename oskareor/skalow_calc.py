@@ -278,8 +278,9 @@ class OSKARFileConfig:
             config.write(settings_file)
 
     @staticmethod
-    def recase_iterable(iterable: Iterable[str], lower=True):
+    def recase_iterable(iterable: Iterable[str], lower: bool = True) -> Iterable[str]:
         """ Makes every string in an iterable lower case then turns it back into the iterable object. """
+
         iter_type = type(iterable)
         map_obj = map(lambda s: s.lower() if lower else s.upper(), iterable)
 

@@ -5,11 +5,11 @@ Testing stage for OSKAR Regrid.
 
 # pylint: disable=line-too-long, unused-import
 from matplotlib import pyplot as plt
-from oskareor.oskar_exec import LoadDefaults, BTAnalysisPipeline
+from oskareor.oskar_exec import LoadDefaults
 
 # Testing stage
 
-LoadDefaults.load_default_oskar()
+LoadDefaults.reload_template_sky_models()
 
 #BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
 
