@@ -133,7 +133,7 @@ class BTAnalysisPipeline():
 
         print("Setting up OSKAR for "+osm_file)
 
-        cwd = os.getcwd()+'/BTA'
+        cwd = os.getcwd()
 
         # Set up settings path/dict
         settings = [None, None]
@@ -155,13 +155,15 @@ class BTAnalysisPipeline():
             
         settings = tuple(settings)
 
+        print("command = $ "+" ".join([oskar_exec+"/oskar_sim_interferometer",settings[0]]))
+
         # Run OSKAR's interferometer simulation
         try:
             print("Running interferometer on "+osm_file)
             if oskar_mode == "singularity":
-                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer",settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer",settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             elif oskar_mode == "binary":
-                subprocess.run([oskar_exec+"/oskar_sim_interferometer",settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                subprocess.run([oskar_exec+"/oskar_sim_interferometer",settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
             print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
             print(f"Error output: {e.stderr.decode()}")
@@ -171,14 +173,14 @@ class BTAnalysisPipeline():
             try:
                 print("Running imager on "+osm_file)
                 if oskar_mode == "singularity":
-                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager",settings[1]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager",settings[1]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 elif oskar_mode == "binary":
-                    subprocess.run([oskar_exec+"/oskar_imager",settings[1]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                    subprocess.run([oskar_exec+"/oskar_imager",settings[1]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except subprocess.CalledProcessError as e:
                 print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
-
-        subprocess.run(["find",".","-name","'*.log'","-type","f","-delete"], check=True, cwd=cwd)
+        
+        exit()
 
     @staticmethod
     def setup_bta_dir(oskar_telescope_model, h5_file="", interferometer_settings_override="", imager_settings_override="", template=False):

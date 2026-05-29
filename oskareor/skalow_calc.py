@@ -275,7 +275,7 @@ class OSKARFileConfig:
         config.read_dict(settings_dict)
 
         with open(OSKARFileConfig.expand_path(file), 'w', encoding='utf-8') as settings_file:
-            config.write(settings_file)
+            config.write(settings_file, space_around_delimiters=False)
 
     @staticmethod
     def recase_iterable(iterable: Iterable[str], lower: bool = True) -> Iterable[str]:
