@@ -218,7 +218,6 @@ class BTAnalysisPipeline():
 
         subprocess.run(["cp","-r",ofc.expand_path(oskar_telescope_model),"BTA/telescope_model"], check=True)
 
-
         return default_return
 
     @staticmethod
@@ -238,25 +237,32 @@ class BTAnalysisPipeline():
 
         # Get original BTA location string
         original_locations = np.array([settings["interferometer"]["ms_filename"], settings["interferometer"]["oskar_vis_filename"], settings["image"]["root_path"]+"_I.fits"])
-        original_locations = tuple(map(ofc.expand_path, "./BTA/" + original_locations))
+        original_locations = tuple(map(ofc.expand_path, original_locations))
 
         # Convert outpath string
         outpath = tuple(map(ofc.expand_path, outpath))
 
-        # Move sim.ms file to directory
-        if outpath[0] != "":
-            subprocess.run(["mv", original_locations[0], outpath[0]], check=True)
+        # Wrap in try-catch just in case oskar stops working
+        try:
+            # Move sim.ms file to directory
+            if outpath[0] != "":
+                subprocess.run(["mv", original_locations[0], outpath[0]], check=True)
 
-        # Move vis file to directory
-        if outpath[1] != "":
-            subprocess.run(["mv", original_locations[1], outpath[1]], check=True)
+            # Move vis file to directory
+            if outpath[1] != "":
+                subprocess.run(["mv", original_locations[1], outpath[1]], check=True)
 
-        # Move image fits file to directory
-        if outpath[2] != "" and use_imager:
-            subprocess.run(["mv", original_locations[0], outpath[2]], check=True)
+            # Move image fits file to directory
+            if outpath[2] != "" and use_imager:
+                subprocess.run(["mv", original_locations[0], outpath[2]], check=True)
 
-        if clean:
-            subprocess.run(["rm","-rf","BTA"], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
+            print(f"Error output: {e.output}")
+        
+        finally:
+            if clean:
+                subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
     def run_oskar_on_model(file="", phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res: Quantity = 100e6 * u.MHz, interferometer_settings_override = "", imager_settings_override = "", outpath = ("","",""), clean = True, oskar_exec = ohelp.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = ohelp.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, use_imager = True):
