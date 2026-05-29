@@ -155,30 +155,32 @@ class BTAnalysisPipeline():
             
         settings = tuple(settings)
 
-        print("command = $ "+" ".join([oskar_exec+"/oskar_sim_interferometer",settings[0]]))
+        # Executes an shell command with all try-catches included
+        def execute_oskar_shell_command(command):
+            shell_command = " ".join(command)
 
-        # Run OSKAR's interferometer simulation
-        try:
-            print("Running interferometer on "+osm_file)
-            if oskar_mode == "singularity":
-                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer",settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            elif oskar_mode == "binary":
-                subprocess.run([oskar_exec+"/oskar_sim_interferometer",settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except subprocess.CalledProcessError as e:
-            print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
-            print(f"Error output: {e.stderr.decode()}")
+            print(f"Attempting to run the command - $ {shell_command}")
 
-        # Run OSKAR's imager simulation
-        if use_imager:
             try:
-                print("Running imager on "+osm_file)
-                if oskar_mode == "singularity":
-                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager",settings[1]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                elif oskar_mode == "binary":
-                    subprocess.run([oskar_exec+"/oskar_imager",settings[1]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(shell_command, check=True, shell=True, stderr=subprocess.PIPE) #stdout=subprocess.PIPE
             except subprocess.CalledProcessError as e:
                 print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
+
+        # Run OSKAR's interferometer simulation
+        print("Running interferometer on "+osm_file)
+        if oskar_mode == "singularity":
+            execute_oskar_shell_command(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer",settings[0]])
+        elif oskar_mode == "binary":
+            execute_oskar_shell_command([oskar_exec+"/oskar_sim_interferometer",settings[0]])
+        
+        # Run OSKAR's imager simulation
+        if use_imager:
+            print("Running imager on "+osm_file)
+            if oskar_mode == "singularity":
+                execute_oskar_shell_command(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager",settings[1]])
+            elif oskar_mode == "binary":
+                execute_oskar_shell_command([oskar_exec+"/oskar_imager",settings[1]])
         
         exit()
 
@@ -199,7 +201,7 @@ class BTAnalysisPipeline():
         cwd = os.getcwd()
 
         # Define default return value
-        default_return = ["", "", "", "BTA/telescope_model", cwd]
+        default_return = ["", "", "", "BTA/telescope_model.tm", cwd]
 
         # Create directory, delete contents of existing BTA directory
         subprocess.run(["rm","-rf","BTA"], check=True)
@@ -218,7 +220,7 @@ class BTAnalysisPipeline():
             subprocess.run(["cp",ofc.expand_path(imager_settings_override),"BTA/imager_override.ini"], check=True)
             default_return[2] = "BTA/imager_override.ini"
 
-        subprocess.run(["cp","-r",ofc.expand_path(oskar_telescope_model),"BTA/telescope_model"], check=True)
+        subprocess.run(["cp","-r",ofc.expand_path(oskar_telescope_model),"BTA/telescope_model.tm"], check=True)
 
         return default_return
 
