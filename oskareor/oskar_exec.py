@@ -74,6 +74,9 @@ class BTAnalysisPipeline():
         :return (interferometer_settings, imager_settings): The two tuples containing the split settings (settings file location, settings dictionary)
         """
 
+        # Retrieve sub-elements
+        (gen_file, gen_dict) = settings
+
         # Declare default return values
         interf_settings_dict = None
         imager_settings_dict = None
@@ -82,24 +85,27 @@ class BTAnalysisPipeline():
         imager_settings_path = ""
 
         # If file is provided but not a dictionary, read the file
-        if settings[1] is None and settings[0] != "":
-            settings[1] = ofc.read_settings_to_dictionary(settings[0])
+        if gen_dict is None and gen_file != "":
+            gen_dict = ofc.read_settings_to_dictionary(gen_file)
 
         # Make sure that the settings exists before splitting
-        if not settings[1] is None:
-            interf_settings_dict = {k: settings[k] for k in ohelp.LEGAL_INTERFEROMETER_HEADINGS}
+        if not gen_dict is None:
+            interf_settings_dict = {k: gen_dict[k] for k in ohelp.LEGAL_INTERFEROMETER_HEADINGS}
 
             if use_imager:
-                imager_settings_dict = {k: settings[k] for k in ohelp.LEGAL_IMAGER_HEADINGS}
+                imager_settings_dict = {k: gen_dict[k] for k in ohelp.LEGAL_IMAGER_HEADINGS}
+
+        # Remove ini file name, keep containing directory path and base preset name
+        gen_file = gen_file[:-21]
 
         # Make sure a file path has been provided to save the file to
-        if settings[0] != "" and save_file:
-            interf_settings_path = settings[0] + ".oskar_sim_interferometer.ini"
+        if gen_file != "" and save_file:
+            interf_settings_path = gen_file + "_oskar_sim_interferometer.ini"
 
             ofc.save_settings_from_dictionary(interf_settings_path, interf_settings_dict)
 
             if use_imager:
-                imager_settings_path = settings[0] + ".oskar_imager.ini"
+                imager_settings_path = gen_file + "_oskar_imager.ini"
                 
                 ofc.save_settings_from_dictionary(imager_settings_path, imager_settings_dict)
 
@@ -120,6 +126,7 @@ class BTAnalysisPipeline():
         """
 
         # TODO: Provide options for all four execution modes.
+
         # Create the output files
         subprocess.run(["mkdir","-p","BTA/oskar_output"], check=True)
         subprocess.run(["mkdir","-p","BTA/oskar_output/sim.ms"], check=True)
@@ -128,20 +135,33 @@ class BTAnalysisPipeline():
 
         cwd = os.getcwd()+'/BTA'
 
-        # Expand path if not python
+        # Set up settings path/dict
+        settings = [None, None]
+
         if oskar_mode != "python":
-            interferometer_settings[0] = ofc.expand_path(interferometer_settings[0])
+            # Expand path if not python
+            settings[0] = ofc.expand_path(interferometer_settings[0])
             oskar_exec = ofc.expand_path(oskar_exec)
+
             if use_imager:
-                imager_settings[0] = ofc.expand_path(imager_settings[0])
+                settings[1] = ofc.expand_path(imager_settings[0])
+
+        else:
+            # Copy dictionary if python
+            settings[0] = interferometer_settings[1]
+
+            if use_imager:
+                settings[1] = imager_settings[1]
             
+        settings = tuple(settings)
+
         # Run OSKAR's interferometer simulation
         try:
             print("Running interferometer on "+osm_file)
             if oskar_mode == "singularity":
-                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer",interferometer_settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_sim_interferometer",settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
             elif oskar_mode == "binary":
-                subprocess.run([oskar_exec+"/oskar_sim_interferometer",interferometer_settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                subprocess.run([oskar_exec+"/oskar_sim_interferometer",settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
         except subprocess.CalledProcessError as e:
             print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
             print(f"Error output: {e.stderr.decode()}")
@@ -151,9 +171,9 @@ class BTAnalysisPipeline():
             try:
                 print("Running imager on "+osm_file)
                 if oskar_mode == "singularity":
-                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager",imager_settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                    subprocess.run(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager",settings[1]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
                 elif oskar_mode == "binary":
-                    subprocess.run([oskar_exec+"/oskar_imager",imager_settings[0]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+                    subprocess.run([oskar_exec+"/oskar_imager",settings[1]], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
             except subprocess.CalledProcessError as e:
                 print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
@@ -176,22 +196,30 @@ class BTAnalysisPipeline():
 
         cwd = os.getcwd()
 
-        # 1. Create Directory
+        # Define default return value
+        default_return = ["", "", "", "BTA/telescope_model", cwd]
+
+        # Create directory, delete contents of existing BTA directory
+        subprocess.run(["rm","-rf","BTA"], check=True)
         subprocess.run(["mkdir","-p","BTA"], check=True)
 
-        # 2. Move h5 file and INIs to directory
+        # Move h5 file and INIs to directory
         if not template and h5_file != "":
             subprocess.run(["cp",ofc.expand_path(h5_file),"BTA/analysis.h5"], check=True)
+            default_return[0] = "BTA/analysis.h5"
 
         if interferometer_settings_override != "":
             subprocess.run(["cp",ofc.expand_path(interferometer_settings_override),"BTA/interferometer_override.ini"], check=True)
+            default_return[1] = "BTA/interferometer_override.ini"
 
         if imager_settings_override != "":
             subprocess.run(["cp",ofc.expand_path(imager_settings_override),"BTA/imager_override.ini"], check=True)
+            default_return[2] = "BTA/imager_override.ini"
 
         subprocess.run(["cp","-r",ofc.expand_path(oskar_telescope_model),"BTA/telescope_model"], check=True)
 
-        return ("BTA/analysis.h5" if not template else ""), "BTA/interferometer_override.ini", "BTA/imager_override.ini", "BTA/telescope_model", cwd
+
+        return default_return
 
     @staticmethod
     def clean_bta_dir(outpath, use_imager = True, clean = True, settings = None):
@@ -206,10 +234,10 @@ class BTAnalysisPipeline():
 
         # Keep pylint happy
         if settings is None:
-            settings = ohelp.DEFAULT_DYNAMIC_GENERAL_SETTINGS
+            settings = ohelp.DEFAULT_GENERAL_SETTINGS
 
         # Get original BTA location string
-        original_locations = np.array([settings["interferometer"]["ms_filename"], settings["interferometer"]["oskar_vis_filename"], settings["imager"]["root_path"]+"_I.fits"])
+        original_locations = np.array([settings["interferometer"]["ms_filename"], settings["interferometer"]["oskar_vis_filename"], settings["image"]["root_path"]+"_I.fits"])
         original_locations = tuple(map(ofc.expand_path, "./BTA/" + original_locations))
 
         # Convert outpath string
@@ -270,7 +298,7 @@ class BTAnalysisPipeline():
 
         # Create output file locations
         h5_id = file.split('/')[-1][:-3] if not template_flag else template_preset
-        osm_output = ofc.expand_path("BTA/" + h5_id + "_sky_model.osm")
+        osm_output = ofc.expand_path("BTA/sky_model.osm")
         ini_output = ofc.expand_path("BTA/" + h5_id + "_general_settings.ini")
 
         # Set the default dynamic settings array

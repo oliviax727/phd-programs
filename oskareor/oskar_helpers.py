@@ -29,9 +29,19 @@ class OSKARHelper():
         },
         "observation" : {
             "num_time_steps": 24,
+
+            # Below values are modified dynamically =>
+            "start_frequency_hz": 200e6,
+            "num_channels": 100,
+            "frequency_inc_hz": 140e3,
+            "phase_centre_ra_deg": 0.0,
+            "phase_centre_dec_deg": -27.0,
+            "length": "4:00:00.00",
+            "start_time_utc": "2025-03-03 03:30:00.00"
+            # <=
         },
         "telescope": {
-            "input_directory": "telescope_model",
+            "input_directory": "BTA/telescope_model.tm",
             "apeture_array/element_pattern/enable_numerical": False,
             "apeture_array/array_pattern/element/x_gain": 1.0,
             "apeture_array/array_pattern/element/y_gain": 1.0,
@@ -43,14 +53,16 @@ class OSKARHelper():
             "apeture_array/array_pattern/element/y_phase_error_time_deg": 0.0015057
         },
         "interferometer": {
-            "oskar_vis_filename": "oskar_output/vis.vis",
-            "ms_filename": "oskar_output/sim.ms",
+            "oskar_vis_filename": "BTA/oskar_output/vis.vis",
+            "ms_filename": "BTA/oskar_output/sim.ms",
             "channel_bandwidth_hz": 5e4,
             "time_average_sec": 10.0,
             "uv_filter_max": 1000,
             "uv_filter_units": "Wavelengths"
         },
-        "sky": {}
+        "sky": {
+            "oskar_sky_model/file": "BTA/sky_model.osm"
+        }
     }
 
     DEFAULT_IMAGER_SETTINGS: dict = {
@@ -59,33 +71,20 @@ class OSKARHelper():
         },
         "image": {
             "use_gpus": False,
-            "channel_snapshots": "false",
-            "input_vis_data": "oskar_output/sim.ms",
-            "root_path": "oskar_output/sim_image"
-        }
-    }
+            "channel_snapshots": False,
+            "input_vis_data": "BTA/oskar_output/sim.ms",
+            "root_path": "BTA/oskar_output/sim_image",
 
-    # Calculated settings: [observation] start_frequency_hz, num_channels, frequency_inc_hz, phase_centre_ra_deg, phase_centre_dec_deg, length, start_time_utc
-    # Calculated settings: [image] fov_deg, size
-    DEFAULT_DYNAMIC_GENERAL_SETTINGS: dict = {
-        "observation" : {
-            "start_frequency_hz": 200e6,
-            "num_channels": 100,
-            "frequency_inc_hz": 140e3,
-            "phase_centre_ra_deg": 0.0,
-            "phase_centre_dec_deg": -27.0,
-            "length": "4:00:00.00",
-            "start_time_utc": "2025-03-03 03:30:00.00"
-        },
-        "image" : {
+            # Below values are modified dynamically =>
             "fov_deg": 1.5,
             "size": 100
+            # <=
         }
     }
 
     PRIMARY_GENERAL_SETTINGS: dict = { "General": {} }
 
-    DEFAULT_GENERAL_SETTINGS: dict = DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | DEFAULT_DYNAMIC_GENERAL_SETTINGS | PRIMARY_GENERAL_SETTINGS
+    DEFAULT_GENERAL_SETTINGS: dict = DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | PRIMARY_GENERAL_SETTINGS
 
     # Legal settings keywords
     LEGAL_INTERFEROMETER_HEADINGS: set   = { "simulator", "sky", "telescope", "observation", "interferometer"}
