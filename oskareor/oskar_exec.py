@@ -440,7 +440,7 @@ class LoadDefaults:
                 )
     
     @staticmethod
-    def reload_template_oskar_sims(start_from_scratch=False, update_which_files = None, update_which_templates = None):
+    def reload_template_oskar_sims(start_from_scratch = False, update_which_files = None, update_which_templates = None):
         """
         (Re)load all default sky models and update corresponding measurement sets, visibility tables, and fits datacube files.
 
