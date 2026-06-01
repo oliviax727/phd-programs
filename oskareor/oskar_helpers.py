@@ -25,7 +25,8 @@ class OSKARHelper():
             "app": "oskar_sim_interferometer"
         },
         "simulator": {
-            "use_gpus": False
+            "use_gpus": False,
+            "write_status_to_log_file": True
         },
         "observation" : {
             "num_time_steps": 24,
