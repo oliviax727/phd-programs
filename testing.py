@@ -10,7 +10,7 @@ from oskareor.oskar_exec import LoadDefaults
 # Testing stage
 
 #LoadDefaults.reload_template_sky_models()
-LoadDefaults.reload_template_oskar_sims(update_which_templates = { "gaussian" })
+LoadDefaults.reload_all(update_which_templates = { "gaussian" }, oskar_parent_dir = "/software/projects/mwaeor/ohrw")
 
 #BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
 

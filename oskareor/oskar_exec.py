@@ -408,12 +408,13 @@ class LoadDefaults:
     FILETYPES = { "osm", "ini", "ms", "vis", "fits" }
 
     @staticmethod
-    def reload_template_sky_models(update_which_files = None, update_which_templates = None):
+    def reload_template_sky_models(update_which_files = None, update_which_templates = None, oskar_parent_dir = "~"):
         """
         (Re)load all default sky models and update corresponding ini and osm files.
 
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
         :param update_which_templates: A set containing all of the templates to be updated, see `TEMPLATES` for what is available (and used as a default).
+        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
         """
 
         # Fallback to defaults
@@ -435,18 +436,19 @@ class LoadDefaults:
 
             simref.generate_osm_from_simulation(
                 template_value,
-                osm_output=("~/.oskar/osm_templates/"+template_preset_loop+"_sky_model.osm") if "osm" in update_which_files else "",
-                save_dynamic_settings=("~/.oskar/ini_templates/"+template_preset_loop+"_general_settings.ini") if "ini" in update_which_files else ""
+                osm_output=(oskar_parent_dir+"/.oskar/osm_templates/"+template_preset_loop+"_sky_model.osm") if "osm" in update_which_files else "",
+                save_dynamic_settings=(oskar_parent_dir+"/.oskar/ini_templates/"+template_preset_loop+"_general_settings.ini") if "ini" in update_which_files else ""
                 )
     
     @staticmethod
-    def reload_template_oskar_sims(start_from_scratch = False, update_which_files = None, update_which_templates = None):
+    def reload_template_oskar_sims(start_from_scratch = False, update_which_files = None, update_which_templates = None, oskar_parent_dir = "~"):
         """
         (Re)load all default sky models and update corresponding measurement sets, visibility tables, and fits datacube files.
 
         :param start_from_scratch: If true, run the all templates from scratch, and automatically generate the osms and sky models. This will not update the sky models in the template folder.
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
         :param update_which_templates: A set containing all of the templates to be updated, see `TEMPLATES` for what is available (and used as a default).
+        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
         """
 
         # Fallback to defaults
@@ -464,24 +466,25 @@ class LoadDefaults:
             BTAnalysisPipeline.run_oskar_on_model(
                 template_preset=template_preset_loop,
                 outpath=(
-                    ("~/.oskar/ms_templates/"+template_preset_loop+"_measurement_set.ms") if "ms" in update_which_files else "",
-                    ("~/.oskar/vis_templates/"+template_preset_loop+"_visibilities.vis") if "vis" in update_which_files else "",
-                    ("~/.oskar/fits_templates/"+template_preset_loop+"_datacube.fits") if "fits" in update_which_files else ""
+                    (oskar_parent_dir+"/oskar/ms_templates/"+template_preset_loop+"_measurement_set.ms") if "ms" in update_which_files else "",
+                    (oskar_parent_dir+"/.oskar/vis_templates/"+template_preset_loop+"_visibilities.vis") if "vis" in update_which_files else "",
+                    (oskar_parent_dir+"/.oskar/fits_templates/"+template_preset_loop+"_datacube.fits") if "fits" in update_which_files else ""
                 ),
                 oskar_mode="binary",
-                oskar_exec="/home/olivia/.oskar/bin",
+                oskar_exec=oskar_parent_dir+"/.oskar/bin",
                 use_imager=(".fits" in update_which_files),
                 load_osm=(not start_from_scratch)
                 )
                 
     @staticmethod
-    def reload_all(update_which_files = None, update_which_templates = None):
+    def reload_all(update_which_files = None, update_which_templates = None, oskar_parent_dir = "~"):
         """
         (Re)load all default sky models and update the corresponding sky models, settings files, measurement sets, visibility tables, and fits datacubes.
 
         :param use_imager: Whether or not to also generate a datacube of the template file (note that each fits datacube will take a large quantity of space on disk >10 GB).
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
         :param update_which_templates: A set containing all of the templates to be updated, see `TEMPLATES` for what is available (and used as a default).
+        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
         """
 
         # Fallback to defaults
@@ -496,6 +499,6 @@ class LoadDefaults:
 
         # Call previous loader functions
         if "ini" in update_which_files or "osm" in update_which_files:
-            LoadDefaults.reload_template_sky_models(update_which_files=update_which_files, update_which_templates=update_which_templates)
+            LoadDefaults.reload_template_sky_models(update_which_files=update_which_files, update_which_templates=update_which_templates, oskar_parent_dir=oskar_parent_dir)
         if "ms" in update_which_files or "vis" in update_which_files or "fits" in update_which_files:
-            LoadDefaults.reload_template_oskar_sims(update_which_files=update_which_files, update_which_templates=update_which_templates)
+            LoadDefaults.reload_template_oskar_sims(update_which_files=update_which_files, update_which_templates=update_which_templates, oskar_parent_dir=oskar_parent_dir)
