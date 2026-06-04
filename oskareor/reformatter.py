@@ -99,13 +99,13 @@ class SimulationReformatter():
             { "coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1" },
             "One of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
             + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
-            lambda p: ohelp.COEVAL_TEMPLATE_VALUES_1[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)]
+            lambda p: ohelp.load_coeval_templates(True, p['oskar_parent_dir'])[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)]
             ),
         "coeval2"  : (
             { "coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2" },
             "The second of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
             + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
-            lambda p: ohelp.COEVAL_TEMPLATE_VALUES_2[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)]
+            lambda p: ohelp.load_coeval_templates(False, p['oskar_parent_dir'])[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)]
             )
     }
 
@@ -123,7 +123,7 @@ class SimulationReformatter():
         return ohelp.display_options(SimulationReformatter.TEMPLATE_PRESETS, print_options=print_presets, selection=filter_preset)
 
     @staticmethod
-    def mock_values(preset: str, scale: float = 10, d: tuple = (100, 100, 100), special = None):
+    def mock_values(preset: str, scale: float = 10, d: tuple = (100, 100, 100), special = None, oskar_parent_dir: str = "~"):
         """
         Create an array of mock simulation values.
 
@@ -131,6 +131,7 @@ class SimulationReformatter():
         :param scale: a.k.a. `T_max`. The maximum Kelvin value for the whole array, acts as a normalisation factor.
         :param d: The size of the values datacube.
         :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `T_max`) and returns a float, treat the preset parameter as a custom name.
+        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
         
         Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
 
@@ -158,7 +159,8 @@ class SimulationReformatter():
                         "d" : d, "i" : i, "j" : j, "t": t,
                         "x" : i - d[0]/2, "y" : j - d[1]/2,
                         "r": np.sqrt((i - d[0]/2)**2 + (j - d[1]/2)**2),
-                        "T_max" : scale
+                        "T_max" : scale,
+                        "oskar_parent_dir" : oskar_parent_dir
                         }
                     
                     # Populate array cell

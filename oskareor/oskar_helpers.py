@@ -93,10 +93,23 @@ class OSKARHelper():
 
     # Load yuxiang's h5 data
     # Properties: size = (400, 400, 400) px; voxels = (1.5, 1.5, 1.5) cMPc; z_ref = ~7 (box #1), ~8 (box #2)
-    COEVAL_TEMPLATE_1: h5py.File            = h5py.File(ofc.expand_path('~/.oskar/simulations/legacy_templates/yuxiang1.h5'), 'r')
-    COEVAL_TEMPLATE_2: h5py.File            = h5py.File(ofc.expand_path('~/.oskar/simulations/legacy_templates/yuxiang2.h5'), 'r')
-    COEVAL_TEMPLATE_VALUES_1: np.ndarray    = np.array(COEVAL_TEMPLATE_1.get('BrightnessTemp')['brightness_temp'])
-    COEVAL_TEMPLATE_VALUES_2: np.ndarray    = np.array(COEVAL_TEMPLATE_2.get('BrightnessTemp')['brightness_temp'])
+    @staticmethod
+    def load_coeval_templates(template_switch, oskar_parent_dir = "~"):
+        """
+        Loads the values for the coeval templates.
+
+        :param template_switch: If true load template 1, if false load template 2.
+        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        """
+
+        coeval_template = h5py.File(ofc.expand_path(
+            oskar_parent_dir +
+            '/.oskar/simulations/legacy_templates/yuxiang' +
+            ("1" if template_switch else "2") +
+            '.h5')
+            , 'r')
+
+        return np.array(coeval_template.get('BrightnessTemp')['brightness_temp'])
 
     @staticmethod
     def select_option(options: dict, selection: str) -> dict:

@@ -269,7 +269,7 @@ class BTAnalysisPipeline():
                 subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def run_oskar_on_model(file="", phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res: Quantity = 100e6 * u.MHz, interferometer_settings_override = "", imager_settings_override = "", outpath = ("","",""), clean = True, oskar_exec = ohelp.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = ohelp.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, use_imager = True):
+    def run_oskar_on_model(file="", phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res: Quantity = 100e6 * u.MHz, interferometer_settings_override = "", imager_settings_override = "", outpath = ("","",""), clean = True, oskar_exec = ohelp.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = ohelp.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, use_imager = True, oskar_parent_dir = "~"):
         """
         Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
 
@@ -290,6 +290,7 @@ class BTAnalysisPipeline():
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
+        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
         """
 
         template_flag = (template_preset != "")
@@ -320,7 +321,7 @@ class BTAnalysisPipeline():
                 if template_flag:
                     # IF we want to generate a fresh osm file AND its from a template
                     print("Generating OSM files from template ...")
-                    template_values = simref.mock_values(template_preset)
+                    template_values = simref.mock_values(template_preset, oskar_parent_dir=oskar_parent_dir)
                     dynamic_settings = simref.generate_osm_from_simulation(
                         template_values,
                         phase_ref_point=phase_ref_point,
@@ -350,8 +351,8 @@ class BTAnalysisPipeline():
             else:
                 if template_flag:
                     # IF we want to skip generating the osm file AND a template osm has been specified
-                    subprocess.run(["cp", ofc.expand_path("~/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), osm_output], check=True)
-                    subprocess.run(["cp", ofc.expand_path("~/.oskar/ini_templates/"+template_preset+"_general_settings.ini"), ini_output], check=True)
+                    subprocess.run(["cp", ofc.expand_path(oskar_parent_dir+"/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), osm_output], check=True)
+                    subprocess.run(["cp", ofc.expand_path(oskar_parent_dir+"/.oskar/ini_templates/"+template_preset+"_general_settings.ini"), ini_output], check=True)
 
                     dynamic_settings = ofc.read_settings_to_dictionary(ini_output)
                 else:
@@ -430,9 +431,9 @@ class LoadDefaults:
         # Loop through all selected templates
         for template_preset_loop in update_which_templates:
             if "coeval" in template_preset_loop:
-                template_value = simref.mock_values(template_preset_loop, d=(400, 400, 400))
+                template_value = simref.mock_values(template_preset_loop, d=(400, 400, 400), oskar_parent_dir=oskar_parent_dir)
             else:
-                template_value = simref.mock_values(template_preset_loop, scale=20)
+                template_value = simref.mock_values(template_preset_loop, scale=20, oskar_parent_dir=oskar_parent_dir)
 
             simref.generate_osm_from_simulation(
                 template_value,
@@ -473,7 +474,8 @@ class LoadDefaults:
                 oskar_mode="binary",
                 oskar_exec=oskar_parent_dir+"/.oskar/bin",
                 use_imager=(".fits" in update_which_files),
-                load_osm=(not start_from_scratch)
+                load_osm=(not start_from_scratch),
+                oskar_parent_dir=oskar_parent_dir
                 )
                 
     @staticmethod
