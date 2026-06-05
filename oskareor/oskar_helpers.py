@@ -14,10 +14,33 @@ class OSKARHelper():
     Helper functions and constants specific to handling OSKAR and the Reformatter.
     """
 
-    # Define Constants
-    OSKAR_SIF: str = "~/.oskar/OSKAR-2.12.2-Python3.sif"
-    OSKAR_BIN: str = "~/.oskar/bin/"
-    TELESCOPE: str = "~/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
+    # Default paths - Primary
+    OSKAR_SIF: str = "/.oskar/OSKAR-2.12.2-Python3.sif"
+    OSKAR_BIN: str = "/.oskar/bin/"
+    TELESCOPE: str = "/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
+
+    # Default paths - Templates
+    TEMPLATE_FILE_TYPE_EXTENSIONS: dict[str, str] = {
+        "osm"  : "_sky_model.osm",
+        "ini"  : "_general_settings.ini",
+        "vis"  : "_visibilities.vis",
+        "ms"   : "_measurement_set.ms",
+        "fits" : "_datacube.fits"
+    }
+
+    @staticmethod
+    def default_template_path(template_preset: str, oskar_parent_dir: str = "~", file_type: str = "") -> str:
+        """
+        Constructs a default template path.
+
+        :param preset: Mock brightness temperature array format. Run SimulationReformatter.display_template_presets for more information.
+        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param file_type: The file type extension to construct the path around.
+
+        :returns template_path: The path to a specified template file.
+        """
+
+        return oskar_parent_dir + "/.oskar/" + file_type + "_templates/" + template_preset + OSKARHelper.TEMPLATE_FILE_TYPE_EXTENSIONS[file_type]
 
     # Define default settings
     DEFAULT_INTERFEROMETER_SETTINGS: dict = {
@@ -88,18 +111,20 @@ class OSKARHelper():
     DEFAULT_GENERAL_SETTINGS: dict = DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | PRIMARY_GENERAL_SETTINGS
 
     # Legal settings keywords
-    LEGAL_INTERFEROMETER_HEADINGS: set   = { "simulator", "sky", "telescope", "observation", "interferometer"}
-    LEGAL_IMAGER_HEADINGS: set           = { "image" }
+    LEGAL_INTERFEROMETER_HEADINGS: set[str] = { "simulator", "sky", "telescope", "observation", "interferometer"}
+    LEGAL_IMAGER_HEADINGS: set[str]         = { "image" }
 
     # Load yuxiang's h5 data
     # Properties: size = (400, 400, 400) px; voxels = (1.5, 1.5, 1.5) cMPc; z_ref = ~7 (box #1), ~8 (box #2)
     @staticmethod
-    def load_coeval_templates(template_switch, oskar_parent_dir = "~"):
+    def load_coeval_templates(template_switch: bool, oskar_parent_dir: str = "~") -> np.ndarray:
         """
         Loads the values for the coeval templates.
 
         :param template_switch: If true load template 1, if false load template 2.
         :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+
+        :return coeval_bt_array: The brightness temperature array corresponding to one of two coeval boxes.
         """
 
         coeval_template = h5py.File(ofc.expand_path(

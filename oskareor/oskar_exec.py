@@ -269,7 +269,7 @@ class BTAnalysisPipeline():
                 subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def run_oskar_on_model(file="", phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res: Quantity = 100e6 * u.MHz, interferometer_settings_override = "", imager_settings_override = "", outpath = ("","",""), clean = True, oskar_exec = ohelp.OSKAR_SIF, oskar_mode="singularity", oskar_telescope_model = ohelp.TELESCOPE, template_preset = "", coeval = True, load_osm=False, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, use_imager = True, oskar_parent_dir = "~"):
+    def run_oskar_on_model(file="", phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res: Quantity = 100e6 * u.MHz, interferometer_settings_override = "", imager_settings_override = "", outpath = ("","",""), clean = True, oskar_exec = "", oskar_mode="singularity", oskar_telescope_model = "", template_preset = "", coeval = True, load_osm=False, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, use_imager = True, oskar_parent_dir = "~"):
         """
         Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
 
@@ -292,6 +292,10 @@ class BTAnalysisPipeline():
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
         :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
         """
+
+        # Set defaults
+        if oskar_exec == "": oskar_exec = oskar_parent_dir + ohelp.OSKAR_SIF
+        if oskar_telescope_model == "": oskar_telescope_model = oskar_parent_dir + ohelp.TELESCOPE
 
         template_flag = (template_preset != "")
         
@@ -351,8 +355,8 @@ class BTAnalysisPipeline():
             else:
                 if template_flag:
                     # IF we want to skip generating the osm file AND a template osm has been specified
-                    subprocess.run(["cp", ofc.expand_path(oskar_parent_dir+"/.oskar/osm_templates/"+template_preset+"_sky_model.osm"), osm_output], check=True)
-                    subprocess.run(["cp", ofc.expand_path(oskar_parent_dir+"/.oskar/ini_templates/"+template_preset+"_general_settings.ini"), ini_output], check=True)
+                    subprocess.run(["cp", ofc.expand_path(ohelp.default_template_path(template_preset=template_preset, oskar_parent_dir=oskar_parent_dir, file_type="osm")), osm_output], check=True)
+                    subprocess.run(["cp", ofc.expand_path(ohelp.default_template_path(template_preset=template_preset, oskar_parent_dir=oskar_parent_dir, file_type="ini")), ini_output], check=True)
 
                     dynamic_settings = ofc.read_settings_to_dictionary(ini_output)
                 else:
@@ -437,8 +441,8 @@ class LoadDefaults:
 
             simref.generate_osm_from_simulation(
                 template_value,
-                osm_output=(oskar_parent_dir+"/.oskar/osm_templates/"+template_preset_loop+"_sky_model.osm") if "osm" in update_which_files else "",
-                save_dynamic_settings=(oskar_parent_dir+"/.oskar/ini_templates/"+template_preset_loop+"_general_settings.ini") if "ini" in update_which_files else ""
+                osm_output=ohelp.default_template_path(template_preset=template_preset_loop, oskar_parent_dir=oskar_parent_dir, file_type="osm") if "osm" in update_which_files else "",
+                save_dynamic_settings=ohelp.default_template_path(template_preset=template_preset_loop, oskar_parent_dir=oskar_parent_dir, file_type="ini") if "ini" in update_which_files else ""
                 )
     
     @staticmethod
@@ -467,12 +471,12 @@ class LoadDefaults:
             BTAnalysisPipeline.run_oskar_on_model(
                 template_preset=template_preset_loop,
                 outpath=(
-                    (oskar_parent_dir+"/oskar/ms_templates/"+template_preset_loop+"_measurement_set.ms") if "ms" in update_which_files else "",
-                    (oskar_parent_dir+"/.oskar/vis_templates/"+template_preset_loop+"_visibilities.vis") if "vis" in update_which_files else "",
-                    (oskar_parent_dir+"/.oskar/fits_templates/"+template_preset_loop+"_datacube.fits") if "fits" in update_which_files else ""
+                    ohelp.default_template_path(template_preset=template_preset_loop, oskar_parent_dir=oskar_parent_dir, file_type="ms") if "ms" in update_which_files else "",
+                    ohelp.default_template_path(template_preset=template_preset_loop, oskar_parent_dir=oskar_parent_dir, file_type="vis") if "vis" in update_which_files else "",
+                    ohelp.default_template_path(template_preset=template_preset_loop, oskar_parent_dir=oskar_parent_dir, file_type="fits") if "fits" in update_which_files else ""
                 ),
                 oskar_mode="binary",
-                oskar_exec=oskar_parent_dir+"/.oskar/bin",
+                oskar_exec=oskar_parent_dir+ohelp.OSKAR_BIN,
                 use_imager=(".fits" in update_which_files),
                 load_osm=(not start_from_scratch),
                 oskar_parent_dir=oskar_parent_dir

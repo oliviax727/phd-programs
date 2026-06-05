@@ -12,6 +12,3 @@ from oskareor.oskar_exec import LoadDefaults
 #LoadDefaults.reload_template_sky_models()
 LoadDefaults.reload_all(update_which_templates = { "gaussian" }, oskar_parent_dir = "/software/projects/mwaeor/ohrw")
 
-#BTAnalysisPipeline.h5_box_to_datacube(None, template_preset="gaussian")
-
-#BTAnalysisPipeline.h5_box_to_datacube("./regrid/osm_output/yuxiang1_zenith_osm", oskar_exec=RegridHelper.OSKAR_BIN, load_osm=True, oskar_mode="binary", oskar_telescope_model=RegridHelper.TELESCOPE)
