@@ -10,5 +10,5 @@ from oskareor.oskar_exec import LoadDefaults
 # Testing stage
 
 #LoadDefaults.reload_template_sky_models()
-LoadDefaults.reload_all(update_which_templates = { "gaussian" }, oskar_parent_dir = "/software/projects/mwaeor/ohrw")
+LoadDefaults.reload_all(oskar_parent_dir = "/software/projects/mwaeor/ohrw")
 

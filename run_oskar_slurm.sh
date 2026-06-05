@@ -15,4 +15,4 @@ source .venv/bin/activate
 
 source ../install-scripts/oskar-install.sh
 
-./testing.py
+srun -N 1 -n 1 --exclusive ./testing.py
