@@ -181,8 +181,6 @@ class BTAnalysisPipeline():
                 execute_oskar_shell_command(["singularity","exec","--nv","--bind",cwd,"--cleanenv","--home",cwd,oskar_exec,"oskar_imager",settings[1]])
             elif oskar_mode == "binary":
                 execute_oskar_shell_command([oskar_exec+"/oskar_imager",settings[1]])
-        
-        exit()
 
     @staticmethod
     def setup_bta_dir(oskar_telescope_model, h5_file="", interferometer_settings_override="", imager_settings_override="", template=False):
