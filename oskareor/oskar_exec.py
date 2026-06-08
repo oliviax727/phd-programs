@@ -452,6 +452,7 @@ class LoadDefaults:
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
         :param update_which_templates: A set containing all of the templates to be updated, see `TEMPLATES` for what is available (and used as a default).
         :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param default_settings_override: A modified version of the default settings, for experimentation purposes.
         """
 
         # Fallback to defaults
@@ -489,6 +490,7 @@ class LoadDefaults:
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
         :param update_which_templates: A set containing all of the templates to be updated, see `TEMPLATES` for what is available (and used as a default).
         :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param default_settings_override: A modified version of the default settings, for experimentation purposes.
         """
 
         # Fallback to defaults
