@@ -105,26 +105,26 @@ class SimulationReformatter():
             { "coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1" },
             "One of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
             + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
-            lambda p: p['data'][*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)],
+            lambda p: p['data'][*p['central']],
             (400, 400, 400)
             ),
         "coeval2"   : (
             { "coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2" },
             "The second of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
             + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
-            lambda p: p['data'][*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)],
+            lambda p: p['data'][*p['central']],
             (400, 400, 400)
             ),
         "column"    : (
             { "col", "small", "coeval small", "small coeval", "los", "small field" },
             "A small field section of a sky model but with a comparatively large frequency dimension.",
-            lambda p: p['data'][*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)],
+            lambda p: p['data'][*p['central']],
             (10, 10, 100)
         ),
         "slice"    : (
             { "single", "channel", "single channel", "snapshot", "ch", "coeval single", "single coeval", "mono", "monochromatic" },
             "A large field but with no depth or evolution in frequency.",
-            lambda p: p['data'][*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)],
+            lambda p: p['data'][*p['central']],
             (400, 400, 1)
         )
     }
@@ -185,7 +185,8 @@ class SimulationReformatter():
                         "x" : i - d[0]/2, "y" : j - d[1]/2,
                         "r": np.sqrt((i - d[0]/2)**2 + (j - d[1]/2)**2),
                         "T_max" : scale,
-                        "oskar_parent_dir" : oskar_parent_dir
+                        "oskar_parent_dir" : oskar_parent_dir,
+                        "central": ((200 + ((np.array([i, j, t]) - (np.array(d) // 2)))) % 400)
                         }
                     
                     if preset in { "coeval1", "column", "slice" }:
