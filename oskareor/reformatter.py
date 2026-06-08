@@ -175,6 +175,13 @@ class SimulationReformatter():
 
         values = np.zeros(d).astype(np.float64)
 
+        # Load coeval data if needed
+        data = None
+        if preset in { "coeval1", "column", "slice" }:
+            data = ohelp.load_coeval_templates(True, oskar_parent_dir)
+        elif preset in { "coeval2" }:
+            data = ohelp.load_coeval_templates(False, oskar_parent_dir)
+
         # Iterate through all elements of the dictionary
         for t in range(d[2]):
             for i in range(d[0]):
@@ -185,14 +192,9 @@ class SimulationReformatter():
                         "x" : i - d[0]/2, "y" : j - d[1]/2,
                         "r": np.sqrt((i - d[0]/2)**2 + (j - d[1]/2)**2),
                         "T_max" : scale,
-                        "oskar_parent_dir" : oskar_parent_dir,
-                        "central": ((200 + ((np.array([i, j, t]) - (np.array(d) // 2)))) % 400)
+                        "central": ((200 + ((np.array([i, j, t]) - (np.array(d) // 2)))) % 400),
+                        "data" : data
                         }
-                    
-                    if preset in { "coeval1", "column", "slice" }:
-                        params["data"] = ohelp.load_coeval_templates(True, params['oskar_parent_dir'])
-                    elif preset in { "coeval2" }:
-                        params["data"] = ohelp.load_coeval_templates(False, params['oskar_parent_dir'])
                     
                     # Populate array cell
                     values[i, j, t] = func(params)
@@ -698,6 +700,8 @@ class SimulationReformatter():
 
         # Transform datacube
         values, voxels, sigma_f, f_ref, regrid_flag = SimulationReformatter.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, cosmology=cosmology)
+
+        regrid_flag = regrid_flag and (d[2] > 1)
 
         # STEP 7 - Regrid frequency-dimension data if needed
         if regrid_flag:
