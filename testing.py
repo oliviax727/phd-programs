@@ -10,5 +10,5 @@ from oskareor.oskar_exec import LoadDefaults
 # Testing stage
 
 #LoadDefaults.reload_template_sky_models()
-LoadDefaults.reload_all(oskar_parent_dir = "/software/projects/mwaeor/ohrw", update_which_templates = { "column", "slice" })
+LoadDefaults.reload_all(oskar_parent_dir = "/software/projects/mwaeor/ohrw", update_which_templates = { "point" })
 

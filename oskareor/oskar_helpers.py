@@ -84,7 +84,7 @@ class OSKARHelper():
             "time_average_sec": 10.0,
             "uv_filter_max": 1000,
             "uv_filter_units": "Wavelengths",
-            #"common_flux_filter/flux_min" : 1e-10,
+            #"common_flux_filter/flux_min" : 1e-8,
             #"max_time_samples_per_block": 24,
             #"max_channels_per_block": 1
         },
