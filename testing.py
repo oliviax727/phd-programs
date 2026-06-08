@@ -9,6 +9,6 @@ from oskareor.oskar_exec import LoadDefaults
 
 # Testing stage
 
-LoadDefaults.reload_template_sky_models(oskar_parent_dir = "/scratch/mwaeor/ohrw", update_which_templates = { "column", "slice", "gaussian", "point" })
+LoadDefaults.reload_template_sky_models(oskar_parent_dir = "/scratch/mwaeor/ohrw", update_which_templates = { "point" , "column", "gaussian"})
 #LoadDefaults.reload_all(oskar_parent_dir = "/software/projects/mwaeor/ohrw", update_which_templates = { "point" })
 
