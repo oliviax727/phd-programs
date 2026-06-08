@@ -50,7 +50,7 @@ class OSKARHelper():
         "simulator": {
             "use_gpus": False,
             "write_status_to_log_file": True,
-            "max_sources_per_chunk": 160000
+            #"max_sources_per_chunk": 160000
         },
         "observation" : {
             "num_time_steps": 24,
@@ -84,8 +84,9 @@ class OSKARHelper():
             "time_average_sec": 10.0,
             "uv_filter_max": 1000,
             "uv_filter_units": "Wavelengths",
-            "max_time_samples_per_block": 24,
-            "max_channels_per_block": 1
+            #"common_flux_filter/flux_min" : 1e-10,
+            #"max_time_samples_per_block": 24,
+            #"max_channels_per_block": 1
         },
         "sky": {
             "oskar_sky_model/file": "BTA/sky_model.osm"

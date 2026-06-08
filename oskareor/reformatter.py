@@ -65,48 +65,68 @@ class SimulationReformatter():
         return (tb ** 0.5) * omath.SIGMA_F_FLOAT
     
     TEMPLATE_PRESETS = {
-        "gaussian" : (
+        "gaussian"  : (
             { "normal", "gauss", "bell", "n", "g", "b" },
             "Rotationally symmetric centered gaussian plane with FWHM = d(t)/3.",
-            lambda p: omath.gaussian(p['r'], var=omath.STDEV(p['d'][2]/3)**2, amp=p['T_max'])
+            lambda p: omath.gaussian(p['r'], var=omath.STDEV(p['d'][2]/3)**2, amp=p['T_max']),
+            (100, 100, 100)
             ),
-        "flat"     : (
+        "flat"      : (
             { "plane", "constant", "const", "c", "f" },
             "Constant temperature for every pixel.",
-            lambda p: p['T_max']
+            lambda p: p['T_max'],
+            (100, 100, 100)
             ),
-        "random"   : (
+        "random"    : (
             { "rand", "r" },
             "Random values for every cell from 0 to the defined scale (T_max).",
-            lambda p: p['T_max'] * np.random.rand()
+            lambda p: p['T_max'] * np.random.rand(),
+            (100, 100, 100)
             ),
-        "sinusoid" : (
+        "sinusoid"  : (
             { "sinc", "interference", "fringe", "i", "intf", "s" },
             "Rotationally symmetric centered sinc function with freq = 1/d(t).",
-            lambda p: np.abs(omath.sinc(p['r'], f=1/p['d'][2], amp=p['T_max']))
+            lambda p: np.abs(omath.sinc(p['r'], f=1/p['d'][2], amp=p['T_max'])),
+            (100, 100, 100)
             ),
-        "point"    : (
+        "point"     : (
             { "delta", "source", "p" },
             "A point source in the direct centre of the field.",
-            lambda p: p['T_max'] if (p['i'] == p['d'][0] // 2 and p['j'] == p['d'][1] // 2) else 0
+            lambda p: p['T_max'] if (p['i'] == p['d'][0] // 2 and p['j'] == p['d'][1] // 2) else 0,
+            (100, 100, 100)
             ),
         "dark"     : (
             { "clear", "empty", "d" },
             "A completely clear sky.",
             lambda p: 0,
+            (100, 100, 100)
             ),
-        "coeval1"  : (
+        "coeval1"   : (
             { "coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1" },
             "One of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
             + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
-            lambda p: ohelp.load_coeval_templates(True, p['oskar_parent_dir'])[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)]
+            lambda p: ohelp.load_coeval_templates(True, p['oskar_parent_dir'])[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)],
+            (400, 400, 400)
             ),
-        "coeval2"  : (
+        "coeval2"   : (
             { "coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2" },
             "The second of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
             + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
-            lambda p: ohelp.load_coeval_templates(False, p['oskar_parent_dir'])[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)]
-            )
+            lambda p: ohelp.load_coeval_templates(False, p['oskar_parent_dir'])[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)],
+            (400, 400, 400)
+            ),
+        "column"    : (
+            { "col", "small", "coeval small", "small coeval", "los", "small field" },
+            "A small field section of a sky model but with a comparatively large frequency dimension.",
+            lambda p: ohelp.load_coeval_templates(True, p['oskar_parent_dir'])[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)],
+            (10, 10, 100)
+        ),
+        "slice"    : (
+            { "single", "channel", "single channel", "snapshot", "ch", "coeval single", "single coeval", "mono", "monochromatic" },
+            "A large field but with no depth or evolution in frequency.",
+            lambda p: ohelp.load_coeval_templates(True, p['oskar_parent_dir'])[*((200 + ((np.array([p['i'], p['j'], p['t']]) - (np.array(p['d']) // 2)))) % 400)],
+            (400, 400, 1)
+        )
     }
 
     @staticmethod
@@ -123,13 +143,13 @@ class SimulationReformatter():
         return ohelp.display_options(SimulationReformatter.TEMPLATE_PRESETS, print_options=print_presets, selection=filter_preset)
 
     @staticmethod
-    def mock_values(preset: str, scale: float = 10, d: tuple = (100, 100, 100), special = None, oskar_parent_dir: str = "~"):
+    def mock_values(preset: str, scale: float = 10, d: tuple = None, special = None, oskar_parent_dir: str = "~"):
         """
         Create an array of mock simulation values.
 
         :param preset: Mock brightness temperature array format. Run SimulationReformatter.display_template_presets for more information.
         :param scale: a.k.a. `T_max`. The maximum Kelvin value for the whole array, acts as a normalisation factor.
-        :param d: The size of the values datacube.
+        :param d: The (override) size of the values datacube.
         :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `T_max`) and returns a float, treat the preset parameter as a custom name.
         :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
         
@@ -143,11 +163,16 @@ class SimulationReformatter():
             selection = SimulationReformatter.display_template_presets(False, preset)
             preset = list(selection.keys())[0]
             func = selection[preset][2]
+
+            if d is None:
+                d = selection[preset][3]
+
         else:
             func = special
 
         # Create initial array
         print("Creating mock brightness temperatures for the template: "+preset)
+
         values = np.zeros(d).astype(np.float64)
 
         # Iterate through all elements of the dictionary

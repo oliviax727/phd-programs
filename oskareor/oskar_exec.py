@@ -433,7 +433,7 @@ class LoadDefaults:
         # Loop through all selected templates
         for template_preset_loop in update_which_templates:
             if "coeval" in template_preset_loop:
-                template_value = simref.mock_values(template_preset_loop, d=(400, 400, 400), oskar_parent_dir=oskar_parent_dir)
+                template_value = simref.mock_values(template_preset_loop, oskar_parent_dir=oskar_parent_dir)
             else:
                 template_value = simref.mock_values(template_preset_loop, scale=20, oskar_parent_dir=oskar_parent_dir)
 
