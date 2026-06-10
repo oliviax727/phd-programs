@@ -476,7 +476,7 @@ class LoadDefaults:
                 ),
                 oskar_mode="binary",
                 oskar_exec=oskar_parent_dir+ohelp.OSKAR_BIN,
-                use_imager=(".fits" in update_which_files),
+                use_imager=("fits" in update_which_files),
                 load_osm=(not start_from_scratch),
                 oskar_parent_dir=oskar_parent_dir
                 )
