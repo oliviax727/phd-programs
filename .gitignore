@@ -3,6 +3,7 @@ BTA
 backup
 nohup.txt
 eric_test_osm
+.DS_Store
 
 # OSKAR run stage
 oskar_run_stage/output/*
@@ -152,6 +153,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.vscode
 env/
 venv/
 ENV/

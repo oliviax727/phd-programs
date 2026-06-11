@@ -4,3 +4,9 @@ scipy       >= 1.13.1
 pandas      >= 2.2.2
 h5py        >= 3.13.0
 matplotlib  >= 3.9.2
+configparser
+jupyter
+ipython
+pdoc
+pylint
+pylint-venv
