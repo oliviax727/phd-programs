@@ -256,7 +256,7 @@ class BTAnalysisPipeline():
 
             # Move image fits file to directory
             if outpath[2] != "" and use_imager:
-                subprocess.run(["mv", original_locations[0], outpath[2]], check=True)
+                subprocess.run(["mv", original_locations[2], outpath[2]], check=True)
 
         except subprocess.CalledProcessError as e:
             print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
