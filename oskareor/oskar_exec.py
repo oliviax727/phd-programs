@@ -248,7 +248,8 @@ class BTAnalysisPipeline():
         try:
             # Move sim.ms file to directory
             if outpath[0] != "":
-                subprocess.run(["mv", "-f", original_locations[0], outpath[0]], check=True)
+                subprocess.run(["rm", "-rf", outpath[0]], check=True)
+                subprocess.run(["mv", original_locations[0], outpath[0]], check=True)
 
             # Move vis file to directory
             if outpath[1] != "":
