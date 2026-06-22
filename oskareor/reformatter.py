@@ -151,7 +151,7 @@ class SimulationReformatter():
         :param scale: a.k.a. `T_max`. The maximum Kelvin value for the whole array, acts as a normalisation factor.
         :param d: The (override) size of the values datacube.
         :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `T_max`) and returns a float, treat the preset parameter as a custom name.
-        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         
         Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
 

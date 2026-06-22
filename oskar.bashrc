@@ -16,7 +16,7 @@ function oskar_bash() {
     if [[ $1 == "--help" || $1 == "-h" ]]; then
         echo "=================================="
         echo "Run OSKAR with a custom generic bash command. By default it will run the first singularity image it"
-        echo "finds in ~/.oskar. If there is no singularity image it will throw an error."
+        echo "finds in ~/oskareor.data. If there is no singularity image it will throw an error."
         echo "=================================="
         echo "Usage:"
         echo "oskar_bash ((-g|--global)|((-l|--local|-s|--sif) <program>)) (-i|--intif|-I|--img|-b|--beam)"

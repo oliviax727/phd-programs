@@ -1,5 +1,5 @@
 """
-The oskar_helpers module contains a series of helper functions that handle the basic mathematical and computer methods involved in the oskareor module.
+The oskar_helpers module contains a series of helper functions that handle the basic mathematical and computer methods involved in the oskareor.data module.
 """
 
 # System imports
@@ -286,4 +286,4 @@ class OSKARFileConfig:
 
         return iter_type(map_obj)
 
-# TODO: Compile the .oskar directory with the oskareor directory into one github project
+# TODO: Compile the ~/oskareor.data directory with the ./oskareor directory into one github project

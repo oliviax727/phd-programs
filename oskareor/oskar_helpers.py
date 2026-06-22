@@ -1,5 +1,5 @@
 """
-The oskar_helpers module contains a series of helper functions and variables for simulation-to-power-spectra pipeline. Requires an existing and robust .oskar file in the home directory.
+The oskar_helpers module contains a series of helper functions and variables for simulation-to-power-spectra pipeline. Requires an existing and robust oskareor.data file in the home directory.
 """
 
 # Mathematics and calculations
@@ -8,16 +8,16 @@ import numpy as np
 
 from oskareor.skalow_calc import OSKARFileConfig as ofc
 
-# OSKAR EOR helper class - dependant on ~/.oskar
+# OSKAR EOR helper class - dependant on ~/oskareor.data
 class OSKARHelper():
     """
     Helper functions and constants specific to handling OSKAR and the Reformatter.
     """
 
     # Default paths - Primary
-    OSKAR_SIF: str = "/.oskar/OSKAR-2.12.2-Python3.sif"
-    OSKAR_BIN: str = "/.oskar/bin/"
-    TELESCOPE: str = "/.oskar/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
+    OSKAR_SIF: str = "/oskareor.data/OSKAR-2.12.2-Python3.sif"
+    OSKAR_BIN: str = "/oskareor.data/bin/"
+    TELESCOPE: str = "/oskareor.data/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
 
     # Default paths - Templates
     TEMPLATE_FILE_TYPE_EXTENSIONS: dict[str, str] = {
@@ -34,13 +34,13 @@ class OSKARHelper():
         Constructs a default template path.
 
         :param preset: Mock brightness temperature array format. Run SimulationReformatter.display_template_presets for more information.
-        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         :param file_type: The file type extension to construct the path around.
 
         :returns template_path: The path to a specified template file.
         """
 
-        return oskar_parent_dir + "/.oskar/" + file_type + "_templates/" + template_preset + OSKARHelper.TEMPLATE_FILE_TYPE_EXTENSIONS[file_type]
+        return oskar_parent_dir + "/oskareor.data/" + file_type + "_templates/" + template_preset + OSKARHelper.TEMPLATE_FILE_TYPE_EXTENSIONS[file_type]
 
     # Define default settings
     DEFAULT_INTERFEROMETER_SETTINGS: dict = {
@@ -122,14 +122,14 @@ class OSKARHelper():
         Loads the values for the coeval templates.
 
         :param template_switch: If true load template 1, if false load template 2.
-        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
 
         :return coeval_bt_array: The brightness temperature array corresponding to one of two coeval boxes.
         """
 
         coeval_template = h5py.File(ofc.expand_path(
             oskar_parent_dir +
-            '/.oskar/simulations/legacy_templates/yuxiang' +
+            '/oskareor.data/simulations/legacy_templates/yuxiang' +
             ("1" if template_switch else "2") +
             '.h5')
             , 'r')

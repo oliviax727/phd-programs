@@ -248,15 +248,15 @@ class BTAnalysisPipeline():
         try:
             # Move sim.ms file to directory
             if outpath[0] != "":
-                subprocess.run(["mv", original_locations[0], outpath[0]], check=True)
+                subprocess.run(["mv", "-f", original_locations[0], outpath[0]], check=True)
 
             # Move vis file to directory
             if outpath[1] != "":
-                subprocess.run(["mv", original_locations[1], outpath[1]], check=True)
+                subprocess.run(["mv", "-f", original_locations[1], outpath[1]], check=True)
 
             # Move image fits file to directory
             if outpath[2] != "" and use_imager:
-                subprocess.run(["mv", original_locations[2], outpath[2]], check=True)
+                subprocess.run(["mv", "-f", original_locations[2], outpath[2]], check=True)
 
         except subprocess.CalledProcessError as e:
             print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
@@ -288,7 +288,7 @@ class BTAnalysisPipeline():
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
-        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         """
 
         # Set defaults
@@ -417,7 +417,7 @@ class LoadDefaults:
 
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
         :param update_which_templates: A set containing all of the templates to be updated, see `TEMPLATES` for what is available (and used as a default).
-        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         """
 
         # Fallback to defaults
@@ -451,7 +451,7 @@ class LoadDefaults:
         :param start_from_scratch: If true, run the all templates from scratch, and automatically generate the osms and sky models. This will not update the sky models in the template folder.
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
         :param update_which_templates: A set containing all of the templates to be updated, see `TEMPLATES` for what is available (and used as a default).
-        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         :param default_settings_override: A modified version of the default settings, for experimentation purposes.
         """
 
@@ -489,7 +489,7 @@ class LoadDefaults:
         :param use_imager: Whether or not to also generate a datacube of the template file (note that each fits datacube will take a large quantity of space on disk >10 GB).
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
         :param update_which_templates: A set containing all of the templates to be updated, see `TEMPLATES` for what is available (and used as a default).
-        :param oskar_parent_dir: The directory containing the .oskar folder (default is the home folder).
+        :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         :param default_settings_override: A modified version of the default settings, for experimentation purposes.
         """
 
