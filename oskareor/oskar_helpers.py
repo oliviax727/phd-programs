@@ -21,11 +21,12 @@ class OSKARHelper():
 
     # Default paths - Templates
     TEMPLATE_FILE_TYPE_EXTENSIONS: dict[str, str] = {
-        "osm"  : "_sky_model.osm",
-        "ini"  : "_general_settings.ini",
-        "vis"  : "_visibilities.vis",
-        "ms"   : "_measurement_set.ms",
-        "fits" : "_datacube.fits"
+        "osm"   : "_sky_model.osm",
+        "ini"   : "_general_settings.ini",
+        "vis"   : "_visibilities.vis",
+        "ms"    : "_measurement_set.ms",
+        "fits"  : "_datacube.fits",
+        "uvfits": "_uvwplane.fits"
     }
 
     @staticmethod
