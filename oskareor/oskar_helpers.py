@@ -26,7 +26,7 @@ class OSKARHelper():
         "vis"   : "_visibilities.vis",
         "ms"    : "_measurement_set.ms",
         "fits"  : "_datacube.fits",
-        "uvfits": "_uvwplane.fits"
+        "uvfits": "_uvw_plane.uvfits"
     }
 
     @staticmethod

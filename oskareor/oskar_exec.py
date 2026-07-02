@@ -6,6 +6,9 @@ The oskar_exec module contains all funtions that help to automate the execution 
 import os
 import subprocess
 
+# Proprietary software
+from pyuvdata import UVData
+
 # Mathematics and calculations
 import astropy.units as u
 import numpy as np
@@ -110,7 +113,7 @@ class BTAnalysisPipeline():
         return (interf_settings_path, interf_settings_dict), (imager_settings_path, imager_settings_dict)
 
     @staticmethod
-    def run_oskar_on_osm(osm_file, interferometer_settings = ("", ohelp.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", ohelp.DEFAULT_IMAGER_SETTINGS), oskar_exec=None, oskar_mode="python", use_imager=True, use_hyperdrive=True, hyperdrive_cmd="hyperdrive", hyperdrive_out="BTA/hyperdrive.uvfits"):
+    def run_oskar_on_osm(osm_file, interferometer_settings = ("", ohelp.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", ohelp.DEFAULT_IMAGER_SETTINGS), oskar_exec=None, oskar_mode="python", use_imager=True, convert_uvfits=True, uvfits_out="BTA/hyperdrive.uvfits"):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the SimulationReformatter object.
 
@@ -121,7 +124,7 @@ class BTAnalysisPipeline():
         :param oskar_exec: The SIF file or binary file path containing the OSKAR programs.
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
-        :param use_hyperdrive: Whether or not to generate a uvfits file with hyperdrive.
+        :param convert_uvfits: Whether or not to generate a uvfits file with hyperdrive.
         :param hyperdrive_cmd: The binary file or command to use to execute hyperdrive.
         :param hyperdrive_out: The file to output the uvfits.
         """
@@ -186,9 +189,11 @@ class BTAnalysisPipeline():
                 execute_oskar_shell_command([oskar_exec+"/oskar_imager",settings[1]])
 
         # Run Hyperdrive
-        if use_hyperdrive:
+        if convert_uvfits:
             print("Running Hyperdrive")
-            execute_oskar_shell_command([hyperdrive_cmd,"vis-convert","-d",ms_dir,"-o",hyperdrive_out])
+            uv = UVData()
+            uv.read_ms(ms_dir)
+            uv.write_uvfits(uvfits_out)
 
 
     @staticmethod
@@ -232,7 +237,7 @@ class BTAnalysisPipeline():
         return default_return
 
     @staticmethod
-    def clean_bta_dir(outpath, use_imager = True, clean = True, settings = None, use_hyperdrive=True, hyperdrive_loc="BTA/hyperdrive.uvfits"):
+    def clean_bta_dir(outpath, use_imager = True, clean = True, settings = None, convert_uvfits=True, hyperdrive_loc="BTA/hyperdrive.uvfits"):
         """
         Finishes and cleans up the mess created by the BTA class.
 
@@ -240,7 +245,7 @@ class BTAnalysisPipeline():
         :param use_imager: Whether or not copy any existing imager FITS file.
         :param clean: Whether or not to remove the BTA directory. Only works if cd_out is true.
         :param settings: The settings used to run OSKAR, so that the function knows where to find the outputs.
-        :param use_hyperdrive: Whether or not to generate a uvfits file with hyperdrive.
+        :param convert_uvfits: Whether or not to generate a uvfits file with hyperdrive.
         :param hyperdrive_loc: The location of the uvfits file.
         """
 
@@ -276,7 +281,7 @@ class BTAnalysisPipeline():
                 subprocess.run(["mv", "-f", original_locations[2], outpath[2]], check=True)
 
             # Move uvfits file to directory
-            if outpath[3] != "" and use_hyperdrive:
+            if outpath[3] != "" and convert_uvfits:
                 subprocess.run(["mv", "-f", original_locations[3], outpath[3]], check=True)
 
         except subprocess.CalledProcessError as e:
@@ -288,7 +293,7 @@ class BTAnalysisPipeline():
                 subprocess.run(["rm","-rf","BTA"], check=True)
 
     @staticmethod
-    def run_oskar_on_model(file="", phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res: Quantity = 100e6 * u.MHz, interferometer_settings_override = "", imager_settings_override = "", outpath = ("","",""), clean = True, oskar_exec = "", oskar_mode="singularity", oskar_telescope_model = "", template_preset = "", coeval = True, load_osm=False, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, use_imager = True, oskar_parent_dir = "~", use_hyperdrive=True, hyperdrive_cmd="hyperdrive"):
+    def run_oskar_on_model(file="", phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res: Quantity = 100e6 * u.MHz, interferometer_settings_override = "", imager_settings_override = "", outpath = ("","",""), clean = True, oskar_exec = "", oskar_mode="singularity", oskar_telescope_model = "", template_preset = "", coeval = True, load_osm=False, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, use_imager = True, oskar_parent_dir = "~", convert_uvfits=True):
         """
         Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
 
@@ -310,8 +315,7 @@ class BTAnalysisPipeline():
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
         :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
-        :param use_hyperdrive: Whether or not to generate a uvfits file with hyperdrive.
-        :param hyperdrive_cmd: The binary file or command to use to execute hyperdrive.
+        :param convert_uvfits: Whether or not to generate a uvfits file.
         """
 
         # Set defaults
@@ -414,8 +418,7 @@ class BTAnalysisPipeline():
             oskar_exec=oskar_exec,
             oskar_mode=oskar_mode,
             use_imager=use_imager,
-            use_hyperdrive=use_hyperdrive,
-            hyperdrive_cmd=hyperdrive_cmd
+            convert_uvfits=convert_uvfits
             )
 
         # If clean is true remove all data relating to execution
@@ -425,7 +428,7 @@ class BTAnalysisPipeline():
             use_imager=use_imager,
             clean=clean,
             settings=dynamic_settings,
-            use_hyperdrive=use_hyperdrive
+            convert_uvfits=convert_uvfits
             )
 
 
@@ -511,7 +514,7 @@ class LoadDefaults:
                 use_imager=("fits" in update_which_files),
                 load_osm=(not start_from_scratch),
                 oskar_parent_dir=oskar_parent_dir,
-                use_hyperdrive=("uvfits" in update_which_files)
+                convert_uvfits=("uvfits" in update_which_files)
                 )
                 
     @staticmethod

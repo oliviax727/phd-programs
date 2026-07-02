@@ -10,3 +10,5 @@ ipython
 pdoc
 pylint
 pylint-venv
+pyuvdata
+python-casacore
