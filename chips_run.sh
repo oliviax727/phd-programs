@@ -15,7 +15,7 @@ source /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/env_variables_gar
 export OUTPUTDIR='/scratch/mwaeor/ohrw/chips_run_stage'
 export INPUTDIR='/scratch/mwaeor/ohrw/chips_run_stage'
 
-#cd /home/ohrw/bin/
+cd $INPUTDIR
 
 /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska /scratch/ohrw/uvfits_templates/uvfits_templates/slice_uvwplane.uvfits side
 
