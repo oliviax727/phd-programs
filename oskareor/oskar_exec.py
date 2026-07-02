@@ -113,7 +113,7 @@ class BTAnalysisPipeline():
         return (interf_settings_path, interf_settings_dict), (imager_settings_path, imager_settings_dict)
 
     @staticmethod
-    def run_oskar_on_osm(osm_file, interferometer_settings = ("", ohelp.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", ohelp.DEFAULT_IMAGER_SETTINGS), oskar_exec=None, oskar_mode="python", use_imager=True, convert_uvfits=True, uvfits_out="BTA/hyperdrive.uvfits"):
+    def run_oskar_on_osm(osm_file, interferometer_settings = ("", ohelp.DEFAULT_INTERFEROMETER_SETTINGS), imager_settings = ("", ohelp.DEFAULT_IMAGER_SETTINGS), oskar_exec=None, oskar_mode="python", use_imager=True, convert_uvfits=True, uvfits_out="BTA/uvw_out.uvfits"):
         """
         Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the SimulationReformatter object.
 
@@ -124,9 +124,8 @@ class BTAnalysisPipeline():
         :param oskar_exec: The SIF file or binary file path containing the OSKAR programs.
         :param oskar_mode: How shall OSKAR be run? Options include: python, binary, command, singularity.
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
-        :param convert_uvfits: Whether or not to generate a uvfits file with hyperdrive.
-        :param hyperdrive_cmd: The binary file or command to use to execute hyperdrive.
-        :param hyperdrive_out: The file to output the uvfits.
+        :param convert_uvfits: Whether or not to generate a uvfits file.
+        :param uvfits_out: The file to output the uvfits.
         """
 
         # TODO: Provide options for all four execution modes.
@@ -237,7 +236,7 @@ class BTAnalysisPipeline():
         return default_return
 
     @staticmethod
-    def clean_bta_dir(outpath, use_imager = True, clean = True, settings = None, convert_uvfits=True, hyperdrive_loc="BTA/hyperdrive.uvfits"):
+    def clean_bta_dir(outpath, use_imager = True, clean = True, settings = None, convert_uvfits=True, uvfits_loc="BTA/uvw_out.uvfits"):
         """
         Finishes and cleans up the mess created by the BTA class.
 
@@ -245,8 +244,8 @@ class BTAnalysisPipeline():
         :param use_imager: Whether or not copy any existing imager FITS file.
         :param clean: Whether or not to remove the BTA directory. Only works if cd_out is true.
         :param settings: The settings used to run OSKAR, so that the function knows where to find the outputs.
-        :param convert_uvfits: Whether or not to generate a uvfits file with hyperdrive.
-        :param hyperdrive_loc: The location of the uvfits file.
+        :param convert_uvfits: Whether or not to generate a uvfits file.
+        :param uvfits_loc: The location of the uvfits file.
         """
 
         # Keep pylint happy
@@ -258,7 +257,7 @@ class BTAnalysisPipeline():
             settings["interferometer"]["ms_filename"],
             settings["interferometer"]["oskar_vis_filename"],
             settings["image"]["root_path"]+"_I.fits",
-            hyperdrive_loc
+            uvfits_loc
             ])
         original_locations = tuple(map(ofc.expand_path, original_locations))
 
