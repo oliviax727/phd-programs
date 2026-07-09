@@ -191,7 +191,7 @@ class BTAnalysisPipeline():
         if convert_uvfits:
             print("Running Hyperdrive")
             uv = UVData()
-            uv.read_ms(ms_dir)
+            uv.read_ms(ms_dir, ignore_single_chan=False)
             uv.write_uvfits(uvfits_out)
 
 
