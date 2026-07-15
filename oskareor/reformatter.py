@@ -778,7 +778,18 @@ class SimulationReformatter():
         """
         Reverse-engineer an osm file to retreive its values, voxels, sigma_f, f_ref, phase_ref_point, and dynamic settings.
 
-        NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending). With frequency coming in the form of an OSKAR 2.13 list. Each channel must be square.
+        NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending). With frequency coming in the form of a list delimited by commas, and columns delimited by spaces.
+        
+        Example entry of OSM file (first six lines are shown):
+        ```
+        Format = RaD DecD I ReferenceFrequency LineWidth
+        # Entries Key:
+        #00.000000 +00.000000 [0.0000+e00,...] [000.000e6,...] [0.0000+e00,...]
+        # RA       Dec         Stokes I         Freq0           Linewidth
+        359.929040 -27.063173 [0.0000e+00,5.6409e-06,6.4100e-04] [175.233e6,175.096e6,174.959e6] [1.4669e+03,1.5097e+03,1.5869e+03]
+        359.929040 -27.049131 [0.0000e+00,6.9474e-06,0.0000e+00] [177.431e6,177.294e6,177.157e6] [1.3042e+03,1.7997e+03,1.5813e+03]
+        ```
+        (this file would represent a datacube of shape (1,2,3))
 
         :param osm_file: The OSM file to analyse.
         :param generate_dynamic_settings: Whether or not to reverse-engineer the dynamic settings as well.
@@ -794,7 +805,14 @@ class SimulationReformatter():
         If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
         """
 
-        df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Freq0", "Line Width"])
+        split_params = ["Stokes I", "Freq0", "Line Width"]
+
+        df = pd.read_csv(
+            osm_file,
+            delimiter=" ", skiprows=4, index_col=False,
+            names=["RA", "Dec", "Stokes I", "Freq0", "Line Width"],
+            converters={key: ofc.split_arr_np for key in split_params}
+            ).explode(split_params)
 
         #values, voxels = None, cumulative_voxels = None, phase_ref_point = omath.ZENITH_530, f_ref = 200 * u.MHz
         output_data = {
@@ -805,12 +823,9 @@ class SimulationReformatter():
             "f_ref": None,
         }
 
-        # Get x-y dimensions
+        # Get dimensions, assumes cubic data shape
         if d is None:
-            d = tuple((np.ones(2, dtype=np.int32) * int(np.floor(np.sqrt(df.shape[0])))).tolist())
-            
-        # Get t dimension from array
-
+            d = tuple((np.ones(3, dtype=np.int32) * int(np.floor(np.cbrt(df.shape[0])))).tolist())
 
         # Extract values
         output_data["values"] = np.array(df["Stokes I"]).reshape(d)
