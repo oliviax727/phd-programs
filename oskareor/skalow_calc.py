@@ -285,5 +285,8 @@ class OSKARFileConfig:
         map_obj = map(lambda s: s.lower() if lower else s.upper(), iterable)
 
         return iter_type(map_obj)
-
-# TODO: Compile the ~/oskareor.data directory with the ./oskareor directory into one github project
+    
+    @staticmethod
+    def print_list(arr: list, seperator: str = ", ") -> str:
+        """ Prints a stringified and beautified version of a list. """
+        return '[ ' + seperator.join(arr) + ' ]'

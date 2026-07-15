@@ -543,3 +543,14 @@ class LoadDefaults:
             LoadDefaults.reload_template_sky_models(update_which_files=update_which_files, update_which_templates=update_which_templates, oskar_parent_dir=oskar_parent_dir)
         if "ms" in update_which_files or "vis" in update_which_files or "fits" in update_which_files:
             LoadDefaults.reload_template_oskar_sims(update_which_files=update_which_files, update_which_templates=update_which_templates, oskar_parent_dir=oskar_parent_dir)
+    
+    # TODO: Compile the ~/oskareor.data directory with the ./oskareor directory into one github project
+    @staticmethod
+    def setup_oskareor_data_blank(oskar_parent_dir = "~"):
+        """
+        Setup the oskareor directory.
+        
+        :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
+        """
+        
+        print(oskar_parent_dir)
