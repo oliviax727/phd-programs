@@ -287,6 +287,6 @@ class OSKARFileConfig:
         return iter_type(map_obj)
     
     @staticmethod
-    def print_list(arr: list, seperator: str = ", ") -> str:
+    def print_list(arr: list, seperator: str = ", ", buffer: str = " ") -> str:
         """ Prints a stringified and beautified version of a list. """
-        return '[ ' + seperator.join(arr) + ' ]'
+        return '[' + buffer + seperator.join(arr) + buffer + ']'

@@ -187,9 +187,9 @@ class BTAnalysisPipeline():
             elif oskar_mode == "binary":
                 execute_oskar_shell_command([oskar_exec+"/oskar_imager",settings[1]])
 
-        # Run Hyperdrive
+        # Converting to UVFits
         if convert_uvfits:
-            print("Running Hyperdrive")
+            print("Converting to UVFits")
             uv = UVData()
             uv.read_ms(ms_dir, ignore_single_chan=False)
             uv.write_uvfits(uvfits_out)

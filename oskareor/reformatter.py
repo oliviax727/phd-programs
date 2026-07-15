@@ -513,7 +513,7 @@ class SimulationReformatter():
         d = np.shape(values)
 
         # Configure OSM path
-        osm_output = ofc.expand_path(osm_output)
+        osm_output_exp = ofc.expand_path(osm_output)
 
         # Cumulative sums are more important than voxel bins now
         (ras, dcs, freqsum) = (None, None, None) # Keep Pylint Happy
@@ -527,15 +527,15 @@ class SimulationReformatter():
         # Record data to file
         print("Recording data to .osm file")
 
-        with open(osm_output, 'w', encoding='utf-8') as osm:
+        with open(osm_output_exp, 'w', encoding='utf-8') as osm:
             # Clear file contents
             osm.truncate(0)
 
             # Add header lines
             osm.write("Format = RaD DecD I ReferenceFrequency LineWidth\n")
             osm.write("# Entries Key:\n")
-            osm.write("#00.000000 +00.000000 [ 0.0000+e00 ... ] [ 000.000e6 ...] [ 0.0000+e00 ... ]\n")
-            osm.write("# RA       Dec          Stokes I            Freq0             Linewidth\n")
+            osm.write("#00.000000 +00.000000 [0.0000+e00,...] [000.000e6,...] [0.0000+e00,...]\n")
+            osm.write("# RA       Dec         Stokes I         Freq0           Linewidth\n")
 
             # Write OSM lines
             for x in range(d[0]):
@@ -549,13 +549,13 @@ class SimulationReformatter():
                     # Loop through all freq instances
                     for t in range(d[2]):
                         value_acc.append(np.format_float_scientific(values[x, y, t], 4, False))
-                        freq0_acc.append(np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False))
+                        freq0_acc.append(np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False) + "e6")
                         linew_acc.append(np.format_float_scientific(sigma_f[x, y, t], 4, False))
                         
                     # Combine all list entries into a formatted string
-                    value = ofc.print_list(value_acc, ' ')
-                    freq0 = ofc.print_list(freq0_acc, ' ')
-                    linew = ofc.print_list(linew_acc, ' ')
+                    value = ofc.print_list(value_acc, ',', '')
+                    freq0 = ofc.print_list(freq0_acc, ',', '')
+                    linew = ofc.print_list(linew_acc, ',', '')
 
                     # Format data
                     rascn = np.char.zfill(np.format_float_positional(ras[x, y, t], 6, False), 10)
@@ -570,7 +570,7 @@ class SimulationReformatter():
                         str(rascn)    + " " + # Right Ascension
                         decln         + " " + # Declination
                         str(value)    + " " + # Intensity Stokes Parameter
-                        str(freq0)  + "e6 " + # Point source frequency
+                        str(freq0)    + " " + # Point source frequency
                         str(linew)    + " " + # Spectral profile linewidth
                         "\n"
                     )
