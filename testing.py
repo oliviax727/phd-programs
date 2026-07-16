@@ -9,7 +9,7 @@ from oskareor.oskar_exec import LoadDefaults
 
 # Testing stage
 
-#LoadDefaults.reload_template_sky_models(update_which_templates = [ "column" ])
-#LoadDefaults.reload_template_oskar_sims(update_which_templates = [ "column" ])
-
-LoadDefaults.reload_all(update_which_templates = [ "coeval1" ])
+coevals = { "coeval1", "coeval2" }
+templates = LoadDefaults.TEMPLATES - coevals
+LoadDefaults.reload_all(update_which_templates=templates)
+LoadDefaults.reload_all(update_which_templates=coevals)

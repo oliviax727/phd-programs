@@ -61,21 +61,21 @@ class OSKARHelper():
             "frequency_inc_hz": 140e3,
             "phase_centre_ra_deg": 0.0,
             "phase_centre_dec_deg": -27.0,
+            # <=
             "length": "4:00:00.00",
             "start_time_utc": "2025-03-03 03:30:00.00"
-            # <=
         },
         "telescope": {
             "input_directory": "BTA/telescope_model.tm",
             "aperture_array/element_pattern/enable_numerical": False,
-            "aperture_array/array_pattern/element/x_gain": 1.0,
-            "aperture_array/array_pattern/element/y_gain": 1.0,
-            "aperture_array/array_pattern/element/x_gain_error_time": 0.0015057,
-            "aperture_array/array_pattern/element/y_gain_error_time": 0.0015057,
-            "aperture_array/array_pattern/element/x_phase_error_fixed_deg": 0.0,
-            "aperture_array/array_pattern/element/y_phase_error_fixed_deg": 0.0,
-            "aperture_array/array_pattern/element/x_phase_error_time_deg": 0.0015057,
-            "aperture_array/array_pattern/element/y_phase_error_time_deg": 0.0015057
+            #"aperture_array/array_pattern/element/x_gain": 1.0,
+            #"aperture_array/array_pattern/element/y_gain": 1.0,
+            #"aperture_array/array_pattern/element/x_gain_error_time": 0.0015057,
+            #"aperture_array/array_pattern/element/y_gain_error_time": 0.0015057,
+            #"aperture_array/array_pattern/element/x_phase_error_fixed_deg": 0.0,
+            #"aperture_array/array_pattern/element/y_phase_error_fixed_deg": 0.0,
+            #"aperture_array/array_pattern/element/x_phase_error_time_deg": 0.0015057,
+            #"aperture_array/array_pattern/element/y_phase_error_time_deg": 0.0015057
         },
         "interferometer": {
             "oskar_vis_filename": "BTA/oskar_output/vis.vis",
