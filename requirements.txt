@@ -16,3 +16,4 @@ pyuvdata>=3.1,<4
 python-casacore>=3.6,<4
 pylint-fixme-info
 oskarpy @ git+https://github.com/OxfordSKA/OSKAR.git@master#subdirectory=python
+scikit-learn
