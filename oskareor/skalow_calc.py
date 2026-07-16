@@ -285,5 +285,18 @@ class OSKARFileConfig:
         map_obj = map(lambda s: s.lower() if lower else s.upper(), iterable)
 
         return iter_type(map_obj)
-
-# TODO: Compile the ~/oskareor.data directory with the ./oskareor directory into one github project
+    
+    @staticmethod
+    def print_list(arr: list, seperator: str = ", ", buffer: str = " ") -> str:
+        """ Prints a stringified and beautified version of a list. """
+        return '[' + buffer + seperator.join(arr) + buffer + ']'
+    
+    @staticmethod
+    def split_arr(arrstr: str, delimiter: str = ",", padding: int = 1) -> list:
+        """ Parses a string into a list. """
+        return arrstr[padding:-padding].split(delimiter)
+    
+    @staticmethod
+    def split_arr_np(arrstr: str, delimiter: str = ",", padding: int = 1, dtype: np.dtype | str = np.object_) -> np.ndarray:
+        """ Parses a string into a numpy array. """
+        return np.array(OSKARFileConfig.split_arr(arrstr, delimiter, padding), dtype=dtype)

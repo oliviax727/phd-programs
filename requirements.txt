@@ -1,15 +1,18 @@
 # Requires CPython with stdlib _ctypes support (Python built with libffi).
 numpy>=1.26,<3
 astropy>=6,<8
-scipy>=1.11,<1.18
+scipy>=1.11,<1.16
 pandas>=2.2,<3
 h5py>=3.10,<4
 matplotlib>=3.8,<4
 configparser>=7,<8
 jupyter>=1,<2
+ipykernel>=6,<7
 ipython>=8,<10
 pdoc>=15,<16
 pylint>=3,<4
 pylint-venv>=3,<4
 pyuvdata>=3.1,<4
 python-casacore>=3.6,<4
+pylint-fixme-info
+oskarpy @ git+https://github.com/OxfordSKA/OSKAR.git@master#subdirectory=python

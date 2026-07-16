@@ -513,7 +513,7 @@ class SimulationReformatter():
         d = np.shape(values)
 
         # Configure OSM path
-        osm_output = ofc.expand_path(osm_output)
+        osm_output_exp = ofc.expand_path(osm_output)
 
         # Cumulative sums are more important than voxel bins now
         (ras, dcs, freqsum) = (None, None, None) # Keep Pylint Happy
@@ -527,42 +527,53 @@ class SimulationReformatter():
         # Record data to file
         print("Recording data to .osm file")
 
-        with open(osm_output, 'w', encoding='utf-8') as osm:
+        with open(osm_output_exp, 'w', encoding='utf-8') as osm:
             # Clear file contents
             osm.truncate(0)
 
             # Add header lines
-            osm.write("Format = RaD DecD I Q U V ReferenceFrequency LineWidth\n")
+            osm.write("Format = RaD DecD I ReferenceFrequency LineWidth\n")
             osm.write("# Entries Key:\n")
-            osm.write("#00.000000 +00.000000 0.0000+e00 0.0 0.0 0.0 000.000e6 0.0000+e00\n")
-            osm.write("# RA       Dec        Stokes I   Q   U   V   Freq0     Linewidth\n")
+            osm.write("#00.000000 +00.000000 [0.0000+e00,...] [000.000e6,...] [0.0000+e00,...]\n")
+            osm.write("# RA       Dec         Stokes I         Freq0           Linewidth\n")
 
             # Write OSM lines
             for x in range(d[0]):
                 for y in range(d[1]):
+                    
+                    # Accumulate point-specific values in table
+                    value_acc = []
+                    freq0_acc = []
+                    linew_acc = []
+                    
+                    # Loop through all freq instances
                     for t in range(d[2]):
+                        value_acc.append(np.format_float_scientific(values[x, y, t], 4, False))
+                        freq0_acc.append(np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False) + "e6")
+                        linew_acc.append(np.format_float_scientific(sigma_f[x, y, t], 4, False))
+                        
+                    # Combine all list entries into a formatted string
+                    value = ofc.print_list(value_acc, ',', '')
+                    freq0 = ofc.print_list(freq0_acc, ',', '')
+                    linew = ofc.print_list(linew_acc, ',', '')
 
-                        # Format data
-                        rascn = np.char.zfill(np.format_float_positional(ras[x, y, t], 6, False), 10)
-                        decln = np.char.zfill(np.format_float_positional(np.abs(dcs[x, y, t]), 6, False), 9)
-                        value = np.format_float_scientific(values[x, y, t], 4, False)
-                        freq0 = np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False)
-                        linew = np.format_float_scientific(sigma_f[x, y, t], 4, False)
+                    # Format data
+                    rascn = np.char.zfill(np.format_float_positional(ras[x, y, t], 6, False), 10)
+                    decln = np.char.zfill(np.format_float_positional(np.abs(dcs[x, y, t]), 6, False), 9)
 
-                        # Add +/- value to Declinations
-                        if dcs[x, y, t] >= 0: decln = "+" + str(decln)
-                        else:                 decln = "-" + str(decln)
+                    # Add +/- value to Declinations
+                    if dcs[x, y, t] >= 0: decln = "+" + str(decln)
+                    else:                 decln = "-" + str(decln)
 
-                        # Write to OSM
-                        osm.write(
-                            str(rascn)    + " " + # Right Ascension
-                            decln         + " " + # Declination
-                            str(value)    + " " + # Intensity
-                            "0.0 0.0 0.0" + " " + # Redundant Stokes Parameters
-                            str(freq0)  + "e6 " + # Point source frequency
-                            str(linew)    + " " + # Spectral profile linewidth
-                            "\n"
-                        )
+                    # Write to OSM
+                    osm.write(
+                        str(rascn)    + " " + # Right Ascension
+                        decln         + " " + # Declination
+                        str(value)    + " " + # Intensity Stokes Parameter
+                        str(freq0)    + " " + # Point source frequency
+                        str(linew)    + " " + # Spectral profile linewidth
+                        "\n"
+                    )
 
                     print("\rSaving data for spaxel # (", x, ",", y, ")", "of", "(", d[0], ",", d[1], ")", end="")
 
@@ -767,7 +778,18 @@ class SimulationReformatter():
         """
         Reverse-engineer an osm file to retreive its values, voxels, sigma_f, f_ref, phase_ref_point, and dynamic settings.
 
-        NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending).
+        NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending). With frequency coming in the form of a list delimited by commas, and columns delimited by spaces.
+        
+        Example entry of OSM file (first six lines are shown):
+        ```
+        Format = RaD DecD I ReferenceFrequency LineWidth
+        # Entries Key:
+        #00.000000 +00.000000 [0.0000+e00,...] [000.000e6,...] [0.0000+e00,...]
+        # RA       Dec         Stokes I         Freq0           Linewidth
+        359.929040 -27.063173 [0.0000e+00,5.6409e-06,6.4100e-04] [175.233e6,175.096e6,174.959e6] [1.4669e+03,1.5097e+03,1.5869e+03]
+        359.929040 -27.049131 [0.0000e+00,6.9474e-06,0.0000e+00] [177.431e6,177.294e6,177.157e6] [1.3042e+03,1.7997e+03,1.5813e+03]
+        ```
+        (this file would represent a datacube of shape (1,2,3))
 
         :param osm_file: The OSM file to analyse.
         :param generate_dynamic_settings: Whether or not to reverse-engineer the dynamic settings as well.
@@ -783,7 +805,14 @@ class SimulationReformatter():
         If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
         """
 
-        df = pd.read_csv(osm_file, delimiter=" ", skiprows=3, index_col=False, names=["RA", "Dec", "Stokes I", "Q", "U", "V", "Freq0"])
+        split_params = ["Stokes I", "Freq0", "Line Width"]
+
+        df = pd.read_csv(
+            osm_file,
+            delimiter=" ", skiprows=4, index_col=False,
+            names=["RA", "Dec", "Stokes I", "Freq0", "Line Width"],
+            converters={key: ofc.split_arr_np for key in split_params}
+            ).explode(split_params)
 
         #values, voxels = None, cumulative_voxels = None, phase_ref_point = omath.ZENITH_530, f_ref = 200 * u.MHz
         output_data = {
@@ -791,10 +820,10 @@ class SimulationReformatter():
             "voxels": None,
             "cumulative_voxels": None,
             "phase_ref_point": None,
-            "f_ref": None
+            "f_ref": None,
         }
 
-        # Get dimensions of box
+        # Get dimensions, assumes cubic data shape
         if d is None:
             d = tuple((np.ones(3, dtype=np.int32) * int(np.floor(np.cbrt(df.shape[0])))).tolist())
 
