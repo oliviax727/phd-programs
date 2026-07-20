@@ -30,9 +30,6 @@ rm -rf ../2dps_npz_templates/*
 
 chips_files=(/scratch/mwaeor/ohrw/uvfits_templates/uvfits_templates/*)
 
-# shellcheck disable=SC1091
-source /software/projects/mwaeor/ohrw/.venv/bin/activate
-
 for template_file in "${chips_files[@]}"; do
 
     template_name="$(awk -v s="${template_file}" 'BEGIN { start = 39; end = index(s, "_uvw_plane.uvfits") - start; print substr(s, start, end) }')"
@@ -43,7 +40,12 @@ for template_file in "${chips_files[@]}"; do
 
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska side 100 50 'yy' 500. chips.out 0 1
 
+    # shellcheck disable=SC1091
+    source /software/projects/mwaeor/ohrw/.venv/bin/activate
+
     plotchips_all.py --basedir . --plot_type 2D --chips_tag chips.out --polarisation YY --N_chan 100 --N_kperp 50 --max_power 1e10 --min_power 1e3 >> chips.log
+
+    deactivate
 
     cp ./chips2D_yy_chips.out_crosspower.png ../2dps_png_templates/"${template_name}".png
     cp ./2D_coords_and_power.npz ../2dps_npz_templates/"${template_name}".npz
