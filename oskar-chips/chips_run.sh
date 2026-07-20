@@ -28,13 +28,13 @@ rm -rf ../2dps_png_templates/*
 mkdir -p ../2dps_npz_templates
 rm -rf ../2dps_npz_templates/*
 
-chips_files=(/scratch/mwaeor/ohrw/uvfits_templates/uvfits_templates/*)
+chips_files=(/scratch/mwaeor/ohrw/uvfits_templates/*)
 
 for template_file in "${chips_files[@]}"; do
 
     template_name="$(awk -v s="${template_file}" 'BEGIN { start = 39; end = index(s, "_uvw_plane.uvfits") - start; print substr(s, start, end) }')"
 
-    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska /scratch/mwaeor/ohrw/uvfits_templates/column_uvw_plane.uvfits side 15. 299792458.
+    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska "${template_file}" side 15. 299792458.
 
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska side 100 0 'yy' side 1
 
