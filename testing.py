@@ -10,6 +10,6 @@ from oskareor.oskar_exec import LoadDefaults
 # Testing stage
 
 coevals = { "coeval1", "coeval2" }
-templates = LoadDefaults.TEMPLATES - coevals
-LoadDefaults.reload_all(update_which_templates=templates)
-LoadDefaults.reload_all(update_which_templates=coevals)
+#templates = LoadDefaults.TEMPLATES - coevals
+LoadDefaults.reload_template_sky_models()
+#LoadDefaults.reload_all(update_which_templates=coevals)

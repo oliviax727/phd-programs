@@ -332,9 +332,6 @@ class SimulationReformatter():
         # Set maximum frequency resolution
         max_freq_res_hz = max_freq_res.to_value(u.Hz)
 
-        # Set Linewidth array
-        sigma_f = SimulationReformatter.brightness_temperature_to_linewidth(values)
-
         print("Transforming coordinates ...")
         # Main loop of creation
         for t in range(d[2]):
@@ -398,16 +395,15 @@ class SimulationReformatter():
 
         print("\nTransforming complete.")
 
-        return values, voxels, sigma_f, f_ref, regrid_flag
+        return values, voxels, f_ref, regrid_flag
         
     @staticmethod
-    def regrid_datacube(values, voxels, d = None, sigma_f = None, max_freq_res=100 * u.MHz):
+    def regrid_datacube(values, voxels, d = None, max_freq_res=100 * u.MHz):
         """
         Regrids each spaxel of a sky model given a maximum frequency resolution.
 
         :param values: The simulation datacube.
         :param voxels: An array describing a series of voxel dimensions corresponding to each simulation datacube voxel element in units of (rad, rad, Hz).
-        :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
         :param max_freq_res: Maximum allowable voxel frequency resolution.
         """
 
@@ -429,7 +425,6 @@ class SimulationReformatter():
 
                 # Create interpolation B-spline
                 bspline = misp(freq_values, values[x, y, :])
-                dspline = misp(freq_values, sigma_f[x, y, :])
 
                 # Check maximum frequency resolution
                 if np.abs(freq_values[0] - freq_values[-1])/d[2] > max_freq_res_hz:
@@ -441,7 +436,6 @@ class SimulationReformatter():
 
                 # Perform Regrid
                 new_flux = np.clip(bspline(new_freq), 0, None)
-                new_sigf = np.clip(dspline(new_freq), 0, None)
 
                 # Create array of uniform bin sizes
                 freq_bins = np.ones(d[2]) * freq_bandw
@@ -449,11 +443,10 @@ class SimulationReformatter():
                 # Save variables
                 voxels[x, y, :, 2] = freq_bins
                 values[x, y, :] = new_flux
-                sigma_f[x, y, :] = new_sigf
 
         print("\nRegrid complete.")
         
-        return values, voxels, sigma_f
+        return values, voxels
     
     @staticmethod
     def calculate_cumulative_voxels(voxels, f_ref = 200 * u.MHz, phase_ref_point = omath.ZENITH_530):
@@ -493,14 +486,13 @@ class SimulationReformatter():
         
     @staticmethod
     # TODO: Gaussian source?
-    def save_datacube_to_osm(values, voxels = None, cumulative_voxels = None, sigma_f = None, f_ref = 200 * u.MHz, phase_ref_point = omath.ZENITH_530, osm_output="reformat/osm_output/osm_output.osm"):
+    def save_datacube_to_osm(values, voxels = None, cumulative_voxels = None, f_ref = 200 * u.MHz, phase_ref_point = omath.ZENITH_530, osm_output="reformat/osm_output/osm_output.osm"):
         """
         Saves a given datacube of flux values and voxel dimensions (RA, Dec, Freq.) to a master OSM file.
 
         :param values: The sky model datacube.
         :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element (rad, rad, Hz).
         :param cumulative_voxels: A jagged array consisting of the cumulative summation of components from the voxel array (deg, deg, Hz).
-        :param sigma_f: An array of same dimensions as values but containing information about the linewidth of the frequency emission profile.
         :param f_ref: Refrence frequency, the ending frequency of the model.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always reformat frequency bins, if false, reformat only when max frequency resolution is met.
@@ -532,10 +524,10 @@ class SimulationReformatter():
             osm.truncate(0)
 
             # Add header lines
-            osm.write("Format = RaD DecD I ReferenceFrequency LineWidth\n")
+            osm.write("Format = RaD DecD ReferenceFrequency FrequencyIncrement\n")
             osm.write("# Entries Key:\n")
-            osm.write("#00.000000 +00.000000 [0.0000+e00,...] [000.000e6,...] [0.0000+e00,...]\n")
-            osm.write("# RA       Dec         Stokes I         Freq0           Linewidth\n")
+            osm.write("#00.000000 +00.000000 000.000e6 000.000e3 [0.0000+e00,...]\n")
+            osm.write("# RA       Dec        Freq0     Freq+      Stokes I\n")
 
             # Write OSM lines
             for x in range(d[0]):
@@ -543,19 +535,17 @@ class SimulationReformatter():
                     
                     # Accumulate point-specific values in table
                     value_acc = []
-                    freq0_acc = []
-                    linew_acc = []
                     
                     # Loop through all freq instances
                     for t in range(d[2]):
                         value_acc.append(np.format_float_scientific(values[x, y, t], 4, False))
-                        freq0_acc.append(np.format_float_positional(freqsum[x, y, t] / 1e6, 3, False) + "e6")
-                        linew_acc.append(np.format_float_scientific(sigma_f[x, y, t], 4, False))
+                    
+                    # Frequency values
+                    freq_ref = np.format_float_positional(np.mean(freqsum[x, y, :]) / 1e6, 3, False) + "e6"
+                    freq_inc = np.format_float_positional(np.mean(voxels[:,:,:,2]) / 1e3, 3, False) + "e3"
                         
                     # Combine all list entries into a formatted string
                     value = ofc.print_list(value_acc, ',', '')
-                    freq0 = ofc.print_list(freq0_acc, ',', '')
-                    linew = ofc.print_list(linew_acc, ',', '')
 
                     # Format data
                     rascn = np.char.zfill(np.format_float_positional(ras[x, y, t], 6, False), 10)
@@ -569,9 +559,9 @@ class SimulationReformatter():
                     osm.write(
                         str(rascn)    + " " + # Right Ascension
                         decln         + " " + # Declination
+                        str(freq_ref) + " " + # Point source frequency START
+                        str(freq_inc) + " " + # Point source frequency INCRM
                         str(value)    + " " + # Intensity Stokes Parameter
-                        str(freq0)    + " " + # Point source frequency
-                        str(linew)    + " " + # Spectral profile linewidth
                         "\n"
                     )
 
@@ -710,19 +700,19 @@ class SimulationReformatter():
             voxels = np.full((*d, 3), v, dtype=np.float64)
 
         # Transform datacube
-        values, voxels, sigma_f, f_ref, regrid_flag = SimulationReformatter.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, cosmology=cosmology)
+        values, voxels, f_ref, regrid_flag = SimulationReformatter.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, cosmology=cosmology)
 
         regrid_flag = regrid_flag and (d[2] > 1)
 
         # STEP 7 - Regrid frequency-dimension data if needed
         if regrid_flag:
-            values, voxels, sigma_f = SimulationReformatter.regrid_datacube(values=values, voxels=voxels, sigma_f=sigma_f, max_freq_res=max_freq_res)
+            values, voxels = SimulationReformatter.regrid_datacube(values=values, voxels=voxels, max_freq_res=max_freq_res)
         else:
             print("No Regrid required!")
 
         # STEP 8 - Write data to OSM file
         if osm_output != "":
-            SimulationReformatter.save_datacube_to_osm(values=values, voxels=voxels, sigma_f=sigma_f, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
+            SimulationReformatter.save_datacube_to_osm(values=values, voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
 
         # Output dynamic settings file
         dynamic_settings = SimulationReformatter.generate_dynamic_settings(
@@ -776,9 +766,10 @@ class SimulationReformatter():
     @staticmethod
     def convert_osm_file_to_arrays(osm_file, generate_dynamic_settings = True, phase_ref_point_override = None, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, save_dynamic_settings = "", d = None):
         """
-        Reverse-engineer an osm file to retreive its values, voxels, sigma_f, f_ref, phase_ref_point, and dynamic settings.
+        Reverse-engineer an osm file to retreive its values, voxels, f_ref, phase_ref_point, and dynamic settings.
 
-        NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending). With frequency coming in the form of a list delimited by commas, and columns delimited by spaces.
+        NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending).
+        With frequency coming in the form of a list delimited by commas, and columns delimited by spaces.
         
         Example entry of OSM file (first six lines are shown):
         ```
@@ -800,7 +791,7 @@ class SimulationReformatter():
         :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
         :param d: The dimensions of the array, if none, the program will assume a cubic values array with side-lengths equal to the floor of the cube root of the number of entries in the OSM file.
 
-        :return output_data: The values, voxels, cumulative voxels, sigma_f, f_ref, and phase_ref_point contained in a dictionary.
+        :return output_data: The values, voxels, cumulative voxels, f_ref, and phase_ref_point contained in a dictionary.
         
         If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
         """
@@ -883,5 +874,4 @@ class SimulationReformatter():
 
             return output_data, dynamic_settings
         
-        else:
-            return output_data
+        return output_data
