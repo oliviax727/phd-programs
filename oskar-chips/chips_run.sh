@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=ohrw_chips_ska
-#SBATCH --output=chips.out
+#SBATCH --output=/scratch/mwaeor/ohrw/chips.out
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=40
 #SBATCH --time=04:00:00
