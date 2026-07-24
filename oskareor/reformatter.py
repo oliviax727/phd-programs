@@ -19,25 +19,32 @@ from scipy.interpolate import make_interp_spline as misp
 from astropy.coordinates import SkyCoord
 
 # Local imports
-from oskareor.skalow_calc import EoRCosmology as eorcosmo, SKAMath as omath, OSKARFileConfig as ofc
+from oskareor.skalow_calc import (
+    EoRCosmology as eorcosmo,
+    SKAMath as omath,
+    OSKARFileConfig as ofc,
+)
 from oskareor.oskar_helpers import OSKARHelper as ohelp
 
-class SimulationReformatter():
+
+class SimulationReformatter:
     """
     The reformatter class contains functions relating to translating simulation data to OSKAR output data.
 
     NB: all units are assumed SI unless explicitly stated as an astropy quantity. Exceptions to this rule include:
     - Flux (in Jansky)
     - Distance (in Mpc)
-    
+
     Sky coordinate locations are given in Degrees, whereas angular diameters are given in radians.
     """
 
     @staticmethod
-    def brightness_temperature_to_flux(tb: float, fxy: float, dtheta: float, dphi: float) -> float:
+    def brightness_temperature_to_flux(
+        tb: float, fxy: float, dtheta: float, dphi: float
+    ) -> float:
         """
         Given the temperature, frequency, and angular size in both sky directions, calculate the luminosity in Jy.
-        
+
         :param tb: The brightness temperature. Must be provided in Kelvin.
         :param fxy: The frequency of emission. Must be provided in units of Hertz.
         :param dtheta: The first specified angular diameter. Perpendicular to the first. Must be provided in units of Radians.
@@ -47,10 +54,10 @@ class SimulationReformatter():
         """
 
         # Calculate pixelated luminosity
-        fv = 2 * c.k_B.si.value * fxy**2 * tb * (dtheta * dphi) / c.c.si.value ** 2
+        fv = 2 * c.k_B.si.value * fxy**2 * tb * (dtheta * dphi) / c.c.si.value**2
 
-        return fv * 1e26 # Converts to Jansky
-    
+        return fv * 1e26  # Converts to Jansky
+
     @staticmethod
     def brightness_temperature_to_linewidth(tb: float) -> float:
         """
@@ -62,88 +69,130 @@ class SimulationReformatter():
         """
 
         # Calculate linewidth in Hz
-        return (tb ** 0.5) * omath.SIGMA_F_FLOAT
-    
+        return (tb**0.5) * omath.SIGMA_F_FLOAT
+
     TEMPLATE_PRESETS = {
-        "gaussian"  : (
-            { "normal", "gauss", "bell", "n", "g", "b" },
+        "gaussian": (
+            {"normal", "gauss", "bell", "n", "g", "b"},
             "Rotationally symmetric centered gaussian plane with FWHM = d(t)/3.",
-            lambda p: omath.gaussian(p['r'], var=omath.STDEV(p['d'][2]/3)**2, amp=p['T_max']),
-            (100, 100, 100)
+            lambda p: omath.gaussian(
+                p["r"], var=omath.STDEV(p["d"][2] / 3) ** 2, amp=p["T_max"]
             ),
-        "flat"      : (
-            { "plane", "constant", "const", "c", "f" },
+            (100, 100, 100),
+        ),
+        "flat": (
+            {"plane", "constant", "const", "c", "f"},
             "Constant temperature for every pixel.",
-            lambda p: p['T_max'],
-            (100, 100, 100)
-            ),
-        "random"    : (
-            { "rand", "r" },
+            lambda p: p["T_max"],
+            (100, 100, 100),
+        ),
+        "random": (
+            {"rand", "r"},
             "Random values for every cell from 0 to the defined scale (T_max).",
-            lambda p: p['T_max'] * np.random.rand(),
-            (100, 100, 100)
-            ),
-        "sinusoid"  : (
-            { "sinc", "interference", "fringe", "i", "intf", "s" },
+            lambda p: p["T_max"] * np.random.rand(),
+            (100, 100, 100),
+        ),
+        "sinusoid": (
+            {"sinc", "interference", "fringe", "i", "intf", "s"},
             "Rotationally symmetric centered sinc function with freq = 1/d(t).",
-            lambda p: np.abs(omath.sinc(p['r'], f=1/p['d'][2], amp=p['T_max'])),
-            (100, 100, 100)
-            ),
-        "point"     : (
-            { "delta", "source", "p" },
+            lambda p: np.abs(omath.sinc(p["r"], f=1 / p["d"][2], amp=p["T_max"])),
+            (100, 100, 100),
+        ),
+        "point": (
+            {"delta", "source", "p"},
             "A point source in the direct centre of the field.",
-            lambda p: p['T_max'] if (p['i'] == p['d'][0] // 2 and p['j'] == p['d'][1] // 2) else 0,
-            (100, 100, 100)
+            lambda p: (
+                p["T_max"]
+                if (p["i"] == p["d"][0] // 2 and p["j"] == p["d"][1] // 2)
+                else 0
             ),
-        "dark"     : (
-            { "clear", "empty", "d" },
+            (100, 100, 100),
+        ),
+        "dark": (
+            {"clear", "empty", "d"},
             "A completely clear sky.",
             lambda p: 0,
-            (100, 100, 100)
-            ),
-        "coeval1"   : (
-            { "coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1" },
+            (100, 100, 100),
+        ),
+        "coeval1": (
+            {"coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1"},
             "One of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
             + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
-            lambda p: p['data'][*p['central']],
-            (400, 400, 400)
-            ),
-        "coeval2"   : (
-            { "coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2" },
+            lambda p: p["data"][*p["central"]],
+            (400, 400, 400),
+        ),
+        "coeval2": (
+            {"coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2"},
             "The second of two simulation boxes, cocentric with the desired values box, the original model has d = (400, 400, 400).\n"
             + "If d(a) < 400 then the box outer edges will be cropped and if d(a) > 400 the box will repeat beyond 400 px from the centre.",
-            lambda p: p['data'][*p['central']],
-            (400, 400, 400)
-            ),
-        "column"    : (
-            { "col", "small", "coeval small", "small coeval", "los", "small field" },
-            "A small field section of a sky model but with a comparatively large frequency dimension.",
-            lambda p: p['data'][*p['central']],
-            (10, 10, 100)
+            lambda p: p["data"][*p["central"]],
+            (400, 400, 400),
         ),
-        "slice"    : (
-            { "single", "channel", "single channel", "snapshot", "ch", "coeval single", "single coeval", "mono", "monochromatic" },
+        "flat400": (
+            {
+                "coeval flat",
+                "flat coeval",
+                "flat_coeval",
+                "coeval_flat",
+                "fc",
+                "cf",
+                "f400",
+            },
+            "A coeval box preselected to match the dimensions of both template coeval boxes d = (400, 400, 400).\n",
+            lambda p: p["T_max"],
+            (400, 400, 400),
+        ),
+        "column": (
+            {"col", "small", "coeval small", "small coeval", "los", "small field"},
+            "A small field section of a sky model but with a comparatively large frequency dimension.",
+            lambda p: p["data"][*p["central"]],
+            (10, 10, 100),
+        ),
+        "slice": (
+            {
+                "single",
+                "channel",
+                "single channel",
+                "snapshot",
+                "ch",
+                "coeval single",
+                "single coeval",
+                "mono",
+                "monochromatic",
+            },
             "A large field but with no depth or evolution in frequency.",
-            lambda p: p['data'][*p['central']],
-            (400, 400, 1)
-        )
+            lambda p: p["data"][*p["central"]],
+            (400, 400, 1),
+        ),
     }
 
     @staticmethod
-    def display_template_presets(print_presets: bool = True, filter_preset: str = "") -> dict:
+    def display_template_presets(
+        print_presets: bool = True, filter_preset: str = ""
+    ) -> dict:
         """
         Return and/or display all available templates, their names, and their descriptions. All templates except random, coeval1, and coeval2 are identical in all t-dimension voxels.
 
         :param print_presets: If true print the templates to console and return the dictionary. If false only return the dictionary.
         :param filter_preset: If true print/return the information for only one specific template entry, according to the given string.
-        
+
         :return template_options: The dictionary containing all available templates or a dictionary of the specific desired template.
         """
 
-        return ohelp.display_options(SimulationReformatter.TEMPLATE_PRESETS, print_options=print_presets, selection=filter_preset)
+        return ohelp.display_options(
+            SimulationReformatter.TEMPLATE_PRESETS,
+            print_options=print_presets,
+            selection=filter_preset,
+        )
 
     @staticmethod
-    def mock_values(preset: str, scale: float = 10, d: tuple = None, special = None, oskar_parent_dir: str = "~"):
+    def mock_values(
+        preset: str,
+        scale: float = 10,
+        d: tuple = None,
+        special=None,
+        oskar_parent_dir: str = "~",
+    ):
         """
         Create an array of mock simulation values.
 
@@ -152,7 +201,7 @@ class SimulationReformatter():
         :param d: The (override) size of the values datacube.
         :param special: A custom lambda function that takes the dictionary of parameters (`d`, `i`, `j`, `x`, `y`, `t`, `r`, `T_max`) and returns a float, treat the preset parameter as a custom name.
         :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
-        
+
         Note that `x` and `y` are positioned so that the centermost pixel is (0, 0) whereas `i` and `j` are the standard array values array indicies. Only `d`, `i`, and `j` are indicies, the others should be treated as floats.
 
         :return values: Mock brightness temperature values.
@@ -171,15 +220,15 @@ class SimulationReformatter():
             func = special
 
         # Create initial array
-        print("Creating mock brightness temperatures for the template: "+preset)
+        print("Creating mock brightness temperatures for the template: " + preset)
 
         values = np.zeros(d).astype(np.float64)
 
         # Load coeval data if needed
         data = None
-        if preset in { "coeval1", "column", "slice" }:
+        if preset in {"coeval1", "column", "slice"}:
             data = ohelp.load_coeval_templates(True, oskar_parent_dir)
-        elif preset in { "coeval2" }:
+        elif preset in {"coeval2"}:
             data = ohelp.load_coeval_templates(False, oskar_parent_dir)
 
         # Iterate through all elements of the dictionary
@@ -188,25 +237,33 @@ class SimulationReformatter():
                 for j in range(d[1]):
                     # Define the iteration dictionary
                     params = {
-                        "d" : d, "i" : i, "j" : j, "t": t,
-                        "x" : i - d[0]/2, "y" : j - d[1]/2,
-                        "r": np.sqrt((i - d[0]/2)**2 + (j - d[1]/2)**2),
-                        "T_max" : scale,
-                        "central": ((200 + ((np.array([i, j, t]) - (np.array(d) // 2)))) % 400),
-                        "data" : data
-                        }
-                    
+                        "d": d,
+                        "i": i,
+                        "j": j,
+                        "t": t,
+                        "x": i - d[0] / 2,
+                        "y": j - d[1] / 2,
+                        "r": np.sqrt((i - d[0] / 2) ** 2 + (j - d[1] / 2) ** 2),
+                        "T_max": scale,
+                        "central": (
+                            (200 + ((np.array([i, j, t]) - (np.array(d) // 2)))) % 400
+                        ),
+                        "data": data,
+                    }
+
                     # Populate array cell
                     values[i, j, t] = func(params)
 
             print("\rCreating values for t-dim slice #", t, "of", d[2], end="")
-        
+
         print("\nValues created!")
 
         return values.astype(np.float64)
 
     @staticmethod
-    def convert_h5_coeval_to_csv(h5_location, save_data = False, outdir = '', name = "out_h5_data"):
+    def convert_h5_coeval_to_csv(
+        h5_location, save_data=False, outdir="", name="out_h5_data"
+    ):
         """
         Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
 
@@ -218,33 +275,41 @@ class SimulationReformatter():
         :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
 
-        file = h5py.File(h5_location, 'r')
+        file = h5py.File(h5_location, "r")
 
         # Get BT data
-        bt_data = np.array(file.get('BrightnessTemp')['brightness_temp'])
+        bt_data = np.array(file.get("BrightnessTemp")["brightness_temp"])
 
         # Get Box and Voxel dimensions
-        box_len = file.get('user_params').attrs['BOX_LEN']#* file.get('cosmo_params').attrs['hlittle']
+        box_len = file.get("user_params").attrs[
+            "BOX_LEN"
+        ]  # * file.get('cosmo_params').attrs['hlittle']
         vox = np.array(np.ones(3) * box_len / bt_data.shape[0])
 
         # Define cosmology with H0=100h
         cosmology = eorcosmo(
-            omega_m_0 = file.get('cosmo_params').attrs['OMm'],
-            omega_b_0 = file.get('cosmo_params').attrs['OMb']
+            omega_m_0=file.get("cosmo_params").attrs["OMm"],
+            omega_b_0=file.get("cosmo_params").attrs["OMb"],
         )
 
         # Transform intitial redshift
-        z_mid = file.attrs['redshift']
-        z_ref = cosmology.dz_to_z(cosmology.z_to_dz(z_mid) - u.Mpc*box_len/2)
+        z_mid = file.attrs["redshift"]
+        z_ref = cosmology.dz_to_z(cosmology.z_to_dz(z_mid) - u.Mpc * box_len / 2)
 
         if save_data:
-            np.savetxt(outdir+'/'+name+'.csv', bt_data, delimiter=", ")
-            np.savetxt(outdir+'/'+name+'.txt', np.array([bt_data.shape, z_ref, vox, cosmology]), delimiter=", ")
+            np.savetxt(outdir + "/" + name + ".csv", bt_data, delimiter=", ")
+            np.savetxt(
+                outdir + "/" + name + ".txt",
+                np.array([bt_data.shape, z_ref, vox, cosmology]),
+                delimiter=", ",
+            )
 
         return bt_data, bt_data.shape, z_ref, vox, cosmology
-    
+
     @staticmethod
-    def convert_h5_lightcone_to_csv(h5_location, save_data = False, outdir = '', name = "out_h5_data"):
+    def convert_h5_lightcone_to_csv(
+        h5_location, save_data=False, outdir="", name="out_h5_data"
+    ):
         """
         Extract h5 data from Yuxiang Qin's lightcone simulations and either return the data objects or save to a seperate CSV.
 
@@ -255,33 +320,57 @@ class SimulationReformatter():
         :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
 
-        file = h5py.File(h5_location, 'r')
+        file = h5py.File(h5_location, "r")
 
         # Get BT data
-        bt_data = np.array(file.get('lightcones/brightness_temp'))
+        bt_data = np.array(file.get("lightcones/brightness_temp"))
 
         # Define cosmology with H0=100h
         cosmology = eorcosmo(
-            omega_m_0 = file.get('cosmo_params').attrs['OMm'],
-            omega_b_0 = file.get('cosmo_params').attrs['OMb']
+            omega_m_0=file.get("cosmo_params").attrs["OMm"],
+            omega_b_0=file.get("cosmo_params").attrs["OMb"],
         )
 
         # Get Box and Voxel dimensions
-        box_len = file.get('user_params').attrs['BOX_LEN'] * file.get('cosmo_params').attrs['hlittle']
-        rs = np.array(list(file.get('node_redshifts')))
-        vox = np.array([box_len, box_len, abs(cosmology.z_to_dz(rs[0])-cosmology.z_to_dz(rs[-1])).to_value(u.Mpc)]) / bt_data.shape
-        
+        box_len = (
+            file.get("user_params").attrs["BOX_LEN"]
+            * file.get("cosmo_params").attrs["hlittle"]
+        )
+        rs = np.array(list(file.get("node_redshifts")))
+        vox = (
+            np.array(
+                [
+                    box_len,
+                    box_len,
+                    abs(cosmology.z_to_dz(rs[0]) - cosmology.z_to_dz(rs[-1])).to_value(
+                        u.Mpc
+                    ),
+                ]
+            )
+            / bt_data.shape
+        )
+
         # Transform intitial redshift
         z_ref = np.min(rs)
 
         if save_data:
-            np.savetxt(outdir+'/'+name+'.csv', bt_data, delimiter=", ")
-            np.savetxt(outdir+'/'+name+'.txt', np.array([bt_data.shape, z_ref, vox, cosmology]), delimiter=", ")
+            np.savetxt(outdir + "/" + name + ".csv", bt_data, delimiter=", ")
+            np.savetxt(
+                outdir + "/" + name + ".txt",
+                np.array([bt_data.shape, z_ref, vox, cosmology]),
+                delimiter=", ",
+            )
 
         return bt_data, bt_data.shape, z_ref, vox, cosmology
-    
+
     @staticmethod
-    def convert_h5_to_csv(h5_location: str, save_data: bool = False, outdir: str = '', name: str = "out_h5_data", coeval: bool = True):
+    def convert_h5_to_csv(
+        h5_location: str,
+        save_data: bool = False,
+        outdir: str = "",
+        name: str = "out_h5_data",
+        coeval: bool = True,
+    ):
         """
         Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
 
@@ -294,12 +383,23 @@ class SimulationReformatter():
         """
 
         if coeval:
-            return SimulationReformatter.convert_h5_coeval_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
-        
-        return SimulationReformatter.convert_h5_lightcone_to_csv(h5_location=h5_location, save_data=save_data, outdir=outdir, name=name)
-        
+            return SimulationReformatter.convert_h5_coeval_to_csv(
+                h5_location=h5_location, save_data=save_data, outdir=outdir, name=name
+            )
+
+        return SimulationReformatter.convert_h5_lightcone_to_csv(
+            h5_location=h5_location, save_data=save_data, outdir=outdir, name=name
+        )
+
     @staticmethod
-    def transform_datacube_units(values, voxels, z_ref = 7, require_regrid = True, max_freq_res = 100 * u.MHz, cosmology = eorcosmo()):
+    def transform_datacube_units(
+        values,
+        voxels,
+        z_ref=7,
+        require_regrid=True,
+        max_freq_res=100 * u.MHz,
+        cosmology=eorcosmo(),
+    ):
         """
         Transform a datacube with dimensions x, y, t (cMpc x cMpc x cMpc) to ⍺, δ, f (rad x rad x Hz),
 
@@ -341,15 +441,15 @@ class SimulationReformatter():
                     # Retreive voxel values
                     dx = voxels[x, y, t, 0]
                     dy = voxels[x, y, t, 1]
-                    dt = voxels[x, y, t, 2] 
+                    dt = voxels[x, y, t, 2]
                     tb = values[x, y, t]
 
                     # STEP 1 - Convert transverse comoving distances to flat angular resolution
-                    dz_pix = dz_val+dt/2 # Alter it by the CENTRAL pixel value
+                    dz_pix = dz_val + dt / 2  # Alter it by the CENTRAL pixel value
 
                     # Calculate transformed dimensions
-                    dtheta = np.arctan(dx/dz_pix)
-                    dphi = np.arctan(dy/dz_pix)
+                    dtheta = np.arctan(dx / dz_pix)
+                    dphi = np.arctan(dy / dz_pix)
 
                     # STEPS 2 & 3 - Convert line-of-sight comoving distance to frequency
                     df = 0
@@ -357,14 +457,14 @@ class SimulationReformatter():
                     if x == y == 0:
                         # Determine corresponding redshifts
                         z_bot = z_prev
-                        z_top = cosmology.dz_to_z(dz+dt*u.Mpc)
+                        z_top = cosmology.dz_to_z(dz + dt * u.Mpc)
 
                         # Convert to frequency
                         f_bot = cosmology.z_to_f(z_bot)
                         f_top = cosmology.z_to_f(z_top)
 
                         # Store altered frequency bandwidth
-                        df = np.abs((f_bot-f_top).to_value(u.Hz))
+                        df = np.abs((f_bot - f_top).to_value(u.Hz))
 
                         # STEP 7.1 - Check if Regridding is needed
                         if df > max_freq_res_hz:
@@ -374,31 +474,33 @@ class SimulationReformatter():
                         df = voxels[0, 0, t, 2]
 
                     # STEP 4 - Convert brightness temperature to pixel flux
-                    fxy = fq + df/2
-                      
+                    fxy = fq + df / 2
+
                     # Calculate pixelated luminosity
-                    fv = SimulationReformatter.brightness_temperature_to_flux(tb=tb, fxy=fxy, dtheta=dtheta, dphi=dphi)
-                
+                    fv = SimulationReformatter.brightness_temperature_to_flux(
+                        tb=tb, fxy=fxy, dtheta=dtheta, dphi=dphi
+                    )
+
                     # Save values
                     voxels[x, y, t, 0] = dtheta
                     voxels[x, y, t, 1] = dphi
                     voxels[x, y, t, 2] = df
                     values[x, y, t] = fv
-            
+
             # Increment distance and frequency parameters
-            dz = dz + dt*u.Mpc # Increment the value of dz by voxel dimension
-            z_prev = z_top # Top z in current box = bottom z in next box
-            dz_val = dz_val + dt # Increment the value of dz by voxel dimension
-            fq = fq + df # Increment cumulative frequency
+            dz = dz + dt * u.Mpc  # Increment the value of dz by voxel dimension
+            z_prev = z_top  # Top z in current box = bottom z in next box
+            dz_val = dz_val + dt  # Increment the value of dz by voxel dimension
+            fq = fq + df  # Increment cumulative frequency
 
             print("\rTransforming t-dim slice #", t, "of", d[2], end="")
 
         print("\nTransforming complete.")
 
         return values, voxels, f_ref, regrid_flag
-        
+
     @staticmethod
-    def regrid_datacube(values, voxels, d = None, max_freq_res=100 * u.MHz):
+    def regrid_datacube(values, voxels, d=None, max_freq_res=100 * u.MHz):
         """
         Regrids each spaxel of a sky model given a maximum frequency resolution.
 
@@ -418,21 +520,36 @@ class SimulationReformatter():
         for x in range(d[0]):
             for y in range(d[1]):
 
-                print("\rRegridding spaxel # (", x, ",", y, ")", "of", "(", d[0], ",", d[1], ")", end="")
+                print(
+                    "\rRegridding spaxel # (",
+                    x,
+                    ",",
+                    y,
+                    ")",
+                    "of",
+                    "(",
+                    d[0],
+                    ",",
+                    d[1],
+                    ")",
+                    end="",
+                )
 
                 # Set the values as being in the middle of each bin
-                freq_values = np.cumsum(voxels[x, y, :, 2]) - voxels[x, y, :, 2]/2
+                freq_values = np.cumsum(voxels[x, y, :, 2]) - voxels[x, y, :, 2] / 2
 
                 # Create interpolation B-spline
                 bspline = misp(freq_values, values[x, y, :])
 
                 # Check maximum frequency resolution
-                if np.abs(freq_values[0] - freq_values[-1])/d[2] > max_freq_res_hz:
+                if np.abs(freq_values[0] - freq_values[-1]) / d[2] > max_freq_res_hz:
                     # Resize d[2] to match maximum resolution
-                    d[2] = np.abs(freq_values[0] - freq_values[-1])/max_freq_res_hz
+                    d[2] = np.abs(freq_values[0] - freq_values[-1]) / max_freq_res_hz
 
                 # Generate evenly-distributed frequency array
-                new_freq, freq_bandw = np.linspace(freq_values[0], freq_values[-1], d[2], retstep=True)
+                new_freq, freq_bandw = np.linspace(
+                    freq_values[0], freq_values[-1], d[2], retstep=True
+                )
 
                 # Perform Regrid
                 new_flux = np.clip(bspline(new_freq), 0, None)
@@ -445,11 +562,13 @@ class SimulationReformatter():
                 values[x, y, :] = new_flux
 
         print("\nRegrid complete.")
-        
+
         return values, voxels
-    
+
     @staticmethod
-    def calculate_cumulative_voxels(voxels, f_ref = 200 * u.MHz, phase_ref_point = omath.ZENITH_530):
+    def calculate_cumulative_voxels(
+        voxels, f_ref=200 * u.MHz, phase_ref_point=omath.ZENITH_530
+    ):
         """
         Calculate the cumulative voxel sum and centre with a refrence point and frequency.
 
@@ -462,19 +581,23 @@ class SimulationReformatter():
 
         # RA, Dec centering function and freq shift function
         def centering(x):
-            """ Add half the total and half the spaxel widths to centre the main point. """
-            return x - np.max(x, axis=(0, 1), keepdims=True)/2 - np.min(x, axis=(0, 1), keepdims=True)/2
+            """Add half the total and half the spaxel widths to centre the main point."""
+            return (
+                x
+                - np.max(x, axis=(0, 1), keepdims=True) / 2
+                - np.min(x, axis=(0, 1), keepdims=True) / 2
+            )
 
         def shifting(x):
-            """ Add only half the cell bandwidth, do not center. """
-            return x - np.min(x, axis=2, keepdims=True)/2
+            """Add only half the cell bandwidth, do not center."""
+            return x - np.min(x, axis=2, keepdims=True) / 2
 
         # Centre the cumulative RA and Dec sums so that the zero value is in the centre
-        rasum = centering(np.cumsum(voxels[:,:,:,0], axis=0))
-        decsum = centering(np.cumsum(voxels[:,:,:,1], axis=1))
+        rasum = centering(np.cumsum(voxels[:, :, :, 0], axis=0))
+        decsum = centering(np.cumsum(voxels[:, :, :, 1], axis=1))
 
         # Centre the frequency
-        freqsum = f_ref.to_value(u.Hz) - shifting(np.cumsum(voxels[:,:,:,2], axis=2))
+        freqsum = f_ref.to_value(u.Hz) - shifting(np.cumsum(voxels[:, :, :, 2], axis=2))
 
         # Calculate phase centre offsets
         source_pos = phase_ref_point.spherical_offsets_by(rasum * u.rad, decsum * u.rad)
@@ -483,10 +606,16 @@ class SimulationReformatter():
 
         return (ras, dcs, freqsum)
 
-        
     @staticmethod
     # TODO: Gaussian source?
-    def save_datacube_to_osm(values, voxels = None, cumulative_voxels = None, f_ref = 200 * u.MHz, phase_ref_point = omath.ZENITH_530, osm_output="reformat/osm_output/osm_output.osm"):
+    def save_datacube_to_osm(
+        values,
+        voxels=None,
+        cumulative_voxels=None,
+        f_ref=200 * u.MHz,
+        phase_ref_point=omath.ZENITH_530,
+        osm_output="reformat/osm_output/osm_output.osm",
+    ):
         """
         Saves a given datacube of flux values and voxel dimensions (RA, Dec, Freq.) to a master OSM file.
 
@@ -508,18 +637,22 @@ class SimulationReformatter():
         osm_output_exp = ofc.expand_path(osm_output)
 
         # Cumulative sums are more important than voxel bins now
-        (ras, dcs, freqsum) = (None, None, None) # Keep Pylint Happy
+        ras, dcs, freqsum = (None, None, None)  # Keep Pylint Happy
         if cumulative_voxels is None and voxels is None:
-            raise ValueError("Either an array of voxels or cumulative voxes must be provided!")
+            raise ValueError(
+                "Either an array of voxels or cumulative voxes must be provided!"
+            )
         elif voxels is None:
-            (ras, dcs, freqsum) = cumulative_voxels
+            ras, dcs, freqsum = cumulative_voxels
         elif cumulative_voxels is None:
-            (ras, dcs, freqsum) = SimulationReformatter.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
-            
+            ras, dcs, freqsum = SimulationReformatter.calculate_cumulative_voxels(
+                voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point
+            )
+
         # Record data to file
         print("Recording data to .osm file")
 
-        with open(osm_output_exp, 'w', encoding='utf-8') as osm:
+        with open(osm_output_exp, "w", encoding="utf-8") as osm:
             # Clear file contents
             osm.truncate(0)
 
@@ -532,47 +665,88 @@ class SimulationReformatter():
             # Write OSM lines
             for x in range(d[0]):
                 for y in range(d[1]):
-                    
+
                     # Accumulate point-specific values in table
                     value_acc = []
-                    
+
                     # Loop through all freq instances
                     for t in range(d[2]):
-                        value_acc.append(np.format_float_scientific(values[x, y, t], 4, False))
-                    
+                        value_acc.append(
+                            np.format_float_scientific(values[x, y, t], 4, False)
+                        )
+
                     # Frequency values
-                    freq_ref = np.format_float_positional(np.mean(freqsum[x, y, :]) / 1e6, 3, False) + "e6"
-                    freq_inc = np.format_float_positional(np.mean(voxels[:,:,:,2]) / 1e3, 3, False) + "e3"
-                        
+                    freq_ref = (
+                        np.format_float_positional(
+                            np.mean(freqsum[x, y, :]) / 1e6, 3, False
+                        )
+                        + "e6"
+                    )
+                    freq_inc = (
+                        np.format_float_positional(
+                            np.mean(voxels[:, :, :, 2]) / 1e3, 3, False
+                        )
+                        + "e3"
+                    )
+
                     # Combine all list entries into a formatted string
-                    value = ofc.print_list(value_acc, ',', '')
+                    value = ofc.print_list(value_acc, ",", "")
 
                     # Format data
-                    rascn = np.char.zfill(np.format_float_positional(ras[x, y, t], 6, False), 10)
-                    decln = np.char.zfill(np.format_float_positional(np.abs(dcs[x, y, t]), 6, False), 9)
+                    rascn = np.char.zfill(
+                        np.format_float_positional(ras[x, y, t], 6, False), 10
+                    )
+                    decln = np.char.zfill(
+                        np.format_float_positional(np.abs(dcs[x, y, t]), 6, False), 9
+                    )
 
                     # Add +/- value to Declinations
-                    if dcs[x, y, t] >= 0: decln = "+" + str(decln)
-                    else:                 decln = "-" + str(decln)
+                    if dcs[x, y, t] >= 0:
+                        decln = "+" + str(decln)
+                    else:
+                        decln = "-" + str(decln)
 
                     # Write to OSM
                     osm.write(
-                        str(rascn)    + " " + # Right Ascension
-                        decln         + " " + # Declination
-                        str(freq_ref) + " " + # Point source frequency START
-                        str(freq_inc) + " " + # Point source frequency INCRM
-                        str(value)    + " " + # Intensity Stokes Parameter
-                        "\n"
+                        str(rascn)
+                        + " "  # Right Ascension
+                        + decln
+                        + " "  # Declination
+                        + str(freq_ref)
+                        + " "  # Point source frequency START
+                        + str(freq_inc)
+                        + " "  # Point source frequency INCRM
+                        + str(value)
+                        + " "  # Intensity Stokes Parameter
+                        + "\n"
                     )
 
-                    print("\rSaving data for spaxel # (", x, ",", y, ")", "of", "(", d[0], ",", d[1], ")", end="")
+                    print(
+                        "\rSaving data for spaxel # (",
+                        x,
+                        ",",
+                        y,
+                        ")",
+                        "of",
+                        "(",
+                        d[0],
+                        ",",
+                        d[1],
+                        ")",
+                        end="",
+                    )
 
-        print("\nProcess complete, data saved to "+osm_output)
+        print("\nProcess complete, data saved to " + osm_output)
 
     # TODO: Automatically find ideal UTC time of observation
     # pylint: disable=unused-argument
     @staticmethod
-    def calculate_observation_time_from_date(phase_ref_point = omath.ZENITH_530, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR):
+    def calculate_observation_time_from_date(
+        phase_ref_point=omath.ZENITH_530,
+        ref_time=omath.REF_TIME,
+        ref_location=omath.SKA_REF_LOC,
+        observation_length=omath.OBS_LEN_4HR,
+    ):
         """
         Calculates the closest ideal observation time from a given UTC date and telescope lattitude.
 
@@ -587,13 +761,26 @@ class SimulationReformatter():
         obs_length_flag = False
 
         if obs_length_flag:
-            warnings.warn("The provided observation time is too long! The object will not be in the sky for the entire duration of time.")
+            warnings.warn(
+                "The provided observation time is too long! The object will not be in the sky for the entire duration of time."
+            )
 
         return ref_time, obs_length_flag
+
     # pylint: enable=unused-argument
 
     @staticmethod
-    def generate_dynamic_settings(values, voxels = None, cumulative_voxels = None, phase_ref_point = omath.ZENITH_530, f_ref = 200 * u.MHz, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, save_dynamic_settings = ""):
+    def generate_dynamic_settings(
+        values,
+        voxels=None,
+        cumulative_voxels=None,
+        phase_ref_point=omath.ZENITH_530,
+        f_ref=200 * u.MHz,
+        ref_time=omath.REF_TIME,
+        ref_location=omath.SKA_REF_LOC,
+        observation_length=omath.OBS_LEN_4HR,
+        save_dynamic_settings="",
+    ):
         """
         Generates a set of dynamically-set ini settings for OSKAR to utilise.
 
@@ -614,13 +801,17 @@ class SimulationReformatter():
 
         # SETUP
         # Cumulative sums are more important than voxel bins now
-        (ras, dcs, freqsum) = (None, None, None) # Keep Pylint Happy
+        ras, dcs, freqsum = (None, None, None)  # Keep Pylint Happy
         if cumulative_voxels is None and voxels is None:
-            raise ValueError("Either an array of voxels or cumulative voxes must be provided!")
+            raise ValueError(
+                "Either an array of voxels or cumulative voxes must be provided!"
+            )
         elif voxels is None:
-            (ras, dcs, freqsum) = cumulative_voxels
+            ras, dcs, freqsum = cumulative_voxels
         elif cumulative_voxels is None:
-            (ras, dcs, freqsum) = SimulationReformatter.calculate_cumulative_voxels(voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point)
+            ras, dcs, freqsum = SimulationReformatter.calculate_cumulative_voxels(
+                voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point
+            )
 
         # Configure d variable
         d = np.shape(values)
@@ -630,47 +821,82 @@ class SimulationReformatter():
 
         # BASIC CONFIG
         # Set starting frequency NB: The last channel has the lowest frequency!
-        dynamic_settings['observation']['start_frequency_hz'] = np.mean(freqsum[:,:,-1])
+        dynamic_settings["observation"]["start_frequency_hz"] = np.mean(
+            freqsum[:, :, -1]
+        )
 
         # Set number of channels and image size
-        dynamic_settings['observation']['num_channels'] = d[2]
-        dynamic_settings['image']['size'] = max(d[0], d[1])
+        dynamic_settings["observation"]["num_channels"] = d[2]
+        dynamic_settings["image"]["size"] = max(d[0], d[1])
 
         # Set the frequency increment
-        dynamic_settings['observation']['frequency_inc_hz'] = np.mean(voxels[:,:,:,2])
+        dynamic_settings["observation"]["frequency_inc_hz"] = np.mean(
+            voxels[:, :, :, 2]
+        )
 
         # Set phase centre RA and Dec
-        dynamic_settings['observation']['phase_centre_ra_deg'] = phase_ref_point.ra.deg
-        dynamic_settings['observation']['phase_centre_dec_deg'] = phase_ref_point.dec.deg
+        dynamic_settings["observation"]["phase_centre_ra_deg"] = phase_ref_point.ra.deg
+        dynamic_settings["observation"][
+            "phase_centre_dec_deg"
+        ] = phase_ref_point.dec.deg
 
         # COORDINATE CONFIG
         # Set image field of view and size
-        ref_time, _ = SimulationReformatter.calculate_observation_time_from_date(phase_ref_point=phase_ref_point, ref_time=ref_time, ref_location=ref_location, observation_length=observation_length)
+        ref_time, _ = SimulationReformatter.calculate_observation_time_from_date(
+            phase_ref_point=phase_ref_point,
+            ref_time=ref_time,
+            ref_location=ref_location,
+            observation_length=observation_length,
+        )
 
         # Calculate RA dimension - use circular mean for angular averages
-        rac = omath.diff(omath.circmean(ras[-1,:,:]), omath.circmean(ras[0,:,:]))
+        rac = omath.diff(omath.circmean(ras[-1, :, :]), omath.circmean(ras[0, :, :]))
 
         # Calculate Dec dimension - use circular mean for angular averages
-        decc = omath.diff(omath.circmean(dcs[-1,:,:], (-180, 180)), omath.circmean(dcs[0,:,:], (-180, 180)))
+        decc = omath.diff(
+            omath.circmean(dcs[-1, :, :], (-180, 180)),
+            omath.circmean(dcs[0, :, :], (-180, 180)),
+        )
 
         # Set the field of view
-        dynamic_settings['image']['fov_deg'] = max(rac, decc)
+        dynamic_settings["image"]["fov_deg"] = max(rac, decc)
 
         # Set the observation time and length
-        dynamic_settings['observation']['start_time_utc'] = (ref_time - observation_length / 2).utc.value
-        dynamic_settings['observation']['length'] = str(observation_length.to_value(format='datetime'))
+        dynamic_settings["observation"]["start_time_utc"] = (
+            ref_time - observation_length / 2
+        ).utc.value
+        dynamic_settings["observation"]["length"] = str(
+            observation_length.to_value(format="datetime")
+        )
 
         # Save the dynamic settings
         if save_dynamic_settings != "":
 
             ofc.save_settings_from_dictionary(save_dynamic_settings, dynamic_settings)
 
-            print("Saved dynamic and default settings to ini file: "+save_dynamic_settings)
-        
+            print(
+                "Saved dynamic and default settings to ini file: "
+                + save_dynamic_settings
+            )
+
         return dynamic_settings
 
     @staticmethod
-    def generate_osm_from_simulation(values, voxels = None, z_ref = 7, phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res = 100 * u.MHz, v = (1.5, 1.5, 1.5), osm_output="reformat/osm_output/osm_output.osm", cosmology=eorcosmo(), save_dynamic_settings = "", ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR):
+    def generate_osm_from_simulation(
+        values,
+        voxels=None,
+        z_ref=7,
+        phase_ref_point=omath.ZENITH_530,
+        require_regrid=True,
+        max_freq_res=100 * u.MHz,
+        v=(1.5, 1.5, 1.5),
+        osm_output="reformat/osm_output/osm_output.osm",
+        cosmology=eorcosmo(),
+        save_dynamic_settings="",
+        ref_time=omath.REF_TIME,
+        ref_location=omath.SKA_REF_LOC,
+        observation_length=omath.OBS_LEN_4HR,
+    ):
         """
         Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -700,19 +926,36 @@ class SimulationReformatter():
             voxels = np.full((*d, 3), v, dtype=np.float64)
 
         # Transform datacube
-        values, voxels, f_ref, regrid_flag = SimulationReformatter.transform_datacube_units(values=values, voxels=voxels, z_ref=z_ref, require_regrid=require_regrid, max_freq_res=max_freq_res, cosmology=cosmology)
+        values, voxels, f_ref, regrid_flag = (
+            SimulationReformatter.transform_datacube_units(
+                values=values,
+                voxels=voxels,
+                z_ref=z_ref,
+                require_regrid=require_regrid,
+                max_freq_res=max_freq_res,
+                cosmology=cosmology,
+            )
+        )
 
         regrid_flag = regrid_flag and (d[2] > 1)
 
         # STEP 7 - Regrid frequency-dimension data if needed
         if regrid_flag:
-            values, voxels = SimulationReformatter.regrid_datacube(values=values, voxels=voxels, max_freq_res=max_freq_res)
+            values, voxels = SimulationReformatter.regrid_datacube(
+                values=values, voxels=voxels, max_freq_res=max_freq_res
+            )
         else:
             print("No Regrid required!")
 
         # STEP 8 - Write data to OSM file
         if osm_output != "":
-            SimulationReformatter.save_datacube_to_osm(values=values, voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point, osm_output=osm_output)
+            SimulationReformatter.save_datacube_to_osm(
+                values=values,
+                voxels=voxels,
+                f_ref=f_ref,
+                phase_ref_point=phase_ref_point,
+                osm_output=osm_output,
+            )
 
         # Output dynamic settings file
         dynamic_settings = SimulationReformatter.generate_dynamic_settings(
@@ -723,13 +966,24 @@ class SimulationReformatter():
             ref_time=ref_time,
             ref_location=ref_location,
             observation_length=observation_length,
-            save_dynamic_settings=save_dynamic_settings
+            save_dynamic_settings=save_dynamic_settings,
         )
 
         return dynamic_settings
-        
+
     @staticmethod
-    def generate_osm_from_h5(file, phase_ref_point = omath.ZENITH_530, require_regrid = True, max_freq_res = 100e6, osm_output="reformat/osm_output/osm_output.osm", coeval=True, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, save_dynamic_settings = ""):
+    def generate_osm_from_h5(
+        file,
+        phase_ref_point=omath.ZENITH_530,
+        require_regrid=True,
+        max_freq_res=100e6,
+        osm_output="reformat/osm_output/osm_output.osm",
+        coeval=True,
+        ref_time=omath.REF_TIME,
+        ref_location=omath.SKA_REF_LOC,
+        observation_length=omath.OBS_LEN_4HR,
+        save_dynamic_settings="",
+    ):
         """
         Combines both the convert_h5_to_csv and generate_osm_from_simulation functions.
 
@@ -746,31 +1000,45 @@ class SimulationReformatter():
         :return dynamic_settings: The dynamically defined settings dictionary.
         """
 
-        values, z_ref, vox, cosmology = SimulationReformatter.convert_h5_to_csv(file, coeval=coeval)
+        values, z_ref, vox, cosmology = SimulationReformatter.convert_h5_to_csv(
+            file, coeval=coeval
+        )
 
-        if osm_output == "": osm_output = file.split('/')[-1][:-3] + "_osm.osm"
+        if osm_output == "":
+            osm_output = file.split("/")[-1][:-3] + "_osm.osm"
 
-        return SimulationReformatter.generate_osm_from_simulation(values,
-                z_ref=z_ref,
-                require_regrid=require_regrid,
-                max_freq_res=max_freq_res,
-                v=vox, osm_output=osm_output,
-                cosmology=cosmology,
-                phase_ref_point=phase_ref_point,
-                ref_time=ref_time,
-                ref_location=ref_location,
-                observation_length=observation_length,
-                save_dynamic_settings=save_dynamic_settings
-                )
-    
+        return SimulationReformatter.generate_osm_from_simulation(
+            values,
+            z_ref=z_ref,
+            require_regrid=require_regrid,
+            max_freq_res=max_freq_res,
+            v=vox,
+            osm_output=osm_output,
+            cosmology=cosmology,
+            phase_ref_point=phase_ref_point,
+            ref_time=ref_time,
+            ref_location=ref_location,
+            observation_length=observation_length,
+            save_dynamic_settings=save_dynamic_settings,
+        )
+
     @staticmethod
-    def convert_osm_file_to_arrays(osm_file, generate_dynamic_settings = True, phase_ref_point_override = None, ref_time = omath.REF_TIME, ref_location = omath.SKA_REF_LOC, observation_length = omath.OBS_LEN_4HR, save_dynamic_settings = "", d = None):
+    def convert_osm_file_to_arrays(
+        osm_file,
+        generate_dynamic_settings=True,
+        phase_ref_point_override=None,
+        ref_time=omath.REF_TIME,
+        ref_location=omath.SKA_REF_LOC,
+        observation_length=omath.OBS_LEN_4HR,
+        save_dynamic_settings="",
+        d=None,
+    ):
         """
         Reverse-engineer an osm file to retreive its values, voxels, f_ref, phase_ref_point, and dynamic settings.
 
         NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending).
         With frequency coming in the form of a list delimited by commas, and columns delimited by spaces.
-        
+
         Example entry of OSM file (first six lines are shown):
         ```
         Format = RaD DecD I ReferenceFrequency LineWidth
@@ -792,7 +1060,7 @@ class SimulationReformatter():
         :param d: The dimensions of the array, if none, the program will assume a cubic values array with side-lengths equal to the floor of the cube root of the number of entries in the OSM file.
 
         :return output_data: The values, voxels, cumulative voxels, f_ref, and phase_ref_point contained in a dictionary.
-        
+
         If generate_dynamic_settings is set to True, additionally return an updated dictionary of settings to provide to OSKAR.
         """
 
@@ -800,12 +1068,14 @@ class SimulationReformatter():
 
         df = pd.read_csv(
             osm_file,
-            delimiter=" ", skiprows=4, index_col=False,
+            delimiter=" ",
+            skiprows=4,
+            index_col=False,
             names=["RA", "Dec", "Stokes I", "Freq0", "Line Width"],
-            converters={key: ofc.split_arr_np for key in split_params}
-            ).explode(split_params)
+            converters={key: ofc.split_arr_np for key in split_params},
+        ).explode(split_params)
 
-        #values, voxels = None, cumulative_voxels = None, phase_ref_point = omath.ZENITH_530, f_ref = 200 * u.MHz
+        # values, voxels = None, cumulative_voxels = None, phase_ref_point = omath.ZENITH_530, f_ref = 200 * u.MHz
         output_data = {
             "values": None,
             "voxels": None,
@@ -816,40 +1086,59 @@ class SimulationReformatter():
 
         # Get dimensions, assumes cubic data shape
         if d is None:
-            d = tuple((np.ones(3, dtype=np.int32) * int(np.floor(np.cbrt(df.shape[0])))).tolist())
+            d = tuple(
+                (
+                    np.ones(3, dtype=np.int32) * int(np.floor(np.cbrt(df.shape[0])))
+                ).tolist()
+            )
 
         # Extract values
         output_data["values"] = np.array(df["Stokes I"]).reshape(d)
 
         # Extract cumulative voxels
-        output_data["cumulative_voxels"] = (np.array(df["RA"]).reshape(d), np.array(df["Dec"]).reshape(d), np.array(df["Freq0"]).reshape(d))
+        output_data["cumulative_voxels"] = (
+            np.array(df["RA"]).reshape(d),
+            np.array(df["Dec"]).reshape(d),
+            np.array(df["Freq0"]).reshape(d),
+        )
 
         # Create temporary values from the cumulative voxels
         temp_values = np.moveaxis(np.array(output_data["cumulative_voxels"]), 0, -1)
 
         # If the phase refrence point is given, override the calculation of the phase refrence point
         if phase_ref_point_override is None:
-            output_data["phase_ref_point"] = SkyCoord(ra=omath.denorm(omath.circmean(temp_values[:,:,:,0]))*u.deg, dec=omath.norm(omath.circmean(temp_values[:,:,:,1], (-180, 180)))*u.deg, frame='icrs') 
+            output_data["phase_ref_point"] = SkyCoord(
+                ra=omath.denorm(omath.circmean(temp_values[:, :, :, 0])) * u.deg,
+                dec=omath.norm(omath.circmean(temp_values[:, :, :, 1], (-180, 180)))
+                * u.deg,
+                frame="icrs",
+            )
         else:
             output_data["phase_ref_point"] = phase_ref_point_override
 
         # Calculate the frequency bin step
-        step = np.mean(temp_values[:,:,0, 2] - temp_values[:,:,1, 2])/2
+        step = np.mean(temp_values[:, :, 0, 2] - temp_values[:, :, 1, 2]) / 2
 
         # Calculate the refrence frequency
-        output_data["f_ref"] = np.mean(temp_values[:,:,0, 2]) + step
+        output_data["f_ref"] = np.mean(temp_values[:, :, 0, 2]) + step
 
         # Begin mutating temp_values
 
         # Shift values based on refrence points
-        temp_values[:,:,:,0] = omath.diff_sgn(temp_values[:,:,:,0], output_data["phase_ref_point"].ra.deg)
-        temp_values[:,:,:,1] = omath.diff_sgn(temp_values[:,:,:,1], output_data["phase_ref_point"].dec.deg)
-        temp_values[:,:,:,2] = output_data["f_ref"] - temp_values[:,:,:,2]
+        temp_values[:, :, :, 0] = omath.diff_sgn(
+            temp_values[:, :, :, 0], output_data["phase_ref_point"].ra.deg
+        )
+        temp_values[:, :, :, 1] = omath.diff_sgn(
+            temp_values[:, :, :, 1], output_data["phase_ref_point"].dec.deg
+        )
+        temp_values[:, :, :, 2] = output_data["f_ref"] - temp_values[:, :, :, 2]
 
         # Calculate the inverse cumulative sum
-        temp_values[:,:,:,0] = np.diff(temp_values[:,:,:,0], prepend=0, axis=0)
-        temp_values[:,:,:,1] = np.diff(temp_values[:,:,:,1], prepend=0, axis=1)
-        temp_values[:,:,:,2] = np.diff(temp_values[:,:,:,2], prepend=-step, axis=2)
+        temp_values[:, :, :, 0] = np.diff(temp_values[:, :, :, 0], prepend=0, axis=0)
+        temp_values[:, :, :, 1] = np.diff(temp_values[:, :, :, 1], prepend=0, axis=1)
+        temp_values[:, :, :, 2] = np.diff(
+            temp_values[:, :, :, 2], prepend=-step, axis=2
+        )
 
         # Extract voxels
         output_data["voxels"] = temp_values
@@ -861,17 +1150,17 @@ class SimulationReformatter():
         # Generate the dynamic settings
         if generate_dynamic_settings:
             dynamic_settings = SimulationReformatter.generate_dynamic_settings(
-                values = output_data["values"],
-                voxels = output_data["voxels"],
-                cumulative_voxels = output_data["cumulative_voxels"],
-                phase_ref_point = output_data["phase_ref_point"],
-                f_ref = output_data["f_ref"] * u.Hz,
+                values=output_data["values"],
+                voxels=output_data["voxels"],
+                cumulative_voxels=output_data["cumulative_voxels"],
+                phase_ref_point=output_data["phase_ref_point"],
+                f_ref=output_data["f_ref"] * u.Hz,
                 ref_time=ref_time,
                 ref_location=ref_location,
                 observation_length=observation_length,
-                save_dynamic_settings=save_dynamic_settings
-                )
+                save_dynamic_settings=save_dynamic_settings,
+            )
 
             return output_data, dynamic_settings
-        
+
         return output_data
