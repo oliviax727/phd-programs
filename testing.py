@@ -13,3 +13,5 @@ from oskareor.oskar_helpers import OSKARHelper as ohelp
 TEMPLATES = { "flat400" }
 
 ldd.reload_all(update_which_templates=TEMPLATES)
+
+ldd.reload_template_sky_models()

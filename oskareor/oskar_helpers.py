@@ -1,6 +1,4 @@
-"""
-The oskar_helpers module contains a series of helper functions and variables for simulation-to-power-spectra pipeline. Requires an existing and robust oskareor.data file in the home directory.
-"""
+"""The oskar_helpers module contains a series of helper functions and variables for simulation-to-power-spectra pipeline. Requires an existing and robust oskareor.data file in the home directory."""
 
 # Mathematics and calculations
 import h5py
@@ -11,16 +9,12 @@ from oskareor.skalow_calc import OSKARFileConfig as ofc
 
 # OSKAR EOR helper class - dependant on ~/oskareor.data
 class OSKARHelper:
-    """
-    Helper functions and constants specific to handling OSKAR and the Reformatter.
-    """
+    """Helper functions and constants specific to handling OSKAR and the Reformatter."""
 
     # Default paths - Primary
     OSKAR_SIF: str = "/oskareor.data/OSKAR-2.12.2-Python3.sif"
     OSKAR_BIN: str = "/oskareor.data/bin/"
-    TELESCOPE: str = (
-        "/oskareor.data/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
-    )
+    TELESCOPE: str = "/oskareor.data/SKA-Low_telescope_models/SKA-Low_AAstar_original_rigid-rotation.tm"
 
     # Default paths - Templates
     TEMPLATE_FILE_TYPE_EXTENSIONS: dict[str, str] = {
@@ -33,11 +27,8 @@ class OSKARHelper:
     }
 
     @staticmethod
-    def default_template_path(
-        template_preset: str, oskar_parent_dir: str = "~", file_type: str = ""
-    ) -> str:
-        """
-        Constructs a default template path.
+    def default_template_path(template_preset: str, oskar_parent_dir: str = "~", file_type: str = "") -> str:
+        """Constructs a default template path.
 
         :param preset: Mock brightness temperature array format. Run SimulationReformatter.display_template_presets for more information.
         :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
@@ -111,9 +102,7 @@ class OSKARHelper:
     PRIMARY_GENERAL_SETTINGS: dict = {"General": {}}
 
     DEFAULT_GENERAL_SETTINGS: dict = (
-        DEFAULT_IMAGER_SETTINGS
-        | DEFAULT_INTERFEROMETER_SETTINGS
-        | PRIMARY_GENERAL_SETTINGS
+        DEFAULT_IMAGER_SETTINGS | DEFAULT_INTERFEROMETER_SETTINGS | PRIMARY_GENERAL_SETTINGS
     )
 
     # Legal settings keywords
@@ -129,11 +118,8 @@ class OSKARHelper:
     # Load yuxiang's h5 data
     # Properties: size = (400, 400, 400) px; voxels = (1.5, 1.5, 1.5) cMPc; z_ref = ~7 (box #1), ~8 (box #2)
     @staticmethod
-    def load_coeval_templates(
-        template_switch: bool, oskar_parent_dir: str = "~"
-    ) -> np.ndarray:
-        """
-        Loads the values for the coeval templates.
+    def load_coeval_templates(template_switch: bool, oskar_parent_dir: str = "~") -> np.ndarray:
+        """Loads the values for the coeval templates.
 
         :param template_switch: If true load template 1, if false load template 2.
         :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
@@ -155,8 +141,7 @@ class OSKARHelper:
 
     @staticmethod
     def select_option(options: dict, selection: str) -> dict:
-        """
-        Select an option from an option dictionary.
+        """Select an option from an option dictionary.
 
         :param options (dict): The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
         :param selection (str): The option to select. If empty return the whole option dictionary.
@@ -174,11 +159,8 @@ class OSKARHelper:
         raise ValueError("Option " + selection + " is not a valid option.")
 
     @staticmethod
-    def display_options(
-        options: dict, selection: str = "", print_options: bool = True
-    ) -> dict:
-        """
-        Select and/or display option(s) from an option dictionary.
+    def display_options(options: dict, selection: str = "", print_options: bool = True) -> dict:
+        """Select and/or display option(s) from an option dictionary.
 
         :param options (dict): The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
         :param selection (str): The option to select. If empty return the whole option dictionary.

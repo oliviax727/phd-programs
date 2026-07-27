@@ -1,6 +1,4 @@
-"""
-The oskar_helpers module contains a series of helper functions that handle the basic mathematical and computer methods involved in the oskareor.data module.
-"""
+"""The oskar_helpers module contains a series of helper functions that handle the basic mathematical and computer methods involved in the oskareor.data module."""
 
 # System imports
 import os
@@ -25,16 +23,12 @@ from scipy.stats import circmean as circmean_radians
 
 
 class SKAMath:
-    """
-    Mathematical helper functions for various calculations used throughout the document. All angle units are in radians unless if otherwise specified.
-    """
+    """Mathematical helper functions for various calculations used throughout the document. All angle units are in radians unless if otherwise specified."""
 
     # Retreive SKA Location from astropy server, if it fails, return the default Earth Location
     @staticmethod
     def get_ska_location() -> EarthLocation:
-        """
-        Gets the EarthLocation object for the SKA (or MWA).
-        """
+        """Gets the EarthLocation object for the SKA (or MWA)."""
 
         ska_location = None
 
@@ -44,9 +38,7 @@ class SKAMath:
             try:
                 ska_location = EarthLocation.of_site("MWA")
             except USE:
-                ska_location = EarthLocation.from_geodetic(
-                    lon=-117 * u.deg, lat=-27 * u.deg
-                )
+                ska_location = EarthLocation.from_geodetic(lon=-117 * u.deg, lat=-27 * u.deg)
 
         return ska_location
 
@@ -54,19 +46,13 @@ class SKAMath:
     SKA_REF_LOC: EarthLocation = get_ska_location()
     OBS_LEN_4HR: TimeDelta = TimeDelta(4 * u.hr)
     REF_TIME: Time = Time(val="2025-03-03T05:30:00.00", format="isot", scale="utc")
-    ZENITH_530: SkyCoord = SkyCoord(
-        ra=0 * u.deg, dec=-27 * u.deg, frame="icrs"
-    )  # SKA-Low Zenith at 5:30 am 2025-03-03
-    ZERO_RADEC: SkyCoord = SkyCoord(
-        ra=0 * u.deg, dec=0 * u.deg, frame="icrs"
-    )  # Centre RA/dec
+    ZENITH_530: SkyCoord = SkyCoord(ra=0 * u.deg, dec=-27 * u.deg, frame="icrs")  # SKA-Low Zenith at 5:30 am 2025-03-03
+    ZERO_RADEC: SkyCoord = SkyCoord(ra=0 * u.deg, dec=0 * u.deg, frame="icrs")  # Centre RA/dec
 
     # Astropy unit constants
     FREQ_21CM: Quantity = 1.420405751768e9 * u.Hz
     WLEN_21CM: Quantity = (c.c / FREQ_21CM).to(u.cm)
-    SIGMA_F: Quantity = (np.sqrt(c.k_B / (1.008 * c.u * WLEN_21CM**2))).to(
-        u.Hz * u.K**-0.5
-    )
+    SIGMA_F: Quantity = (np.sqrt(c.k_B / (1.008 * c.u * WLEN_21CM**2))).to(u.Hz * u.K**-0.5)
 
     # Unitless quantities
     SIGMA_F_FLOAT: float = SIGMA_F.to_value(u.Hz * u.K ** (-1 / 2))
@@ -109,11 +95,7 @@ class SKAMath:
         return (
             SKAMath.norm(SKAMath.delta(a, b) - 360)
             if (SKAMath.delta(a, b)) > 180
-            else (
-                (SKAMath.delta(a, b) + 360)
-                if SKAMath.delta(a, b) < -180
-                else SKAMath.delta(a, b)
-            )
+            else ((SKAMath.delta(a, b) + 360) if SKAMath.delta(a, b) < -180 else SKAMath.delta(a, b))
         )
 
     signed_angle_difference = np.vectorize(signed_angle_difference)
@@ -135,9 +117,7 @@ class SKAMath:
 
     # Normal, sinusoid, and sinc functions for convenience
     @staticmethod
-    def normal(
-        x: float, mean: float = 0, var: float = 1, amp: float = np.sqrt(2 * np.pi)
-    ) -> float:
+    def normal(x: float, mean: float = 0, var: float = 1, amp: float = np.sqrt(2 * np.pi)) -> float:
         """A simple normal distribution function."""
         return amp * np.exp(-((x - mean) ** 2) / (2 * var)) / np.sqrt(2 * np.pi * var)
 
@@ -175,10 +155,9 @@ class SKAMath:
 
     # l, m, n to RA, dec
     @staticmethod
-    def lm_to_radec(
-        l: float, m: float, phase_centre: SkyCoord = ZERO_RADEC
-    ) -> list[float]:
+    def lm_to_radec(l: float, m: float, phase_centre: SkyCoord = ZERO_RADEC) -> list[float]:
         """Convert the l, m plane coordinates to RA and dec."""
+
         d0 = phase_centre.dec.to_value(u.rad)
         a0 = phase_centre.ra.to_value(u.rad)
         n = np.sqrt(1 - l**2 - m**2)
@@ -190,8 +169,7 @@ class SKAMath:
 
 
 class EoRCosmology:
-    """
-    Defines a specific cosmological model for other classes to refer to. Assumes a flat universe.
+    """Defines a specific cosmological model for other classes to refer to. Assumes a flat universe.
 
     :param h0 (Quantity): The Hubble constant.
     :param omega_m_0 (float): The dimensionless matter density.
@@ -234,9 +212,7 @@ class EoRCosmology:
 
 
 class OSKARFileConfig:
-    """
-    The OSKARFileConfig class contains helper functions specifically relating to directory and file management.
-    """
+    """The OSKARFileConfig class contains helper functions specifically relating to directory and file management."""
 
     @staticmethod
     def expand_path(path: str) -> str:
@@ -272,22 +248,17 @@ class OSKARFileConfig:
 
     @staticmethod
     def find_replace_line(file_name: str, find_line: str, replace_line: str):
-        """
-        Replace a given line in a settings.ini file given the line is equal to a special string.
+        """Replace a given line in a settings.ini file given the line is equal to a special string.
 
         :param file (str): The file to perform the find-and-replace.
         :param find_line (str): The special keyword to trigger a replace.
         :param replace_line (str): The line to replace the preset.
         """
 
-        with open(
-            OSKARFileConfig.expand_path(file_name), "r", encoding="utf-8"
-        ) as file:
+        with open(OSKARFileConfig.expand_path(file_name), "r", encoding="utf-8") as file:
             lines = file.readlines()
 
-        with open(
-            OSKARFileConfig.expand_path(file_name), "w", encoding="utf-8"
-        ) as file:
+        with open(OSKARFileConfig.expand_path(file_name), "w", encoding="utf-8") as file:
             for line in lines:
                 if line.startswith(find_line):
                     file.write(replace_line + "\n")
@@ -296,8 +267,7 @@ class OSKARFileConfig:
 
     @staticmethod
     def read_settings_to_dictionary(file: str) -> dict:
-        """
-        Convert a settings ini file into a dictionary using configparser.
+        """Convert a settings ini file into a dictionary using configparser.
 
         :param file (str): The specific ini file to read.
 
@@ -312,8 +282,7 @@ class OSKARFileConfig:
 
     @staticmethod
     def save_settings_from_dictionary(file: str, settings_dict: dict):
-        """
-        Save a dictionary contents as an ini file using configparser.
+        """Save a dictionary contents as an ini file using configparser.
 
         :param file (str): The specific ini file to save the data to.
         :param settings_dict (dict): The settings in the form of a dictionary.
@@ -322,9 +291,7 @@ class OSKARFileConfig:
         config = cfp.ConfigParser()
         config.read_dict(settings_dict)
 
-        with open(
-            OSKARFileConfig.expand_path(file), "w", encoding="utf-8"
-        ) as settings_file:
+        with open(OSKARFileConfig.expand_path(file), "w", encoding="utf-8") as settings_file:
             config.write(settings_file, space_around_delimiters=False)
 
     @staticmethod
@@ -354,6 +321,4 @@ class OSKARFileConfig:
         dtype: np.dtype | str = np.object_,
     ) -> np.ndarray:
         """Parses a string into a numpy array."""
-        return np.array(
-            OSKARFileConfig.split_arr(arrstr, delimiter, padding), dtype=dtype
-        )
+        return np.array(OSKARFileConfig.split_arr(arrstr, delimiter, padding), dtype=dtype)

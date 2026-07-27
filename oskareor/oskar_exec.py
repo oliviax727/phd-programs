@@ -1,6 +1,4 @@
-"""
-The oskar_exec module contains all funtions that help to automate the execution of OSKAR - converting sky models to measurement sets and images for the analysis of simulated SKA observations.
-"""
+"""The oskar_exec module contains all funtions that help to automate the execution of OSKAR - converting sky models to measurement sets and images for the analysis of simulated SKA observations."""
 
 # System imports
 import os
@@ -27,9 +25,7 @@ from oskareor.reformatter import SimulationReformatter as simref
 
 
 class BTAnalysisPipeline:
-    """
-    A broader class that combines all components of the individual components of the simulated IGM to simulated observation pipeline together.
-    """
+    """A broader class that combines all components of the individual components of the simulated IGM to simulated observation pipeline together."""
 
     @staticmethod
     def configure_oskar_settings(
@@ -38,8 +34,7 @@ class BTAnalysisPipeline:
         imager_settings_override="",
         save_ini="",
     ):
-        """
-        Configure the settings files for the OSKAR interferometer and imager programs.
+        """Configure the settings files for the OSKAR interferometer and imager programs.
 
         :param osm_file: File path to the existing OSM file
         :param dynamic_settings: Dynamically generated settings from the reformatting code.
@@ -59,14 +54,10 @@ class BTAnalysisPipeline:
 
         # Setup the interferometer ini file
         if interferometer_settings_override != "":
-            dynamic_settings = mutate_settings(
-                interferometer_settings_override, dynamic_settings
-            )
+            dynamic_settings = mutate_settings(interferometer_settings_override, dynamic_settings)
 
         if imager_settings_override != "":
-            dynamic_settings = mutate_settings(
-                imager_settings_override, dynamic_settings
-            )
+            dynamic_settings = mutate_settings(imager_settings_override, dynamic_settings)
 
         if save_ini != "":
             ofc.save_settings_from_dictionary(save_ini, dynamic_settings)
@@ -75,8 +66,7 @@ class BTAnalysisPipeline:
 
     @staticmethod
     def split_general_settings(settings=("", None), use_imager=True, save_file=True):
-        """
-        Split a settings dictionary into its components for the OSKAR interferometer and OSKAR imager.
+        """Split a settings dictionary into its components for the OSKAR interferometer and OSKAR imager.
 
         :param settings: A tuple containing a filepath and dictionary, the code will always prioritise using an evaluation the dictionary if available.
         :param use_imager: Whether to create a seperate imager file path and settings dictionary pair.
@@ -101,14 +91,10 @@ class BTAnalysisPipeline:
 
         # Make sure that the settings exists before splitting
         if not gen_dict is None:
-            interf_settings_dict = {
-                k: gen_dict[k] for k in ohelp.LEGAL_INTERFEROMETER_HEADINGS
-            }
+            interf_settings_dict = {k: gen_dict[k] for k in ohelp.LEGAL_INTERFEROMETER_HEADINGS}
 
             if use_imager:
-                imager_settings_dict = {
-                    k: gen_dict[k] for k in ohelp.LEGAL_IMAGER_HEADINGS
-                }
+                imager_settings_dict = {k: gen_dict[k] for k in ohelp.LEGAL_IMAGER_HEADINGS}
 
         # Remove ini file name, keep containing directory path and base preset name
         gen_file = gen_file[:-21]
@@ -117,16 +103,12 @@ class BTAnalysisPipeline:
         if gen_file != "" and save_file:
             interf_settings_path = gen_file + "_oskar_sim_interferometer.ini"
 
-            ofc.save_settings_from_dictionary(
-                interf_settings_path, interf_settings_dict
-            )
+            ofc.save_settings_from_dictionary(interf_settings_path, interf_settings_dict)
 
             if use_imager:
                 imager_settings_path = gen_file + "_oskar_imager.ini"
 
-                ofc.save_settings_from_dictionary(
-                    imager_settings_path, imager_settings_dict
-                )
+                ofc.save_settings_from_dictionary(imager_settings_path, imager_settings_dict)
 
         return (interf_settings_path, interf_settings_dict), (
             imager_settings_path,
@@ -144,8 +126,7 @@ class BTAnalysisPipeline:
         convert_uvfits=True,
         uvfits_out="BTA/uvw_out.uvfits",
     ):
-        """
-        Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the SimulationReformatter object.
+        """Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the SimulationReformatter object.
 
         :param osm_file: Directory containing the OSM files to be imaged.
         :param interferometer_settings: A tuple containing the file path to the OSKAR interferometer settings file and the interferometer settings dictionary.
@@ -197,13 +178,9 @@ class BTAnalysisPipeline:
             print(f"Attempting to run the command - $ {shell_command}")
 
             try:
-                subprocess.run(
-                    shell_command, check=True, shell=True, stderr=subprocess.PIPE
-                )  # stdout=subprocess.PIPE
+                subprocess.run(shell_command, check=True, shell=True, stderr=subprocess.PIPE)  # stdout=subprocess.PIPE
             except subprocess.CalledProcessError as e:
-                print(
-                    f"Command '{e.cmd}' returned non-zero exit status {e.returncode}."
-                )
+                print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
                 print(f"Error output: {e.stderr.decode()}")
 
         # Run OSKAR's interferometer simulation
@@ -225,9 +202,7 @@ class BTAnalysisPipeline:
                 ]
             )
         elif oskar_mode == "binary":
-            execute_oskar_shell_command(
-                [oskar_exec + "/oskar_sim_interferometer", settings[0]]
-            )
+            execute_oskar_shell_command([oskar_exec + "/oskar_sim_interferometer", settings[0]])
 
         # Run OSKAR's imager simulation
         if use_imager:
@@ -266,8 +241,7 @@ class BTAnalysisPipeline:
         imager_settings_override="",
         template=False,
     ):
-        """
-        Sets up the operating directory from which all anaysis will be done.
+        """Sets up the operating directory from which all anaysis will be done.
 
         :param oskar_telescope_model: The telescope model for OSKAR to use.
         :param h5_file: The location of the h5 file.
@@ -289,9 +263,7 @@ class BTAnalysisPipeline:
 
         # Move h5 file and INIs to directory
         if not template and h5_file != "":
-            subprocess.run(
-                ["cp", ofc.expand_path(h5_file), "BTA/analysis.h5"], check=True
-            )
+            subprocess.run(["cp", ofc.expand_path(h5_file), "BTA/analysis.h5"], check=True)
             default_return[0] = "BTA/analysis.h5"
 
         if interferometer_settings_override != "":
@@ -337,8 +309,7 @@ class BTAnalysisPipeline:
         convert_uvfits=True,
         uvfits_loc="BTA/uvw_out.uvfits",
     ):
-        """
-        Finishes and cleans up the mess created by the BTA class.
+        """Finishes and cleans up the mess created by the BTA class.
 
         :param outpath: A tuple containing the output path of the: sim.ms file, vis file, image FITS file, and uvfits file.
         :param use_imager: Whether or not copy any existing imager FITS file.
@@ -375,21 +346,15 @@ class BTAnalysisPipeline:
 
             # Move vis file to directory
             if outpath[1] != "":
-                subprocess.run(
-                    ["mv", "-f", original_locations[1], outpath[1]], check=True
-                )
+                subprocess.run(["mv", "-f", original_locations[1], outpath[1]], check=True)
 
             # Move image fits file to directory
             if outpath[2] != "" and use_imager:
-                subprocess.run(
-                    ["mv", "-f", original_locations[2], outpath[2]], check=True
-                )
+                subprocess.run(["mv", "-f", original_locations[2], outpath[2]], check=True)
 
             # Move uvfits file to directory
             if outpath[3] != "" and convert_uvfits:
-                subprocess.run(
-                    ["mv", "-f", original_locations[3], outpath[3]], check=True
-                )
+                subprocess.run(["mv", "-f", original_locations[3], outpath[3]], check=True)
 
         except subprocess.CalledProcessError as e:
             print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
@@ -422,8 +387,7 @@ class BTAnalysisPipeline:
         oskar_parent_dir="~",
         convert_uvfits=True,
     ):
-        """
-        Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
+        """Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
 
         :param file: Location of the h5 file.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
@@ -459,14 +423,12 @@ class BTAnalysisPipeline:
             template_preset = file.split("/")[-1][:-4]
 
         print("Setting up BTA directory ...")
-        h5_file, interf_override_ini, imager_override_ini, _, _ = (
-            BTAnalysisPipeline.setup_bta_dir(
-                oskar_telescope_model=oskar_telescope_model,
-                h5_file=file,
-                interferometer_settings_override=interferometer_settings_override,
-                imager_settings_override=imager_settings_override,
-                template=template_flag,
-            )
+        h5_file, interf_override_ini, imager_override_ini, _, _ = BTAnalysisPipeline.setup_bta_dir(
+            oskar_telescope_model=oskar_telescope_model,
+            h5_file=file,
+            interferometer_settings_override=interferometer_settings_override,
+            imager_settings_override=imager_settings_override,
+            template=template_flag,
         )
 
         # Create output file locations
@@ -483,9 +445,7 @@ class BTAnalysisPipeline:
                 if template_flag:
                     # IF we want to generate a fresh osm file AND its from a template
                     print("Generating OSM files from template ...")
-                    template_values = simref.mock_values(
-                        template_preset, oskar_parent_dir=oskar_parent_dir
-                    )
+                    template_values = simref.mock_values(template_preset, oskar_parent_dir=oskar_parent_dir)
                     dynamic_settings = simref.generate_osm_from_simulation(
                         template_values,
                         phase_ref_point=phase_ref_point,
@@ -547,9 +507,7 @@ class BTAnalysisPipeline:
                     dynamic_settings = ofc.read_settings_to_dictionary(ini_output)
                 else:
                     # IF we want to skip generating the osm file AND a use a specified already-complete osm file
-                    subprocess.run(
-                        ["cp", ofc.expand_path(file), osm_output], check=True
-                    )
+                    subprocess.run(["cp", ofc.expand_path(file), osm_output], check=True)
 
                     _, dynamic_settings = simref.convert_osm_file_to_arrays(
                         osm_output,
@@ -570,12 +528,10 @@ class BTAnalysisPipeline:
         )
 
         # Split the current settings files and retreive specific files
-        interferometer_settings, imager_settings = (
-            BTAnalysisPipeline.split_general_settings(
-                settings=(ini_output, dynamic_settings),
-                use_imager=use_imager,
-                save_file=True,
-            )
+        interferometer_settings, imager_settings = BTAnalysisPipeline.split_general_settings(
+            settings=(ini_output, dynamic_settings),
+            use_imager=use_imager,
+            save_file=True,
         )
 
         # Run OSKAR
@@ -602,9 +558,7 @@ class BTAnalysisPipeline:
 
 
 class LoadDefaults:
-    """
-    A module for refreshing and reloading templates. By default all relevant files for all relevant templates will be reloaded.
-    The list of available templates are found in the `TEMPLATES` set and the list of available file outputs are found in the `FILETYPES` set.
+    """A module for refreshing and reloading templates. By default all relevant files for all relevant templates will be reloaded. The list of available templates are found in the `TEMPLATES` set and the list of available file outputs are found in the `FILETYPES` set.
 
     NB: Note that each fits datacube will take a large quantity of space on disk >10 GB.
     """
@@ -614,9 +568,7 @@ class LoadDefaults:
     FILETYPES = {"osm", "ini", "ms", "vis", "fits", "uvfits"}
 
     @staticmethod
-    def reload_template_sky_models(
-        update_which_files=None, update_which_templates=None, oskar_parent_dir="~"
-    ):
+    def reload_template_sky_models(update_which_files=None, update_which_templates=None, oskar_parent_dir="~"):
         """
         (Re)load all default sky models and update corresponding ini and osm files.
 
@@ -638,13 +590,9 @@ class LoadDefaults:
         # Loop through all selected templates
         for template_preset_loop in update_which_templates:
             if "coeval" in template_preset_loop:
-                template_value = simref.mock_values(
-                    template_preset_loop, oskar_parent_dir=oskar_parent_dir
-                )
+                template_value = simref.mock_values(template_preset_loop, oskar_parent_dir=oskar_parent_dir)
             else:
-                template_value = simref.mock_values(
-                    template_preset_loop, scale=20, oskar_parent_dir=oskar_parent_dir
-                )
+                template_value = simref.mock_values(template_preset_loop, scale=20, oskar_parent_dir=oskar_parent_dir)
 
             simref.generate_osm_from_simulation(
                 template_value,
@@ -675,8 +623,7 @@ class LoadDefaults:
         update_which_templates=None,
         oskar_parent_dir="~",
     ):
-        """
-        (Re)load all default sky models and update corresponding measurement sets, visibility tables, and fits datacube files.
+        """(Re)load all default sky models and update corresponding measurement sets, visibility tables, and fits datacube files.
 
         :param start_from_scratch: If true, run the all templates from scratch, and automatically generate the osms and sky models. This will not update the sky models in the template folder.
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
@@ -746,11 +693,8 @@ class LoadDefaults:
             )
 
     @staticmethod
-    def reload_all(
-        update_which_files=None, update_which_templates=None, oskar_parent_dir="~"
-    ):
-        """
-        (Re)load all default sky models and update the corresponding sky models, settings files, measurement sets, visibility tables, and fits datacubes.
+    def reload_all(update_which_files=None, update_which_templates=None, oskar_parent_dir="~"):
+        """(Re)load all default sky models and update the corresponding sky models, settings files, measurement sets, visibility tables, and fits datacubes.
 
         :param use_imager: Whether or not to also generate a datacube of the template file (note that each fits datacube will take a large quantity of space on disk >10 GB).
         :param update_which_files: A set containing all of the file types to be updated, see `FILETYPES` for what is available (and used as a default).
@@ -776,11 +720,7 @@ class LoadDefaults:
                 update_which_templates=update_which_templates,
                 oskar_parent_dir=oskar_parent_dir,
             )
-        if (
-            "ms" in update_which_files
-            or "vis" in update_which_files
-            or "fits" in update_which_files
-        ):
+        if "ms" in update_which_files or "vis" in update_which_files or "fits" in update_which_files:
             LoadDefaults.reload_template_oskar_sims(
                 update_which_files=update_which_files,
                 update_which_templates=update_which_templates,
@@ -790,8 +730,7 @@ class LoadDefaults:
     # TODO: Compile the ~/oskareor.data directory with the ./oskareor directory into one github project
     @staticmethod
     def setup_oskareor_data_blank(oskar_parent_dir="~"):
-        """
-        Setup the oskareor directory.
+        """Setup the oskareor directory.
 
         :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         """
