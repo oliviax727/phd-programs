@@ -28,7 +28,7 @@ rm -rf ../2dps_png_templates/*
 mkdir -p ../2dps_npz_templates
 rm -rf ../2dps_npz_templates/*
 
-chips_files=(/scratch/mwaeor/ohrw/uvfits_templates/*)
+chips_files=(/scratch/mwaeor/ohrw/active_uvfits/*)
 
 for template_file in "${chips_files[@]}"; do
 
