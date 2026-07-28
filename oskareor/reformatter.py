@@ -17,11 +17,7 @@ from scipy.interpolate import make_interp_spline as misp
 from astropy.coordinates import SkyCoord
 
 # Local imports
-from oskareor.skalow_calc import (
-    EoRCosmology as eorcosmo,
-    SKAMath as omath,
-    OSKARFileConfig as ofc,
-)
+from oskareor.skalow_calc import EoRCosmology as eorcosmo, SKAMath as omath, FileManager as ofmg, SKAString as ostr
 from oskareor.oskar_helpers import OSKARHelper as ohelp
 
 
@@ -591,7 +587,7 @@ class SimulationReformatter:
         d = np.shape(values)
 
         # Configure OSM path
-        osm_output_exp = ofc.expand_path(osm_output)
+        osm_output_exp = ofmg.expand_path(osm_output)
 
         # Cumulative sums are more important than voxel bins now
         ras, dcs, freqsum = (None, None, None)  # Keep Pylint Happy
@@ -633,7 +629,7 @@ class SimulationReformatter:
                     freq_inc = np.format_float_positional(np.mean(voxels[:, :, :, 2]) / 1e3, 3, False) + "e3"
 
                     # Combine all list entries into a formatted string
-                    value = ofc.print_list(value_acc, ",", "")
+                    value = ostr.print_list(value_acc, ",", "")
 
                     # Format data
                     rascn = np.char.zfill(np.format_float_positional(ras[x, y, t], 6, False), 10)
@@ -777,7 +773,7 @@ class SimulationReformatter:
         # Save the dynamic settings
         if save_dynamic_settings != "":
 
-            ofc.save_settings_from_dictionary(save_dynamic_settings, dynamic_settings)
+            ofmg.save_settings_from_dictionary(save_dynamic_settings, dynamic_settings)
 
             print("Saved dynamic and default settings to ini file: " + save_dynamic_settings)
 
@@ -967,7 +963,7 @@ class SimulationReformatter:
             skiprows=4,
             index_col=False,
             names=["RA", "Dec", "Freq0", "FreqI", "Stokes I"],
-            converters={key: ofc.split_arr_np for key in split_params},
+            converters={key: ostr.split_arr_np for key in split_params},
         ).explode(split_params)
 
         # values, voxels = None, cumulative_voxels = None, phase_ref_point = omath.ZENITH_530, f_ref = 200 * u.MHz

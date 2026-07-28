@@ -4,9 +4,6 @@
 import os
 import subprocess
 
-# Proprietary software
-from pyuvdata import UVData
-
 # Mathematics and calculations
 import astropy.units as u
 import numpy as np
@@ -15,7 +12,7 @@ import numpy as np
 from astropy.units import Quantity
 
 # Local imports
-from oskareor.skalow_calc import OSKARFileConfig as ofc, SKAMath as omath
+from oskareor.skalow_calc import FileManager as ofmg, SKAMath as omath, SKAString as ostr
 from oskareor.oskar_helpers import OSKARHelper as ohelp
 from oskareor.reformatter import SimulationReformatter as simref
 
@@ -48,7 +45,7 @@ class BTAnalysisPipeline:
 
         # Function to mutate the existing dynamic settings dictionary
         def mutate_settings(override_file, settings_dict):
-            override_data = ofc.read_settings_to_dictionary(override_file)
+            override_data = ofmg.read_settings_to_dictionary(override_file)
 
             return settings_dict | override_data | ohelp.PRIMARY_GENERAL_SETTINGS
 
@@ -60,7 +57,7 @@ class BTAnalysisPipeline:
             dynamic_settings = mutate_settings(imager_settings_override, dynamic_settings)
 
         if save_ini != "":
-            ofc.save_settings_from_dictionary(save_ini, dynamic_settings)
+            ofmg.save_settings_from_dictionary(save_ini, dynamic_settings)
 
         return dynamic_settings
 
@@ -87,7 +84,7 @@ class BTAnalysisPipeline:
 
         # If file is provided but not a dictionary, read the file
         if gen_dict is None and gen_file != "":
-            gen_dict = ofc.read_settings_to_dictionary(gen_file)
+            gen_dict = ofmg.read_settings_to_dictionary(gen_file)
 
         # Make sure that the settings exists before splitting
         if not gen_dict is None:
@@ -103,12 +100,12 @@ class BTAnalysisPipeline:
         if gen_file != "" and save_file:
             interf_settings_path = gen_file + "_oskar_sim_interferometer.ini"
 
-            ofc.save_settings_from_dictionary(interf_settings_path, interf_settings_dict)
+            ofmg.save_settings_from_dictionary(interf_settings_path, interf_settings_dict)
 
             if use_imager:
                 imager_settings_path = gen_file + "_oskar_imager.ini"
 
-                ofc.save_settings_from_dictionary(imager_settings_path, imager_settings_dict)
+                ofmg.save_settings_from_dictionary(imager_settings_path, imager_settings_dict)
 
         return (interf_settings_path, interf_settings_dict), (
             imager_settings_path,
@@ -156,11 +153,11 @@ class BTAnalysisPipeline:
 
         if oskar_mode != "python":
             # Expand path if not python
-            settings[0] = ofc.expand_path(interferometer_settings[0])
-            oskar_exec = ofc.expand_path(oskar_exec)
+            settings[0] = ofmg.expand_path(interferometer_settings[0])
+            oskar_exec = ofmg.expand_path(oskar_exec)
 
             if use_imager:
-                settings[1] = ofc.expand_path(imager_settings[0])
+                settings[1] = ofmg.expand_path(imager_settings[0])
 
         else:
             # Copy dictionary if python
@@ -229,9 +226,7 @@ class BTAnalysisPipeline:
         # Converting to UVFits
         if convert_uvfits:
             print("Converting to UVFits")
-            uv = UVData()
-            uv.read_ms(ms_dir, ignore_single_chan=False)
-            uv.write_uvfits(uvfits_out)
+            ofmg.convert_ms_to_uvfits(ms_dir=ms_dir, uvfits_file=uvfits_out)
 
     @staticmethod
     def setup_bta_dir(
@@ -263,14 +258,14 @@ class BTAnalysisPipeline:
 
         # Move h5 file and INIs to directory
         if not template and h5_file != "":
-            subprocess.run(["cp", ofc.expand_path(h5_file), "BTA/analysis.h5"], check=True)
+            subprocess.run(["cp", ofmg.expand_path(h5_file), "BTA/analysis.h5"], check=True)
             default_return[0] = "BTA/analysis.h5"
 
         if interferometer_settings_override != "":
             subprocess.run(
                 [
                     "cp",
-                    ofc.expand_path(interferometer_settings_override),
+                    ofmg.expand_path(interferometer_settings_override),
                     "BTA/interferometer_override.ini",
                 ],
                 check=True,
@@ -281,7 +276,7 @@ class BTAnalysisPipeline:
             subprocess.run(
                 [
                     "cp",
-                    ofc.expand_path(imager_settings_override),
+                    ofmg.expand_path(imager_settings_override),
                     "BTA/imager_override.ini",
                 ],
                 check=True,
@@ -292,7 +287,7 @@ class BTAnalysisPipeline:
             [
                 "cp",
                 "-r",
-                ofc.expand_path(oskar_telescope_model),
+                ofmg.expand_path(oskar_telescope_model),
                 "BTA/telescope_model.tm",
             ],
             check=True,
@@ -332,10 +327,10 @@ class BTAnalysisPipeline:
                 uvfits_loc,
             ]
         )
-        original_locations = tuple(map(ofc.expand_path, original_locations))
+        original_locations = tuple(map(ofmg.expand_path, original_locations))
 
         # Convert outpath string
-        outpath = tuple(map(ofc.expand_path, outpath))
+        outpath = tuple(map(ofmg.expand_path, outpath))
 
         # Wrap in try-catch just in case oskar stops working
         try:
@@ -433,8 +428,8 @@ class BTAnalysisPipeline:
 
         # Create output file locations
         h5_id = file.split("/")[-1][:-3] if not template_flag else template_preset
-        osm_output = ofc.expand_path("BTA/sky_model.osm")
-        ini_output = ofc.expand_path("BTA/" + h5_id + "_general_settings.ini")
+        osm_output = ofmg.expand_path("BTA/sky_model.osm")
+        ini_output = ofmg.expand_path("BTA/" + h5_id + "_general_settings.ini")
 
         # Set the default dynamic settings array
         dynamic_settings = ohelp.DEFAULT_GENERAL_SETTINGS
@@ -478,7 +473,7 @@ class BTAnalysisPipeline:
                     subprocess.run(
                         [
                             "cp",
-                            ofc.expand_path(
+                            ofmg.expand_path(
                                 ohelp.default_template_path(
                                     template_preset=template_preset,
                                     oskar_parent_dir=oskar_parent_dir,
@@ -492,7 +487,7 @@ class BTAnalysisPipeline:
                     subprocess.run(
                         [
                             "cp",
-                            ofc.expand_path(
+                            ofmg.expand_path(
                                 ohelp.default_template_path(
                                     template_preset=template_preset,
                                     oskar_parent_dir=oskar_parent_dir,
@@ -504,10 +499,10 @@ class BTAnalysisPipeline:
                         check=True,
                     )
 
-                    dynamic_settings = ofc.read_settings_to_dictionary(ini_output)
+                    dynamic_settings = ofmg.read_settings_to_dictionary(ini_output)
                 else:
                     # IF we want to skip generating the osm file AND a use a specified already-complete osm file
-                    subprocess.run(["cp", ofc.expand_path(file), osm_output], check=True)
+                    subprocess.run(["cp", ofmg.expand_path(file), osm_output], check=True)
 
                     _, dynamic_settings = simref.convert_osm_file_to_arrays(
                         osm_output,
@@ -584,8 +579,8 @@ class LoadDefaults:
             update_which_templates = LoadDefaults.TEMPLATES
 
         # Set update_which parameters to be lower case
-        update_which_files = ofc.recase_iterable(update_which_files)
-        update_which_templates = ofc.recase_iterable(update_which_templates)
+        update_which_files = ostr.recase_iterable(update_which_files)
+        update_which_templates = ostr.recase_iterable(update_which_templates)
 
         # Loop through all selected templates
         for template_preset_loop in update_which_templates:
@@ -639,8 +634,8 @@ class LoadDefaults:
             update_which_templates = LoadDefaults.TEMPLATES
 
         # Set update_which parameters to be lower case
-        update_which_files = ofc.recase_iterable(update_which_files)
-        update_which_templates = ofc.recase_iterable(update_which_templates)
+        update_which_files = ostr.recase_iterable(update_which_files)
+        update_which_templates = ostr.recase_iterable(update_which_templates)
 
         # Loop through all selected templates
         for template_preset_loop in update_which_templates:
@@ -710,8 +705,8 @@ class LoadDefaults:
             update_which_templates = LoadDefaults.TEMPLATES
 
         # Set update_which parameters to be lower case
-        update_which_files = ofc.recase_iterable(update_which_files)
-        update_which_templates = ofc.recase_iterable(update_which_templates)
+        update_which_files = ostr.recase_iterable(update_which_files)
+        update_which_templates = ostr.recase_iterable(update_which_templates)
 
         # Call previous loader functions
         if "ini" in update_which_files or "osm" in update_which_files:

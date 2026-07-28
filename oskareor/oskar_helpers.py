@@ -4,7 +4,8 @@
 import h5py
 import numpy as np
 
-from oskareor.skalow_calc import OSKARFileConfig as ofc
+# In-Project Objects
+from oskareor.skalow_calc import FileManager as ofmg, SKAString as ostr
 
 
 # OSKAR EOR helper class - dependant on ~/oskareor.data
@@ -128,7 +129,7 @@ class OSKARHelper:
         """
 
         coeval_template = h5py.File(
-            ofc.expand_path(
+            ofmg.expand_path(
                 oskar_parent_dir
                 + "/oskareor.data/simulations/legacy_templates/yuxiang"
                 + ("1" if template_switch else "2")
@@ -152,7 +153,7 @@ class OSKARHelper:
         if selection == "":
             return options
 
-        for option in ofc.recase_iterable(set(options.keys())):
+        for option in ostr.recase_iterable(set(options.keys())):
             if selection.lower() == option or selection.lower() in options[option][0]:
                 return {option: options[option]}
 
@@ -195,3 +196,6 @@ class OSKARHelper:
             print("============")
 
         return options
+
+
+# TODO: Create oskareor.data dir creator

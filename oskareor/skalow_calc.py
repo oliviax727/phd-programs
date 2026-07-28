@@ -21,6 +21,9 @@ from astropy.units import Quantity
 # Data handling and statistics
 from scipy.stats import circmean as circmean_radians
 
+# Proprietary software
+from pyuvdata import UVData
+
 
 class SKAMath:
     """Mathematical helper functions for various calculations used throughout the document. All angle units are in radians unless if otherwise specified."""
@@ -211,8 +214,30 @@ class EoRCosmology:
         return (f0 / f) - 1
 
 
-class OSKARFileConfig:
-    """The OSKARFileConfig class contains helper functions specifically relating to directory and file management."""
+class FileManager:
+    """The FileManager class contains helper functions specifically relating to directory and file management, as well as the conversion of files."""
+
+    @staticmethod
+    def convert_h5_to_uvfits(h5_file, uvfits_file):
+        """Converts a H5 file outputted from 21cmFAST and converts it directly into a uvfits file for CHIPS to analyse unadulterated.
+
+        :param h5_file: The H5 file to convert.
+        :param uvfits_file: The output target uvfits file.
+        """
+
+        # FIXME: Write H5 file converter
+
+    @staticmethod
+    def convert_ms_to_uvfits(ms_dir, uvfits_file):
+        """Converts a CASA Measurement Set outputted from OSKAR into a uvfits file for CHIPS to analyse unadulterated.
+
+        :param ms_dir: The CASA measurement set directory to convert.
+        :param uvfits_file: The output target uvfits file.
+        """
+
+        uv = UVData()
+        uv.read_ms(ms_dir, ignore_single_chan=False)
+        uv.write_uvfits(uvfits_file)
 
     @staticmethod
     def expand_path(path: str) -> str:
@@ -255,10 +280,10 @@ class OSKARFileConfig:
         :param replace_line (str): The line to replace the preset.
         """
 
-        with open(OSKARFileConfig.expand_path(file_name), "r", encoding="utf-8") as file:
+        with open(FileManager.expand_path(file_name), "r", encoding="utf-8") as file:
             lines = file.readlines()
 
-        with open(OSKARFileConfig.expand_path(file_name), "w", encoding="utf-8") as file:
+        with open(FileManager.expand_path(file_name), "w", encoding="utf-8") as file:
             for line in lines:
                 if line.startswith(find_line):
                     file.write(replace_line + "\n")
@@ -275,7 +300,7 @@ class OSKARFileConfig:
         """
 
         config = cfp.ConfigParser()
-        with open(OSKARFileConfig.expand_path(file), encoding="utf-8") as filestream:
+        with open(FileManager.expand_path(file), encoding="utf-8") as filestream:
             config.read_file(filestream)
 
         return {s: dict(config.items(s)) for s in config.sections()}
@@ -291,8 +316,12 @@ class OSKARFileConfig:
         config = cfp.ConfigParser()
         config.read_dict(settings_dict)
 
-        with open(OSKARFileConfig.expand_path(file), "w", encoding="utf-8") as settings_file:
+        with open(FileManager.expand_path(file), "w", encoding="utf-8") as settings_file:
             config.write(settings_file, space_around_delimiters=False)
+
+
+class SKAString:
+    """The SKAString class handles string and list manipulation."""
 
     @staticmethod
     def recase_iterable(iterable: Iterable[str], lower: bool = True) -> Iterable[str]:
@@ -321,4 +350,7 @@ class OSKARFileConfig:
         dtype: np.dtype | str = np.object_,
     ) -> np.ndarray:
         """Parses a string into a numpy array."""
-        return np.array(OSKARFileConfig.split_arr(arrstr, delimiter, padding), dtype=dtype)
+        return np.array(SKAString.split_arr(arrstr, delimiter, padding), dtype=dtype)
+
+
+# TODO: Type-guard everything
