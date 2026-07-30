@@ -33,21 +33,35 @@ rm -rf ../2dps_npz_templates/*
 chips_files=(/scratch/mwaeor/ohrw/active_uvfits/*)
 
 nchan=400
+kperp=100
+umax=500
+c=299792458
 
 for template_file in "${chips_files[@]}"; do
 
     template_name="$(awk -v s="${template_file}" 'BEGIN { start = 39; end = index(s, "_uvw_plane.uvfits") - start; print substr(s, start, end) }')"
 
-    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska "${template_file}" side 15. 299792458.
+    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska "${template_file}" side 15. $c.
 
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska side $nchan 0 'yy' side 1
 
-    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska side $nchan 50 'yy' 500. chips.out 0 1
+    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska side $nchan $kperp 'yy' $umax. chips.out 0 1
 
     # shellcheck disable=SC1091
     source /software/projects/mwaeor/ohrw/.venv/bin/activate
 
-    plotchips_all.py --basedir . --plot_type 2D --chips_tag chips.out --polarisation YY --N_chan $nchan --N_kperp 100 --max_power 1e12 --min_power 1e5 >> chips.log
+    plotchips_all.py \
+        --basedir . \
+        --plot_type 2D \
+        --chips_tag chips.out \
+        --polarisation YY \
+        --N_chan $nchan \
+        --N_kperp $kperp \
+        --umax $umax \
+        --max_power 1e11 \
+        --min_power 1e5 \
+        --no_noise \
+        >> chips.log
 
     deactivate
 
