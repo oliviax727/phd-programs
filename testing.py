@@ -10,8 +10,6 @@ from oskareor.oskar_helpers import OSKARHelper as ohelp
 
 # Testing stage
 
-TEMPLATES = { "flat400" }
+IGNORE_TEMPLATES = {"flat400", "coeval1", "coeval2"}
 
-ldd.reload_all(update_which_templates=TEMPLATES)
-
-ldd.reload_template_sky_models()
+ldd.reload_all(update_which_templates=ldd.TEMPLATES - IGNORE_TEMPLATES)
