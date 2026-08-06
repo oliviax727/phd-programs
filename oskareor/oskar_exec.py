@@ -367,7 +367,7 @@ class BTAnalysisPipeline:
         max_freq_res: Quantity = 100e6 * u.MHz,
         interferometer_settings_override="",
         imager_settings_override="",
-        outpath=("", "", ""),
+        outpath=("", "", "", ""),
         clean=True,
         oskar_exec="",
         oskar_mode="singularity",
@@ -381,6 +381,7 @@ class BTAnalysisPipeline:
         use_imager=True,
         oskar_parent_dir="~",
         convert_uvfits=True,
+        box_dim=None,
     ):
         """Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
 
@@ -403,6 +404,7 @@ class BTAnalysisPipeline:
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
         :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         :param convert_uvfits: Whether or not to generate a uvfits file.
+        :param box_dim: The dimensions of the given h5 box. If a value is provided use it as an override.
         """
 
         # Set defaults
@@ -440,7 +442,7 @@ class BTAnalysisPipeline:
                 if template_flag:
                     # IF we want to generate a fresh osm file AND its from a template
                     print("Generating OSM files from template ...")
-                    template_values = simref.mock_values(template_preset, oskar_parent_dir=oskar_parent_dir)
+                    template_values = simref.mock_values(template_preset, oskar_parent_dir=oskar_parent_dir, d=box_dim)
                     dynamic_settings = simref.generate_osm_from_simulation(
                         template_values,
                         phase_ref_point=phase_ref_point,
@@ -512,6 +514,7 @@ class BTAnalysisPipeline:
                         ref_location=ref_location,
                         observation_length=observation_length,
                         save_dynamic_settings=ini_output,
+                        d=box_dim,
                     )
 
         # Configure the OSKAR settings
