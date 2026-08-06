@@ -240,10 +240,13 @@ class FileManager:
         uv.write_uvfits(uvfits_file)
 
     @staticmethod
-    def expand_path(path: str) -> str:
+    def expand_path(path: str, allow_empty: bool = True) -> str:
         """Expands a filepath to produce an absolute path."""
         if path != "":
             return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
+
+        if allow_empty:
+            return ""
 
         raise ValueError("Cannot expand an empty path string.")
 

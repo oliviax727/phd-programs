@@ -26,5 +26,11 @@ for field in flat_fields:
     dynamic_settings = simref.generate_osm_from_simulation(values=values, z_ref=12, v=(2, 2, 2), osm_output=osm_output)
 
     btap.run_oskar_on_model(
-        file=osm_output, outpath=("", "", fits_output, ""), load_osm=True, convert_uvfits=False, box_dim=field["d"]
+        file=osm_output,
+        outpath=("", "", fits_output, ""),
+        load_osm=True,
+        convert_uvfits=False,
+        box_dim=field["d"],
+        oskar_mode="binary",
+        oskar_exec="~" + ohelp.OSKAR_BIN,
     )

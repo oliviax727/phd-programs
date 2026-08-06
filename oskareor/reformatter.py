@@ -717,12 +717,13 @@ class SimulationReformatter:
         ras, dcs, freqsum = (None, None, None)  # Keep Pylint Happy
         if cumulative_voxels is None and voxels is None:
             raise ValueError("Either an array of voxels or cumulative voxes must be provided!")
-        elif voxels is None:
-            ras, dcs, freqsum = cumulative_voxels
         elif cumulative_voxels is None:
-            ras, dcs, freqsum = SimulationReformatter.calculate_cumulative_voxels(
+            cumulative_voxels = SimulationReformatter.calculate_cumulative_voxels(
                 voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point
             )
+
+        # Get data from cumulative voxels
+        ras, dcs, freqsum = cumulative_voxels
 
         # Configure d variable
         d = np.shape(values)
@@ -732,14 +733,24 @@ class SimulationReformatter:
 
         # BASIC CONFIG
         # Set starting frequency NB: The last channel has the lowest frequency!
-        dynamic_settings["observation"]["start_frequency_hz"] = np.mean(freqsum[:, :, -1])
+        if freqsum is not None:
+            dynamic_settings["observation"]["start_frequency_hz"] = np.mean(freqsum[:, :, -1])
+        else:
+            dynamic_settings["observation"]["start_frequency_hz"] = f_ref
 
         # Set number of channels and image size
         dynamic_settings["observation"]["num_channels"] = d[2]
         dynamic_settings["image"]["size"] = max(d[0], d[1])
 
         # Set the frequency increment
-        dynamic_settings["observation"]["frequency_inc_hz"] = np.mean(voxels[:, :, :, 2])
+        if voxels is not None:
+            dynamic_settings["observation"]["frequency_inc_hz"] = np.mean(voxels[:, :, :, 2])
+        elif freqsum is not None:
+            dynamic_settings["observation"]["frequency_inc_hz"] = np.mean(
+                cumulative_voxels[:, :, 1:, 2] - cumulative_voxels[:, :, :-1, 2]
+            )
+        else:
+            dynamic_settings["observation"]["frequency_inc_hz"] = 0
 
         # Set phase centre RA and Dec
         dynamic_settings["observation"]["phase_centre_ra_deg"] = phase_ref_point.ra.deg
@@ -962,7 +973,7 @@ class SimulationReformatter:
             delimiter=" ",
             skiprows=4,
             index_col=False,
-            names=["RA", "Dec", "Freq0", "FreqI", "Stokes I"],
+            names=["RA", "Dec", "Freq0", "Freq+", "Stokes I"],
             converters={key: ostr.split_arr_np for key in split_params},
         ).explode(split_params)
 
@@ -1003,7 +1014,10 @@ class SimulationReformatter:
             output_data["phase_ref_point"] = phase_ref_point_override
 
         # Calculate the frequency bin step
-        step = np.mean(temp_values[:, :, 0, 2] - temp_values[:, :, 1, 2]) / 2
+        if temp_values.shape[2] >= 2:
+            step = np.mean(temp_values[:, :, 0, 2] - temp_values[:, :, 1, 2]) / 2
+        else:
+            step = 0
 
         # Calculate the refrence frequency
         output_data["f_ref"] = np.mean(temp_values[:, :, 0, 2]) + step
@@ -1021,10 +1035,6 @@ class SimulationReformatter:
         temp_values[:, :, :, 2] = np.diff(temp_values[:, :, :, 2], prepend=-step, axis=2)
 
         # Extract voxels
-        output_data["voxels"] = temp_values
-
-        # Create temporary values from the cumulative voxels
-        temp_values = np.moveaxis(np.array(output_data["cumulative_voxels"]), 0, -1)
         output_data["voxels"] = temp_values
 
         # Generate the dynamic settings
