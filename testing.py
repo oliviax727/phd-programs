@@ -11,26 +11,6 @@ from oskareor.oskar_helpers import OSKARHelper as ohelp
 
 # Testing stage
 
-flat_fields = [
-    {"d": (400, 400, 1), "name": "coeval400x2"},
-    {"d": (500, 500, 1), "name": "coeval500x2"},
-    {"d": (600, 600, 1), "name": "coeval600x2"},
-]
+coevals = {"coeval1", "coeval2", "flat400"}
 
-for field in flat_fields:
-    values = simref.mock_values(preset="coeval1", d=field["d"])
-
-    osm_output = "./oskar-chips/primary-beam-testing/" + field["name"] + ".osm"
-    fits_output = "./oskar-chips/primary-beam-testing/" + field["name"] + ".fits"
-
-    dynamic_settings = simref.generate_osm_from_simulation(values=values, z_ref=12, v=(2, 2, 2), osm_output=osm_output)
-
-    btap.run_oskar_on_model(
-        file=osm_output,
-        outpath=("", "", fits_output, ""),
-        load_osm=True,
-        convert_uvfits=False,
-        box_dim=field["d"],
-        oskar_mode="binary",
-        oskar_exec="~" + ohelp.OSKAR_BIN,
-    )
+ldd.reload_all(update_which_templates=ldd.TEMPLATES - coevals)

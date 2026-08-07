@@ -116,18 +116,16 @@ class SimulationReformatter:
             (400, 400, 400),
         ),
         "flat400": (
-            {
-                "coeval flat",
-                "flat coeval",
-                "flat_coeval",
-                "coeval_flat",
-                "fc",
-                "cf",
-                "f400",
-            },
-            "A coeval box preselected to match the dimensions of both template coeval boxes d = (400, 400, 400).\n",
+            {"coeval flat", "flat coeval", "flat_coeval", "coeval_flat", "fc", "cf", "f400"},
+            "A flat field box preselected to match the dimensions of both template coeval boxes d = (400, 400, 400).\n",
             lambda p: p["T_max"],
             (400, 400, 400),
+        ),
+        "flat512": (
+            {"large flat", "flat large", "flat_large", "large_flat", "fl", "lf", "f512"},
+            "A flat field box preselected to match the dimensions of a box with (2 ** 9) ** 3 cells.\n",
+            lambda p: p["T_max"],
+            (512, 512, 512),
         ),
         "column": (
             {"col", "small", "coeval small", "small coeval", "los", "small field"},
@@ -1054,3 +1052,6 @@ class SimulationReformatter:
             return output_data, dynamic_settings
 
         return output_data
+
+
+# TODO: Reformatter time counter + full simulation time polling
