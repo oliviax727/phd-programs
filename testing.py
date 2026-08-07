@@ -12,13 +12,13 @@ from oskareor.oskar_helpers import OSKARHelper as ohelp
 # Testing stage
 
 flat_fields = [
-    {"d": (400, 400, 1), "name": "flat400x2"},
-    {"d": (500, 500, 1), "name": "flat500x2"},
-    {"d": (600, 600, 1), "name": "flat600x2"},
+    {"d": (400, 400, 1), "name": "coeval400x2"},
+    {"d": (500, 500, 1), "name": "coeval500x2"},
+    {"d": (600, 600, 1), "name": "coeval600x2"},
 ]
 
 for field in flat_fields:
-    values = simref.mock_values(preset="flat400", d=field["d"])
+    values = simref.mock_values(preset="coeval1", d=field["d"])
 
     osm_output = "./oskar-chips/primary-beam-testing/" + field["name"] + ".osm"
     fits_output = "./oskar-chips/primary-beam-testing/" + field["name"] + ".fits"
