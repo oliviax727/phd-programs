@@ -128,15 +128,22 @@ class OSKARHelper:
         :return coeval_bt_array: The brightness temperature array corresponding to one of two coeval boxes.
         """
 
-        coeval_template = h5py.File(
-            ofmg.expand_path(
-                oskar_parent_dir
-                + "/oskareor.data/simulations/legacy_templates/yuxiang"
-                + ("1" if template_switch else "2")
-                + ".h5"
-            ),
-            "r",
-        )
+        try:
+            coeval_template = h5py.File(
+                ofmg.expand_path(
+                    oskar_parent_dir
+                    + "/oskareor.data/simulations/legacy_templates/yuxiang"
+                    + ("1" if template_switch else "2")
+                    + ".h5"
+                ),
+                "r",
+            )
+        except:
+            print(
+                "WARNING: The coeval template h5 file was not found. As such the template will not be available to use"
+            )
+
+            return np.array([])
 
         return np.array(coeval_template.get("BrightnessTemp")["brightness_temp"])
 
