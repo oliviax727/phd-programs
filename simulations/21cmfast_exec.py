@@ -40,3 +40,8 @@ lightcone = p21c.run_lightcone(
     cache=cache,
     progressbar=True
 )
+
+filename = lightcone.save(cache.direc / "lightcone.h5", clobber=True)
+filename2 = lightcone.save("/fred/oz113/owalters/phd-programs/simulations/simulation_lightcone.h5", clobber=True)
+
+print("Saved lightcone to: " + filename)
