@@ -13,6 +13,6 @@ SETONIX_DATA_DIR = "/software/projects/mwaeor/ohrw/"
 
 # Testing stage
 
-TEMPLATE = {"slice"}
+TEMPLATE = {"flat512"}
 
 ldd.reload_all(update_which_templates=TEMPLATE, oskar_parent_dir=SETONIX_DATA_DIR)
