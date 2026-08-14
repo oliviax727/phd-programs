@@ -20,5 +20,5 @@ pylint-fixme-info
 # oskarpy @ git+https://github.com/OxfordSKA/OSKAR.git@master#subdirectory=python
 scikit-learn
 sphinx
-# 21cmFAST>4
-chips_wrappers @ git+https://github.com/JLBLine/CHIPS_wrappers.git
+21cmFAST>4
+# chips_wrappers @ git+https://github.com/JLBLine/CHIPS_wrappers.git
