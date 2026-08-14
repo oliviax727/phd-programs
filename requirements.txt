@@ -21,4 +21,4 @@ pylint-fixme-info
 scikit-learn
 sphinx
 # 21cmFAST>4
-# chips_wrappers @ git+https://github.com/JLBLine/CHIPS_wrappers.git
+chips_wrappers @ git+https://github.com/JLBLine/CHIPS_wrappers.git

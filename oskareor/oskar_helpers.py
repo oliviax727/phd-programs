@@ -50,7 +50,7 @@ class OSKARHelper:
     # Define default settings
     DEFAULT_INTERFEROMETER_SETTINGS: dict = {
         "General": {"app": "oskar_sim_interferometer"},
-        "simulator": {"use_gpus": False, "write_status_to_log_file": True},
+        "simulator": {"use_gpus": True, "write_status_to_log_file": True},
         "observation": {
             "num_time_steps": 24,
             # Below values are modified dynamically =>
@@ -89,7 +89,7 @@ class OSKARHelper:
     DEFAULT_IMAGER_SETTINGS: dict = {
         "General": {"app": "oskar_imager"},
         "image": {
-            "use_gpus": False,
+            "use_gpus": True,
             "channel_snapshots": True,
             "input_vis_data": "BTA/oskar_output/sim.ms",
             "root_path": "BTA/oskar_output/sim_image",
