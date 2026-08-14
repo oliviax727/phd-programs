@@ -11,6 +11,6 @@ from oskareor.oskar_helpers import OSKARHelper as ohelp
 
 # Testing stage
 
-coevals = {"coeval1", "coeval2", "flat400"}
+TEMPLATE = {"slice"}
 
-ldd.reload_all(update_which_templates=ldd.TEMPLATES - coevals)
+ldd.reload_all(update_which_templates=TEMPLATE)

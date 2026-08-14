@@ -138,12 +138,10 @@ class OSKARHelper:
                 ),
                 "r",
             )
-        except:
-            print(
-                "WARNING: The coeval template h5 file was not found. As such the template will not be available to use"
-            )
+        except FileNotFoundError:
+            print("WARNING: The coeval template h5 file was not found. Random data values will be used instead.")
 
-            return np.array([])
+            return np.random.rand(400, 400, 400) * 10
 
         return np.array(coeval_template.get("BrightnessTemp")["brightness_temp"])
 
