@@ -7,12 +7,13 @@
 #SBATCH --account=oz113
 #SBATCH --output=/fred/oz113/owalters/slurm.out
 
+# shellcheck disable=SC1091
 source /home/owalters/module-load.sh
 
 export GSL_LIB="/fred/oz113/owalters/gsl-2.8/lib"
 export GSL_INC="/fred/oz113/owalters/gsl-2.8/include"
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/fred/oz113/owalters/gsl-2.8/lib"
 
-cd /fred/oz113/owalters/phd-programs
+cd /fred/oz113/owalters/phd-programs || exit
 
 ./simulations/21cmfast_exec.py

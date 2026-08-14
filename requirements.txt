@@ -17,8 +17,10 @@ pylint-venv>=3,<4
 pyuvdata>=3.1,<4
 python-casacore>=3.6,<4
 pylint-fixme-info
-# oskarpy @ git+https://github.com/OxfordSKA/OSKAR.git@master#subdirectory=python
 scikit-learn
 sphinx
-21cmFAST>4
+
+# Special non-compulsory libraries
+# 21cmFAST>4
+# oskarpy @ git+https://github.com/OxfordSKA/OSKAR.git@master#subdirectory=python
 # chips_wrappers @ git+https://github.com/JLBLine/CHIPS_wrappers.git
