@@ -22,4 +22,4 @@ cd /fred/oz113/owalters/phd-programs || exit
 
 ./simulations/21cmfast_exec.py
 
-tar -czf /fred/oz113/owalters/p21c.data.tar.gz $P21C_TEMP_DIR
+tar -czf /fred/oz113/owalters/p21c.data.tar.gz "$P21C_TEMP_DIR"
