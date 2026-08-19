@@ -9,7 +9,8 @@
 #SBATCH --tmp=2TB
 
 # Create Temporary Directory
-export P21C_TEMP_DIR=$JOBFS/p21c
+export P21C_TEMP_DIR="$JOBFS/p21c"
+export P21C_OUT_DIR="/fred/oz113/owalters/phd-programs"
 
 # shellcheck disable=SC1091
 source /home/owalters/module-load.sh
