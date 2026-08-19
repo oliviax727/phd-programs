@@ -1,7 +1,9 @@
 #!.venv/bin/python
 
 import py21cmfast as p21c
-from tempfile import mkdtemp
+import os
+
+TEMP_DIR = os.environ['P21C_TEMP_DIR']# "/fred/oz113/owalters/.slurm-cache/p21c"
 
 print(f' Using 21cmFAST version {p21c.__version__}')
 
@@ -25,7 +27,7 @@ scin_toml_file = "/fred/oz113/owalters/phd-programs/simulations/scin-park19.toml
 
 p21c.write_template(scin_inputs, scin_toml_file)
 
-cache = p21c.OutputCache(mkdtemp())
+cache = p21c.OutputCache(TEMP_DIR)
 
 lcn = p21c.RectilinearLightconer.between_redshifts(
     min_redshift=5.5,
