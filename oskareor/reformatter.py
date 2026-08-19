@@ -361,7 +361,7 @@ class SimulationReformatter:
     def transform_datacube_units(
         values,
         voxels,
-        z_ref=7,
+        z_ref=5.5,
         require_regrid=True,
         max_freq_res=100 * u.MHz,
         cosmology=eorcosmo(),
@@ -793,7 +793,7 @@ class SimulationReformatter:
     def generate_osm_from_simulation(
         values,
         voxels=None,
-        z_ref=7,
+        z_ref=5.5,
         phase_ref_point=omath.ZENITH_530,
         require_regrid=True,
         max_freq_res=100 * u.MHz,
