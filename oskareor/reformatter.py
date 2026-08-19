@@ -123,9 +123,10 @@ class SimulationReformatter:
         ),
         "flat512": (
             {"large flat", "flat large", "flat_large", "large_flat", "fl", "lf", "f512"},
-            "A flat field box preselected to match the dimensions of a box with (2 ** 9) ** 3 cells.\n",
+            "A flat field box preselected to match the dimensions of a box that is 512 x 512 x 1024 voxels"
+            + "(i.e. the flat field correction used for the science).\n",
             lambda p: p["T_max"],
-            (512, 512, 512),
+            (512, 512, 1024),
         ),
         "column": (
             {"col", "small", "coeval small", "small coeval", "los", "small field"},
