@@ -182,7 +182,7 @@ class EoRCosmology:
 
     def __init__(
         self,
-        h0: Quantity = 100 * u.km / u.s / u.Mpc,
+        h0: Quantity = 67.66 * u.km / u.s / u.Mpc,
         omega_m_0: float = 0.31,
         omega_b_0: float = 0.048,
     ):
