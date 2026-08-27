@@ -1,14 +1,22 @@
 #!/bin/bash -l
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
+<<<<<<< HEAD:exec/21cmfast.run.sh
 #SBATCH --mem=750GB
-#SBATCH --time=48:00:00
-#SBATCH --job-name=owalters-p21c
+=======
+#SBATCH --mem=600GB
+>>>>>>> 75b5aebe2931a97a9f7c28e659c1ad064d1a5e44:exec/21cmfast_exec.run.sh
+#SBATCH --time=24:00:00
+#SBATCH --job-name=gpc-p21c-olivia
 #SBATCH --account=oz113
 #SBATCH --output=/fred/oz113/owalters/slurm.out
+<<<<<<< HEAD:exec/21cmfast.run.sh
+#SBATCH --tmp=300GB
+=======
 #SBATCH --tmp=600GB
 
 echo "Initialising ..."
+>>>>>>> 75b5aebe2931a97a9f7c28e659c1ad064d1a5e44:exec/21cmfast_exec.run.sh
 
 # Create Temporary Directory
 export P21C_TEMP_DIR="$JOBFS/gpc-p21c-olivia"
@@ -29,8 +37,12 @@ echo "Running the simulation ..."
 
 ./simulations/21cmfast_exec.py
 
+<<<<<<< HEAD:exec/21cmfast.run.sh
+cp -r "$P21C_TEMP_DIR" /fred/oz113/owalters/p21c.data
+=======
 echo "Simulation complete, migrating data ..."
 
-cp -r "$P21C_TEMP_DIR" /fred/oz113/owalters/p21c.data
+cp -r "$P21C_TEMP_DIR" /fred/oz113/owalters/
 
 echo "Data transfer complete!"
+>>>>>>> 75b5aebe2931a97a9f7c28e659c1ad064d1a5e44:exec/21cmfast_exec.run.sh
