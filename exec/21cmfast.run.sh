@@ -2,7 +2,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=750GB
-#SBATCH --time=48:00:00
+#SBATCH --time=3-00:00:00
 #SBATCH --job-name=owalters-p21c
 #SBATCH --account=oz113
 #SBATCH --output=/fred/oz113/owalters/slurm.out
