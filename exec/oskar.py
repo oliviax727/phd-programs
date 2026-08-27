@@ -4,7 +4,9 @@ Execution for OSKAR.
 """
 
 import sys
+
 sys.path.append("/scratch/mwaeor/ohrw/phd-programs/")
+# pylint: disable=wrong-import-position
 from oskareor.oskar_exec import LoadDefaults as ldd
 
 SETONIX_DATA_DIR_SOFTWARE = "/software/projects/mwaeor/ohrw/"

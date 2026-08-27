@@ -27,7 +27,7 @@ cd /fred/oz113/owalters/phd-programs || exit
 
 echo "Running the simulation ..."
 
-./simulations/21cmfast_exec.py
+./exec/21cmfast.py
 
 echo "Simulation complete, migrating data ..."
 

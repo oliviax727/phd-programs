@@ -10,9 +10,11 @@
 #SBATCH --gres=gpu:8
 #SBATCH --exclusive
 
-cd /scratch/mwaeor/ohrw/phd-programs
+cd /scratch/mwaeor/ohrw/phd-programs || exit
+# shellcheck disable=SC1091
 source .venv/bin/activate
 
+# shellcheck disable=SC1091
 source /software/projects/mwaeor/ohrw/install-scripts/oskar-install.sh
 
-srun -N 1 -n 1 --exclusive "./exec/oskar.py"
+srun -N 1 -n 1 --exclusive ./exec/oskar.py

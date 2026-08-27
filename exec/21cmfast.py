@@ -3,8 +3,8 @@
 
 HII_DIM=512
 LOWRES_CELL_SIZE_MPC=2
-PERTURB_ON_HIGH_RES = True
-PHOTON_CONS_TYPE = z-photoncons
+PERTURB_ON_HIGH_RES=True
+PHOTON_CONS_TYPE=z-photoncons
 
 From Meiksin 2021 and Reis et al. 2021:
 - USE_CMB_HEATING = True
@@ -22,16 +22,15 @@ From Qin et al. 2024 (Table 1):
 This assumes a constant f_esc. Pursuing a non-constant f_esc will be optional later on.
 """
 
-print("Importing python modules ...")
-
 # Module imports and environment variables
-
 import os
 
-import py21cmfast as p21c
 import numpy as np
+import py21cmfast as p21c
 from astropy import units as u
 from astropy.cosmology import z_at_value as getz
+
+print("Getting environment variables ...")
 
 TEMP_DIR = os.environ["P21C_TEMP_DIR"]
 OUT_DIR = os.environ["P21C_OUT_DIR"]
@@ -86,9 +85,11 @@ print("Length (cMpc)  =", total)
 print("End (cMpc)     =", end)
 print("End redshift z =", getz(cosmo.comoving_distance, end * u.Mpc))
 
+
 def generate(start=0, step=1, num=1):
     """Create an array of linearly-increasing consecutive entries with a defined start, step size, and step count. Similar to np.linspace and np.arrange."""
     return start + np.arange(0, num) * step
+
 
 lc_dist = generate(start=dz_ref, step=inc, num=N_STEPS) * u.Mpc
 
