@@ -1,12 +1,12 @@
 #!/bin/bash -l
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=300GB
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=750GB
 #SBATCH --time=24:00:00
 #SBATCH --job-name=gpc-py21c-olivia
 #SBATCH --account=oz113
 #SBATCH --output=/fred/oz113/owalters/slurm.out
-#SBATCH --tmp=2TB
+#SBATCH --tmp=300GB
 
 # Create Temporary Directory
 export P21C_TEMP_DIR="$JOBFS/p21c"
@@ -23,4 +23,4 @@ cd /fred/oz113/owalters/phd-programs || exit
 
 ./simulations/21cmfast_exec.py
 
-tar -czf /fred/oz113/owalters/p21c.data.tar.gz "$P21C_TEMP_DIR"
+cp -r "$P21C_TEMP_DIR" /fred/oz113/owalters/p21c.data
