@@ -9,7 +9,7 @@ from astropy import units as u
 from astropy.cosmology import z_at_value as getz
 
 # Software
-import py21cmfast as p21c
+import py21cmfast as p21c  # type: ignore
 
 # Local imports
 from oskareor.skalow_calc import EoRCosmology as eorcosmo, SKAMath as omath, FileManager as ofmg, SKAString as ostr

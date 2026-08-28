@@ -602,6 +602,28 @@ class SimulationReformatter:
         # Record data to file
         print("Recording data to .osm file")
 
+        # Convert all data into string-friendly object
+        ffpv = np.vectorize(np.format_float_positional)
+        ffsv = np.vectorize(np.format_float_scientific)
+        oplv = np.vectorize(ostr.print_list)
+        apom = np.vectorize(lambda d: "+" if d >= 0 else "-")
+
+        # Frequency values
+        freq_ref = ffpv(np.mean(freqsum, axis=2) / 1e6, 3, False) + "e6"
+        freq_inc = ffpv(np.mean(voxels[:, :, :, 2]) / 1e3, 3, False) + "e3"
+
+        # Combine all list entries into a formatted string
+        value = oplv(ffsv(values, 4, False), ",", "", axis=2)
+
+        # Format RA/Dec data, add +/- value to Declinations
+        rascn = np.char.zfill(ffpv(ras, 6, False), 10)
+        decln = apom(dcs) + np.char.zfill(ffpv(np.abs(dcs), 6, False), 9)
+
+        # Save to file using pandas dataframe
+        csv_data = pd.DataFrame({"RA": rascn, "Dec": decln, "Freq0": freq_ref, "Freq+": freq_inc, "Stokes I": value})
+
+        csv_data.to_csv(osm_output_exp, sep=" ", index=False, header=False)
+
         with open(osm_output_exp, "w", encoding="utf-8") as osm:
             # Clear file contents
             osm.truncate(0)
