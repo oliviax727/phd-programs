@@ -355,5 +355,10 @@ class SKAString:
         """Parses a string into a numpy array."""
         return np.array(SKAString.split_arr(arrstr, delimiter, padding), dtype=dtype)
 
+    @staticmethod
+    def generate(start: np.number = 0, step: np.number = 1, num: int = 1) -> np.ndarray:
+        """Create an array of linearly-increasing consecutive entries with a defined start, step size, and step count. Similar to np.linspace and np.arrange."""
+        return start + np.arange(0, num) * step
+
 
 # TODO: Type-guard everything
