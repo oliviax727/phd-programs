@@ -109,7 +109,7 @@ print("Writing h5 data to file ...")
 
 # Save the data to both the temp folder and the phd_programs dir
 backup_file = cache.direc / "simulation_lightcone.h5"
-output_file = OUT_DIR + "simulation_lightcone.h5"
+output_file = OUT_DIR + "/simulation_lightcone.h5"
 lightcone.save(backup_file, clobber=True)
 lightcone.save(output_file, clobber=True)
 
