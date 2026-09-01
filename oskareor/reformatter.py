@@ -12,6 +12,7 @@ import h5py
 # Data handling and statistics
 import pandas as pd
 from scipy.interpolate import make_interp_spline as misp
+import csv
 
 # Astropy extras
 from astropy.coordinates import SkyCoord
@@ -600,33 +601,74 @@ class SimulationReformatter:
             )
 
         # Record data to file
-        print("Recording data to .osm file")
+        print("\rRecording data to .osm file ... 10%", end="")
 
-        # Convert all data into string-friendly object
-        ffpv = np.vectorize(np.format_float_positional)
-        ffsv = np.vectorize(np.format_float_scientific)
-        oplv = np.vectorize(ostr.print_list)
-        apom = np.vectorize(lambda d: "+" if d >= 0 else "-")
+        # Calculate the mean of the RAs, Decs, and Voxels in the freq. dimension
+        csv_raw_mean = np.array([ras, dcs, voxels[:, :, :, 2]]).mean(-1)
+        print("\rRecording data to .osm file ... 20%", end="")
 
-        # Frequency values
-        freq_ref = ffpv(np.mean(freqsum, axis=2) / 1e6, 3, False) + "e6"
-        freq_inc = ffpv(np.mean(voxels[:, :, :, 2]) / 1e3, 3, False) + "e3"
+        # Stringify averaged data
+        csv_raw_mean_2 = np.array(
+            [
+                np.vectorize(lambda x: np.char.zfill(np.format_float_positional(x, 6, False), 10))(
+                    csv_raw_mean[0, :, :]
+                ),
+                np.vectorize(lambda x: np.char.zfill(np.format_float_positional(x, 6, False, sign=True), 10))(
+                    csv_raw_mean[1, :, :]
+                ),
+                np.vectorize(lambda x: np.format_float_positional(x / 1e3, 3, False) + "e3")(csv_raw_mean[2, :, :]),
+            ]
+        )
+        print("\rRecording data to .osm file ... 30%", end="")
 
-        # Combine all list entries into a formatted string
-        value = oplv(ffsv(values, 4, False), ",", "", axis=2)
+        # Find minimum (Refrence Frequency) Values
+        csv_raw_minm = np.vectorize(lambda x: np.format_float_positional(x / 1e6, 3, False) + "e6")(
+            np.array([freqsum]).min(-1)
+        )
+        print("\rRecording data to .osm file ... 40%", end="")
 
-        # Format RA/Dec data, add +/- value to Declinations
-        rascn = np.char.zfill(ffpv(ras, 6, False), 10)
-        decln = apom(dcs) + np.char.zfill(ffpv(np.abs(dcs), 6, False), 9)
+        # Convert Stokes I values to stringified array
+        csv_raw_conc = np.expand_dims(
+            np.apply_along_axis(
+                (
+                    lambda x: np.array2string(
+                        x,
+                        separator=",",
+                        formatter={"float": (lambda x: np.format_float_scientific(x, 4, False))},
+                        max_line_width=np.inf,
+                    )
+                ),
+                axis=-1,
+                arr=values,
+            ),
+            axis=0,
+        )
+        print("\rRecording data to .osm file ... 50%", end="")
 
-        # Save to file using pandas dataframe
-        csv_data = pd.DataFrame({"RA": rascn, "Dec": decln, "Freq0": freq_ref, "Freq+": freq_inc, "Stokes I": value})
+        # Concatenate all data
+        csv_raw = np.concatenate((csv_raw_mean_2, csv_raw_minm, csv_raw_conc), axis=0)
+        print("\rRecording data to .osm file ... 60%", end="")
 
-        csv_data.to_csv(osm_output_exp, sep=" ", index=False, header=False)
+        # Reshape and configure for Pandas
+        csv_cond = csv_raw.reshape(5, -1).swapaxes(0, 1)
+        print("\rRecording data to .osm file ... 70%", end="")
 
-        with open(osm_output_exp, "w", encoding="utf-8") as osm:
+        # Create pandas dataframe
+        csv_data = pd.DataFrame(data=csv_cond, columns=["RA", "Dec", "Freq+", "Freq0", "Stokes I"], index=None)
+        print("\rRecording data to .osm file ... 80%", end="")
+
+        # Write data to CSV
+        csv_data.to_csv(
+            osm_output_exp, sep=" ", index=False, header=False, quoting=csv.QUOTE_NONE, quotechar="", escapechar="\\"
+        )
+        print("\rRecording data to .osm file ... 90%", end="")
+
+        # Write Header Lines
+        with open(osm_output_exp, "r+", encoding="utf-8") as osm:
+
             # Clear file contents
-            osm.truncate(0)
+            data = osm.read()
+            osm.seek(0)
 
             # Add header lines
             osm.write("Format = RaD DecD ReferenceFrequency FrequencyIncrement StokesI\n")
@@ -634,41 +676,8 @@ class SimulationReformatter:
             osm.write("#00.000000 +00.000000 000.000e6 000.000e3 [0.0000+e00,...]\n")
             osm.write("# RA       Dec        Freq0     Freq+      Stokes I\n")
 
-            # Write OSM lines
-            for x in range(d[0]):
-                for y in range(d[1]):
-
-                    # Accumulate point-specific values in table
-                    value_acc = []
-
-                    # Loop through all freq instances
-                    for t in range(d[2]):
-                        value_acc.append(np.format_float_scientific(values[x, y, t], 4, False))
-
-                    # Frequency values
-                    freq_ref = np.format_float_positional(np.mean(freqsum[x, y, :]) / 1e6, 3, False) + "e6"
-                    freq_inc = np.format_float_positional(np.mean(voxels[:, :, :, 2]) / 1e3, 3, False) + "e3"
-
-                    # Combine all list entries into a formatted string
-                    value = ostr.print_list(value_acc, ",", "")
-
-                    # Format data
-                    rascn = np.char.zfill(np.format_float_positional(ras[x, y, t], 6, False), 10)
-                    decln = np.char.zfill(np.format_float_positional(np.abs(dcs[x, y, t]), 6, False), 9)
-
-                    # Add +/- value to Declinations
-                    if dcs[x, y, t] >= 0:
-                        decln = "+" + str(decln)
-                    else:
-                        decln = "-" + str(decln)
-
-                    # Write to OSM
-                    osm.write(f"{rascn} {decln} {freq_ref} {freq_inc} {value} \n")
-
-                    print(
-                        f"\rSaving data for spaxel # ({x}, {y}) of ({d[0]}, {d[1]})",
-                        end="",
-                    )
+            osm.write(data)
+        print("\rRecording data to .osm file ... Done!", end="")
 
         print("\nProcess complete, data saved to " + osm_output)
 

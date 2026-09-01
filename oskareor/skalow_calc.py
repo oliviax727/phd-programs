@@ -336,9 +336,9 @@ class SKAString:
         return iter_type(map_obj)
 
     @staticmethod
-    def print_list(arr: list, seperator: str = ", ", buffer: str = " ") -> str:
+    def print_list(arr: Iterable, seperator: str = ", ", buffer: str = " ") -> str:
         """Prints a stringified and beautified version of a list."""
-        return "[" + buffer + seperator.join(arr) + buffer + "]"
+        return "[" + buffer + seperator.join(str(arr)) + buffer + "]"
 
     @staticmethod
     def split_arr(arrstr: str, delimiter: str = ",", padding: int = 1) -> list:
