@@ -13,7 +13,7 @@ from astropy.units import Quantity
 
 # Local imports
 from oskareor.skalow_calc import FileManager as ofmg, SKAMath as omath, SKAString as ostr
-from oskareor.oskar_helpers import OSKARHelper as ohelp
+from oskareor.oskar_helpers import OSKARHelper as ohelp, FunctionTimer as FT
 from oskareor.reformatter import SimulationReformatter as simref
 
 # TODO: Turn into pip project (later)
@@ -554,6 +554,8 @@ class BTAnalysisPipeline:
             convert_uvfits=convert_uvfits,
         )
 
+    run_oskar_on_model_timed = FT(run_oskar_on_model, "Ran OSKAR on a given model.").execute_and_time
+
 
 class LoadDefaults:
     """A module for refreshing and reloading templates. By default all relevant files for all relevant templates will be reloaded. The list of available templates are found in the `TEMPLATES` set and the list of available file outputs are found in the `FILETYPES` set.
@@ -566,7 +568,9 @@ class LoadDefaults:
     FILETYPES = {"osm", "ini", "ms", "vis", "fits", "uvfits"}
 
     @staticmethod
-    def reload_template_sky_models(update_which_files=None, update_which_templates=None, oskar_parent_dir="~"):
+    def reload_template_sky_models(
+        update_which_files=None, update_which_templates=None, oskar_parent_dir="~", time=True
+    ):
         """
         (Re)load all default sky models and update corresponding ini and osm files.
 
@@ -588,11 +592,16 @@ class LoadDefaults:
         # Loop through all selected templates
         for template_preset_loop in update_which_templates:
             if "coeval" in template_preset_loop:
-                template_value = simref.mock_values(template_preset_loop, oskar_parent_dir=oskar_parent_dir)
+                template_value = (simref.mock_values_timed if time else simref.mock_values)(
+                    template_preset_loop, oskar_parent_dir=oskar_parent_dir
+                )
             else:
-                template_value = simref.mock_values(template_preset_loop, scale=20, oskar_parent_dir=oskar_parent_dir)
+                if time:
+                    template_value = (simref.mock_values_timed if time else simref.mock_values)(
+                        template_preset_loop, scale=20, oskar_parent_dir=oskar_parent_dir
+                    )
 
-            simref.generate_osm_from_simulation(
+            (simref.generate_osm_from_simulation_timed if time else simref.generate_osm_from_simulation)(
                 template_value,
                 osm_output=(
                     ohelp.default_template_path(
@@ -616,10 +625,7 @@ class LoadDefaults:
 
     @staticmethod
     def reload_template_oskar_sims(
-        start_from_scratch=False,
-        update_which_files=None,
-        update_which_templates=None,
-        oskar_parent_dir="~",
+        start_from_scratch=False, update_which_files=None, update_which_templates=None, oskar_parent_dir="~", time=True
     ):
         """(Re)load all default sky models and update corresponding measurement sets, visibility tables, and fits datacube files.
 
@@ -642,7 +648,7 @@ class LoadDefaults:
 
         # Loop through all selected templates
         for template_preset_loop in update_which_templates:
-            BTAnalysisPipeline.run_oskar_on_model(
+            (BTAnalysisPipeline.run_oskar_on_model_timed if time else BTAnalysisPipeline.run_oskar_on_model)(
                 template_preset=template_preset_loop,
                 outpath=(
                     (
@@ -691,7 +697,7 @@ class LoadDefaults:
             )
 
     @staticmethod
-    def reload_all(update_which_files=None, update_which_templates=None, oskar_parent_dir="~"):
+    def reload_all(update_which_files=None, update_which_templates=None, oskar_parent_dir="~", time=True):
         """(Re)load all default sky models and update the corresponding sky models, settings files, measurement sets, visibility tables, and fits datacubes.
 
         :param use_imager: Whether or not to also generate a datacube of the template file (note that each fits datacube will take a large quantity of space on disk >10 GB).
@@ -717,12 +723,14 @@ class LoadDefaults:
                 update_which_files=update_which_files,
                 update_which_templates=update_which_templates,
                 oskar_parent_dir=oskar_parent_dir,
+                time=time,
             )
         if "ms" in update_which_files or "vis" in update_which_files or "fits" in update_which_files:
             LoadDefaults.reload_template_oskar_sims(
                 update_which_files=update_which_files,
                 update_which_templates=update_which_templates,
                 oskar_parent_dir=oskar_parent_dir,
+                time=time,
             )
 
     # TODO: Compile the ~/oskareor.data directory with the ./oskareor directory into one github project

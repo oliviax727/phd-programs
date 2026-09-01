@@ -19,7 +19,7 @@ from astropy.coordinates import SkyCoord
 
 # Local imports
 from oskareor.skalow_calc import EoRCosmology as eorcosmo, SKAMath as omath, FileManager as ofmg, SKAString as ostr
-from oskareor.oskar_helpers import OSKARHelper as ohelp
+from oskareor.oskar_helpers import OSKARHelper as ohelp, FunctionTimer as FT
 
 
 class SimulationReformatter:
@@ -240,6 +240,8 @@ class SimulationReformatter:
         print("\nValues created!")
 
         return values.astype(np.float64)
+
+    mock_values_timed = FT(mock_values, "Generated mock simulation values.").execute
 
     @staticmethod
     def convert_h5_coeval_to_csv(h5_location, save_data=False, outdir="", name="out_h5_data"):
@@ -908,6 +910,10 @@ class SimulationReformatter:
 
         return dynamic_settings
 
+    generate_osm_from_simulation_timed = FT(
+        generate_osm_from_simulation, "Generated OSM from a simulation template."
+    ).execute
+
     @staticmethod
     def generate_osm_from_h5(
         file,
@@ -955,6 +961,8 @@ class SimulationReformatter:
             observation_length=observation_length,
             save_dynamic_settings=save_dynamic_settings,
         )
+
+    generate_osm_from_h5_timed = FT(generate_osm_from_h5, "Generated OSM from a h5 file.").execute
 
     @staticmethod
     def convert_osm_file_to_arrays(
@@ -1085,5 +1093,4 @@ class SimulationReformatter:
 
         return output_data
 
-
-# TODO: Reformatter time counter + full simulation time polling
+    convert_osm_file_to_arrays_timed = FT(convert_osm_file_to_arrays, "Converted OSM to arrays.").execute

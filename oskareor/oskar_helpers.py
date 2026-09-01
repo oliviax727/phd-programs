@@ -1,8 +1,13 @@
 """The oskar_helpers module contains a series of helper functions and variables for simulation-to-power-spectra pipeline. Requires an existing and robust oskareor.data file in the home directory."""
 
 # Mathematics and calculations
+from typing import Any, Callable
+
 import h5py
 import numpy as np
+
+# Performance Handling
+from timeit import default_timer as timer
 
 # In-Project Objects
 from oskareor.skalow_calc import FileManager as ofmg, SKAString as ostr
@@ -201,6 +206,63 @@ class OSKARHelper:
             print("============")
 
         return options
+
+
+class FunctionTimer:
+    """A wrapper object for creating a function with a timer."""
+
+    def __init__(self, func, msg=None):
+        self.start_time = None
+        self.end_time = None
+        self.func = func
+        self.msg = msg
+
+    def execute(self, *func_args: tuple, **func_kwargs: dict[str, Any]) -> Any:
+        """Executes a function and times its execution, prints the elapsed time to terminal.
+
+        :param *func_args (tuple): Positional arguments for the function.
+        :param **func_kwargs (tuple): Keyword arguments for the function.
+
+        :return output (Any): Whatever is returned from the base function
+        """
+
+        self.start_time = timer()
+
+        output = self.func(*func_args, **func_kwargs)
+
+        self.end_time = timer()
+
+        if self.msg is not None:
+            self.reprint(self.msg)
+
+        return output
+
+    def reprint(self, msg):
+        """Print the time elapsed with a custom message."""
+        print(msg, "\nTime elapsed:", self.get_time(), "seconds.")
+
+    def get_time(self) -> float:
+        """Get the elapsed time."""
+        if self.end_time is None or self.start_time is None:
+            raise RuntimeError("Function has not been called yet.")
+        else:
+            return self.end_time - self.start_time
+
+    @staticmethod
+    def execute_and_time(func: Callable, msg: str = None, *func_args: tuple, **func_kwargs: dict[str, Any]) -> Any:
+        """Executes a function and times its execution, prints the elapsed time to terminal.
+
+        :param func (Callable): The function in question to call.
+        :param msg (str): The string message to print to terminal on its own line.
+        :param *func_args (tuple): Positional arguments for the function.
+        :param **func_kwargs (tuple): Keyword arguments for the function.
+
+        :return output (Any): Whatever is returned from the base function
+        """
+
+        func_timer = FunctionTimer(func, msg)
+
+        return func_timer.execute(*func_args, **func_kwargs)
 
 
 # TODO: Create oskareor.data dir creator
