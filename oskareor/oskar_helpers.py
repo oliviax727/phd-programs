@@ -3,7 +3,7 @@
 # Mathematics and calculations
 # Performance Handling
 from timeit import default_timer as timer
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, Generic, TypeVar, TypedDict
 
 import h5py
 import numpy as np
@@ -150,38 +150,45 @@ class OSKARHelper:
 
         return np.array(coeval_template.get("BrightnessTemp")["brightness_temp"])
 
-    class OptionDict(TypedDict, closed=False):
-        aliases: str
+    class OptionDictValue(TypedDict):
+        """A dictionary for defining the available options to select from concerning a particluar set of templates."""
+
+        aliases: set[str]
         description: str
 
+    OptionDictValueType = TypeVar("OptionDictValueType", bound=OptionDictValue)
+
+    class OptionDict(dict[str, OptionDictValueType], Generic[OptionDictValueType]):
+        """Maps option names to values sharing the OptionDictValue structure."""
+
     @staticmethod
-    def select_option(options: dict, selection: str) -> dict:
+    def select_option(options: OptionDict, selection: str) -> dict:
         """Select an option from an option dictionary.
 
-        :param options (dict): The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
+        :param options (OptionDict): The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
         :param selection (str): The option to select. If empty return the whole option dictionary.
 
-        :return option_dict (dict): A dictionary containing only the option or the entire option dictionary
+        :return option_dict (OptionDict): A dictionary containing only the option or the entire option dictionary
         """
 
         if selection == "":
             return options
 
         for option in ostr.recase_iterable(set(options.keys())):
-            if selection.lower() == option or selection.lower() in options[option][0]:
+            if selection.lower() == option or selection.lower() in options[option]["aliases"]:
                 return {option: options[option]}
 
         raise ValueError("Option " + selection + " is not a valid option.")
 
     @staticmethod
-    def display_options(options: dict, selection: str = "", print_options: bool = True) -> dict:
+    def display_options(options: OptionDict, selection: str = "", print_options: bool = True) -> dict:
         """Select and/or display option(s) from an option dictionary.
 
-        :param options (dict): The option dictionary. See the OptionDict type for what minimal information is required.
+        :param options (OptionDict): The option dictionary. See the OptionDict type for what minimal information is required.
         :param selection (str): The option to select. If empty return the whole option dictionary.
         :param print_options (bool): If true print the help for the option dictionary. If false return dictionary only.
 
-        :return options_dict (dict): A dictionary containing only the option or the entire option dictionary.
+        :return options_dict (OptionDict): A dictionary containing only the option or the entire option dictionary.
         """
 
         options = OSKARHelper.select_option(options, selection)
@@ -194,12 +201,12 @@ class OSKARHelper:
                     + option.upper()
                     + "\n"
                     + "Description: "
-                    + options[option][1]
+                    + options[option]["description"]
                     + "\n"
                     + "Synonyms: "
                     + option
                     + ", "
-                    + ", ".join(options[option][0])
+                    + ", ".join(options[option]["aliases"])
                     + "\n"
                     + "Preset: "
                     + option

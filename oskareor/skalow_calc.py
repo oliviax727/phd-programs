@@ -213,16 +213,6 @@ class FileManager:
     """The FileManager class contains helper functions specifically relating to directory and file management, as well as the conversion of files."""
 
     @staticmethod
-    def convert_h5_to_uvfits(h5_file, uvfits_file):
-        """Converts a H5 file outputted from 21cmFAST and converts it directly into a uvfits file for CHIPS to analyse unadulterated.
-
-        :param h5_file: The H5 file to convert.
-        :param uvfits_file: The output target uvfits file.
-        """
-
-        # FIXME: Write H5 file converter
-
-    @staticmethod
     def convert_ms_to_uvfits(ms_dir, uvfits_file):
         """Converts a CASA Measurement Set outputted from OSKAR into a uvfits file for CHIPS to analyse unadulterated.
 

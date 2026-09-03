@@ -11,8 +11,15 @@
 echo "Initialising ..."
 
 # Create Temporary Directory
-export P21C_TEMP_DIR="${JOBFS}/gpc-p21c-olivia"
-export P21C_OUT_DIR="/fred/oz113/owalters/phd-programs"
+run_date=$(date +"%F") || exit
+export P21C_TEMPLATE="$1"
+
+export P21C_TEMP_DIR="${JOBFS}/p21c-olivia-${P21C_TEMPLATE}_${run_date}"
+export P21C_OUT_DIR="/fred/oz113/owalters"
+
+mkdir -p "${P21C_TEMP_DIR}"
+
+# TODO: Rsync command here!
 
 echo "Writing cache data to: ${P21C_TEMP_DIR}"
 echo "Loading modules ..."
@@ -32,6 +39,6 @@ echo "Running the simulation ..."
 
 echo "Simulation complete, migrating data ..."
 
-cp -r "$P21C_TEMP_DIR" /fred/oz113/owalters/p21c.data
+cp -r "$P21C_TEMP_DIR" "/fred/oz113/owalters/p21c.data/"
 
 echo "Data transfer complete!"

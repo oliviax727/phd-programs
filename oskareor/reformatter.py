@@ -1,25 +1,31 @@
 """The reformatter module contains functions relating to translating simulation data to OSKAR output data."""
 
 # System imports
+import csv
 import warnings
+from typing import Callable
 
 # Mathematics and calculations
 import astropy.constants as c
 import astropy.units as u
-import numpy as np
 import h5py
+import numpy as np
 
 # Data handling and statistics
 import pandas as pd
-from scipy.interpolate import make_interp_spline as misp
-import csv
 
 # Astropy extras
 from astropy.coordinates import SkyCoord
+from scipy.interpolate import make_interp_spline as misp
+
+from oskareor.oskar_helpers import FunctionTimer as FT
+from oskareor.oskar_helpers import OSKARHelper as ohelp
 
 # Local imports
-from oskareor.skalow_calc import EoRCosmology as eorcosmo, SKAMath as omath, FileManager as ofmg, SKAString as ostr
-from oskareor.oskar_helpers import OSKARHelper as ohelp, FunctionTimer as FT
+from oskareor.skalow_calc import EoRCosmology as eorcosmo
+from oskareor.skalow_calc import FileManager as ofmg
+from oskareor.skalow_calc import SKAMath as omath
+from oskareor.skalow_calc import SKAString as ostr
 
 
 class SimulationReformatter:
@@ -61,115 +67,164 @@ class SimulationReformatter:
         # Calculate linewidth in Hz
         return (tb**0.5) * omath.SIGMA_F_FLOAT
 
-    TEMPLATE_PRESETS = {
-        "gaussian": (
-            {"normal", "gauss", "bell", "n", "g", "b"},
-            "Rotationally symmetric centered gaussian plane with FWHM = d(t)/3.",
-            lambda p: omath.gaussian(p["r"], var=omath.STDEV(p["d"][2] / 3) ** 2, amp=p["T_max"]),
-            (100, 100, 100),
-            20,
-            5,
-            (1, 1, 1),
-        ),
-        "flat": (
-            {"plane", "constant", "const", "c", "f"},
-            "Constant temperature for every pixel.",
-            lambda p: p["T_max"],
-            (100, 100, 100),
-            20,
-            5,
-            (1, 1, 1),
-        ),
-        "random": (
-            {"rand", "r"},
-            "Random values for every cell from 0 to the defined scale (T_max).",
-            lambda p: p["T_max"] * np.random.rand(),
-            (100, 100, 100),
-            20,
-            5,
-            (1, 1, 1),
-        ),
-        "sinusoid": (
-            {"sinc", "interference", "fringe", "i", "intf", "s"},
-            "Rotationally symmetric centered sinc function with freq = 1/d(t).",
-            lambda p: np.abs(omath.sinc(p["r"], f=1 / p["d"][2], amp=p["T_max"])),
-            (100, 100, 100),
-            20,
-            5,
-            (1, 1, 1),
-        ),
-        "point": (
-            {"delta", "source", "p"},
-            "A point source in the direct centre of the field.",
-            lambda p: (p["T_max"] if (p["i"] == p["d"][0] // 2 and p["j"] == p["d"][1] // 2) else 0),
-            (100, 100, 100),
-            20,
-            5,
-            (1, 1, 1),
-        ),
-        "dark": (
-            {"clear", "empty", "d"},
-            "A completely clear sky.",
-            lambda p: 0,
-            (100, 100, 100),
-            20,
-            5,
-            (1, 1, 1),
-        ),
-        "coeval1": (
-            {"coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1"},
-            "One of two simulation boxes, cocentric with the desired values box, "
-            "the original model has d = (400, 400, 400).\n"
-            "If d(a) < 400 then the box outer edges will be cropped, and if d(a) > 400 "
-            "the box will repeat beyond 400 px from the centre.",
-            lambda p: p["data"][*p["central"]],
-            (400, 400, 400),
-            1,
-            6.9169,
-            (1.5, 1.5, 1.5),
-        ),
-        "coeval2": (
-            {"coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2"},
-            "The second of two simulation boxes, cocentric with the desired values box, "
-            "the original model has d = (400, 400, 400).\n"
-            "If d(a) < 400 then the box outer edges will be cropped, and if d(a) > 400 "
-            "the box will repeat beyond 400 px from the centre.",
-            lambda p: p["data"][*p["central"]],
-            (400, 400, 400),
-            1,
-            7.9157,
-            (1.5, 1.5, 1.5),
-        ),
-        "flat400": (
-            {"coeval flat", "flat coeval", "flat_coeval", "coeval_flat", "fc", "cf", "f400"},
-            "A flat field box preselected to match the dimensions of both template coeval boxes d = (400, 400, 400).\n",
-            lambda p: p["T_max"],
-            (400, 400, 400),
-            1,
-            6.9169,
-            (1.5, 1.5, 1.5),
-        ),
-        "flat512": (
-            {"large flat", "flat large", "flat_large", "large_flat", "fl", "lf", "f512"},
-            "A flat field box preselected to match the dimensions of a box that is 512 x 512 x 1024 voxels"
-            + "(i.e. the flat field correction used for the science).\n",
-            lambda p: p["T_max"],
-            (512, 512, 1024),
-            1,
-            5.5,
-            (2, 2, 2),
-        ),
-        "column": (
-            {"col", "small", "coeval small", "small coeval", "los", "small field"},
-            "A small field section of a sky model but with a comparatively large frequency dimension.",
-            lambda p: p["data"][*p["central"]],
-            (10, 10, 100),
-            1,
-            6.9169,
-            (1.5, 1.5, 1.5),
-        ),
-        "slice": (
-            {
+    class ReformatterOptionValue(ohelp.OptionDictValue):
+        """Reformatter option dict value."""
+
+        generator: Callable[[dict], float]
+        d: tuple[int, int, int]
+        scale: int
+        z_ref: float
+        v: tuple[float, float, float]
+
+    ReformatterOptions = ohelp.OptionDict[ReformatterOptionValue]
+
+    TEMPLATE_PRESETS: ReformatterOptions = {
+        "gaussian": {
+            "aliases": {"normal", "gauss", "bell", "n", "g", "b"},
+            "description": ("Rotationally symmetric centered gaussian plane with FWHM = " + "d(t)/3."),
+            "generator": lambda p: omath.gaussian(p["r"], var=omath.STDEV(p["d"][2] / 3) ** 2, amp=p["T_max"]),
+            "d": (100, 100, 100),
+            "scale": 20,
+            "z_ref": 5,
+            "v": (1, 1, 1),
+        },
+        "flat": {
+            "aliases": {"plane", "constant", "const", "c", "f"},
+            "description": "Constant temperature for every pixel.",
+            "generator": lambda p: p["T_max"],
+            "d": (100, 100, 100),
+            "scale": 20,
+            "z_ref": 5,
+            "v": (1, 1, 1),
+        },
+        "random": {
+            "aliases": {"rand", "r"},
+            "description": ("Random values for every cell from 0 to the defined scale " + "(T_max)."),
+            "generator": lambda p: p["T_max"] * np.random.rand(),
+            "d": (100, 100, 100),
+            "scale": 20,
+            "z_ref": 5,
+            "v": (1, 1, 1),
+        },
+        "sinusoid": {
+            "aliases": {"sinc", "interference", "fringe", "i", "intf", "s"},
+            "description": ("Rotationally symmetric centered sinc function with freq = " + "1/d(t)."),
+            "generator": lambda p: np.abs(omath.sinc(p["r"], f=1 / p["d"][2], amp=p["T_max"])),
+            "d": (100, 100, 100),
+            "scale": 20,
+            "z_ref": 5,
+            "v": (1, 1, 1),
+        },
+        "point": {
+            "aliases": {"delta", "source", "p"},
+            "description": "A point source in the direct centre of the field.",
+            "generator": lambda p: (p["T_max"] if p["i"] == p["d"][0] // 2 and p["j"] == p["d"][1] // 2 else 0),
+            "d": (100, 100, 100),
+            "scale": 20,
+            "z_ref": 5,
+            "v": (1, 1, 1),
+        },
+        "dark": {
+            "aliases": {"clear", "empty", "d"},
+            "description": "A completely clear sky.",
+            "generator": lambda p: 0,
+            "d": (100, 100, 100),
+            "scale": 20,
+            "z_ref": 5,
+            "v": (1, 1, 1),
+        },
+        "coeval1": {
+            "aliases": {"coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1"},
+            "description": (
+                "One of two simulation boxes, cocentric with the desired values box, "
+                "the original model has d = (400, 400, 400).\n"
+                "If d(a) < 400 then the box outer edges will be cropped, "
+                "and if d(a) > 400 "
+                "the box will repeat beyond 400 px from the centre."
+            ),
+            "generator": lambda p: p["data"][*p["central"]],
+            "d": (400, 400, 400),
+            "scale": 1,
+            "z_ref": 6.9169,
+            "v": (1.5, 1.5, 1.5),
+        },
+        "coeval2": {
+            "aliases": {"coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2"},
+            "description": (
+                "The second of two simulation boxes, cocentric with the "
+                "desired values box, "
+                "the original model has d = (400, 400, 400).\n"
+                "If d(a) < 400 then the box outer edges will be cropped, "
+                "and if d(a) > 400 "
+                "the box will repeat beyond 400 px from the centre."
+            ),
+            "generator": lambda p: p["data"][*p["central"]],
+            "d": (400, 400, 400),
+            "scale": 1,
+            "z_ref": 7.9157,
+            "v": (1.5, 1.5, 1.5),
+        },
+        "flat400": {
+            "aliases": {
+                "coeval flat",
+                "flat coeval",
+                "flat_coeval",
+                "coeval_flat",
+                "fc",
+                "cf",
+                "f400",
+            },
+            "description": (
+                "A flat field box preselected to match the dimensions of both template "
+                "coeval boxes d = (400, 400, 400).\n"
+            ),
+            "generator": lambda p: p["T_max"],
+            "d": (400, 400, 400),
+            "scale": 1,
+            "z_ref": 6.9169,
+            "v": (1.5, 1.5, 1.5),
+        },
+        "flat512": {
+            "aliases": {
+                "large flat",
+                "flat large",
+                "flat_large",
+                "large_flat",
+                "fl",
+                "lf",
+                "f512",
+            },
+            "description": (
+                "A flat field box preselected to match the dimensions of a box that is "
+                "512 x 512 x 1024 voxels (i.e. the flat field correction "
+                "used for the science).\n"
+            ),
+            "generator": lambda p: p["T_max"],
+            "d": (512, 512, 1024),
+            "scale": 1,
+            "z_ref": 5.5,
+            "v": (2, 2, 2),
+        },
+        "column": {
+            "aliases": {
+                "col",
+                "small",
+                "coeval small",
+                "small coeval",
+                "los",
+                "small field",
+            },
+            "description": (
+                "A small field section of a sky model but with a comparatively " + "large frequency dimension."
+            ),
+            "generator": lambda p: p["data"][*p["central"]],
+            "d": (10, 10, 100),
+            "scale": 1,
+            "z_ref": 6.9169,
+            "v": (1.5, 1.5, 1.5),
+        },
+        "slice": {
+            "aliases": {
                 "single",
                 "channel",
                 "single channel",
@@ -180,17 +235,17 @@ class SimulationReformatter:
                 "mono",
                 "monochromatic",
             },
-            "A large field but with no depth or evolution in frequency.",
-            lambda p: p["data"][*p["central"]],
-            (400, 400, 1),
-            1,
-            6.9169,
-            (1.5, 1.5, 1.5),
-        ),
+            "description": "A large field but with no depth or evolution in frequency.",
+            "generator": lambda p: p["data"][*p["central"]],
+            "d": (400, 400, 1),
+            "scale": 1,
+            "z_ref": 6.9169,
+            "v": (1.5, 1.5, 1.5),
+        },
     }
 
     @staticmethod
-    def display_template_presets(print_presets: bool = True, filter_preset: str = "") -> dict:
+    def display_template_presets(print_presets: bool = True, filter_preset: str = "") -> ReformatterOptions:
         """Return and/or display all available templates, their names, and their descriptions. All templates except random, coeval1, and coeval2 are identical in all t-dimension voxels.
 
         :param print_presets: If true print the templates to console and return the dictionary. If false only return the dictionary.
@@ -200,18 +255,7 @@ class SimulationReformatter:
         """
 
         return ohelp.display_options(
-            SimulationReformatter.TEMPLATE_PRESETS
-            | {
-                "key": (
-                    {"aliases", "or", "synonyms"},
-                    "Description",
-                    "Generation function (see documentation for mock_values)",
-                    "Box dimensions",
-                    "Default scale",
-                    "Reference Redshift",
-                    "Voxel dimensions (cMpc)",
-                ),
-            },
+            SimulationReformatter.TEMPLATE_PRESETS,
             print_options=print_presets,
             selection=filter_preset,
         )
@@ -241,13 +285,13 @@ class SimulationReformatter:
         if special is None:
             selection = SimulationReformatter.display_template_presets(False, preset)
             preset = list(selection.keys())[0]
-            func = selection[preset][2]
+            func = selection[preset]["generator"]
 
             if d is None:
-                d = selection[preset][3]
+                d = selection[preset]["d"]
 
             if scale is None:
-                scale = selection[preset][4]
+                scale = selection[preset]["scale"]
 
         else:
             func = special
@@ -691,12 +735,22 @@ class SimulationReformatter:
         print("\rRecording data to .osm file ... 70%", end="")
 
         # Create pandas dataframe
-        csv_data = pd.DataFrame(data=csv_cond, columns=["RA", "Dec", "Freq+", "Freq0", "Stokes I"], index=None)
+        csv_data = pd.DataFrame(
+            data=csv_cond,
+            columns=["RA", "Dec", "Freq+", "Freq0", "Stokes I"],
+            index=None,
+        )
         print("\rRecording data to .osm file ... 80%", end="")
 
         # Write data to CSV
         csv_data.to_csv(
-            osm_output_exp, sep=" ", index=False, header=False, quoting=csv.QUOTE_NONE, quotechar="", escapechar="\\"
+            osm_output_exp,
+            sep=" ",
+            index=False,
+            header=False,
+            quoting=csv.QUOTE_NONE,
+            quotechar="",
+            escapechar="\\",
         )
         print("\rRecording data to .osm file ... 90%", end="")
 
@@ -899,8 +953,8 @@ class SimulationReformatter:
         if template is not None:
             selection = SimulationReformatter.display_template_presets(False, template)
             preset = list(selection.keys())[0]
-            z_ref = selection[preset][5]
-            v = selection[preset][6]
+            z_ref = selection[preset]["z_ref"]
+            v = selection[preset]["v"]
 
         # Configure d variable
         d = np.shape(values)

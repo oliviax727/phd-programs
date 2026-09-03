@@ -15,7 +15,7 @@ SETONIX_DATA_DIR_SCRATCH = "/scratch/mwaeor/ohrw/"
 # Testing stage
 
 # Flat 512 is priority one
-ldd.reload_template_sky_models(update_which_templates=["flat512"])  # , oskar_parent_dir=SETONIX_DATA_DIR_SCRATCH)
+ldd.reload_template_sky_models(update_which_templates=["flat"])  # , oskar_parent_dir=SETONIX_DATA_DIR_SCRATCH)
 
 # Then do everything else
 # ldd.reload_all(update_which_templates=ldd.TEMPLATES - {"flat"}, oskar_parent_dir=SETONIX_DATA_DIR_SCRATCH)
