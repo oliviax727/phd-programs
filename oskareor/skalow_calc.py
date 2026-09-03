@@ -180,12 +180,7 @@ class EoRCosmology:
     :param cosmo (EoRCosmology): The cosmological ΛCDM model.
     """
 
-    def __init__(
-        self,
-        h0: Quantity = 67.66 * u.km / u.s / u.Mpc,
-        omega_m_0: float = 0.31,
-        omega_b_0: float = 0.048,
-    ):
+    def __init__(self, h0: Quantity = 67.66 * u.km / u.s / u.Mpc, omega_m_0: float = 0.31, omega_b_0: float = 0.048):
         self.h0 = h0  # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
         self.omega_m_0 = omega_m_0
         self.omega_b_0 = omega_b_0

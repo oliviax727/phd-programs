@@ -1,16 +1,16 @@
 """The oskar_helpers module contains a series of helper functions and variables for simulation-to-power-spectra pipeline. Requires an existing and robust oskareor.data file in the home directory."""
 
 # Mathematics and calculations
+# Performance Handling
+from timeit import default_timer as timer
 from typing import Any, Callable
 
 import h5py
 import numpy as np
 
-# Performance Handling
-from timeit import default_timer as timer
-
 # In-Project Objects
-from oskareor.skalow_calc import FileManager as ofmg, SKAString as ostr
+from oskareor.skalow_calc import FileManager as ofmg
+from oskareor.skalow_calc import SKAString as ostr
 
 
 # OSKAR EOR helper class - dependant on ~/oskareor.data
@@ -146,7 +146,7 @@ class OSKARHelper:
         except FileNotFoundError:
             print("WARNING: The coeval template h5 file was not found. Random data values will be used instead.")
 
-            return np.random.rand(400, 400, 400) * 10
+            return np.random.rand(400, 400, 400)
 
         return np.array(coeval_template.get("BrightnessTemp")["brightness_temp"])
 
@@ -239,7 +239,7 @@ class FunctionTimer:
 
     def reprint(self, msg):
         """Print the time elapsed with a custom message."""
-        print(msg, "\nTime elapsed:", self.get_time(), "seconds.")
+        print(msg, "\nTime elapsed:", f"{self.get_time():4.3f}", "seconds.")
 
     def get_time(self) -> float:
         """Get the elapsed time."""
@@ -249,7 +249,7 @@ class FunctionTimer:
             return self.end_time - self.start_time
 
     @staticmethod
-    def execute_and_time(func: Callable, msg: str = None, *func_args: tuple, **func_kwargs: dict[str, Any]) -> Any:
+    def execute_and_time(func: Callable, *func_args: tuple, msg: str = None, **func_kwargs: dict[str, Any]) -> Any:
         """Executes a function and times its execution, prints the elapsed time to terminal.
 
         :param func (Callable): The function in question to call.

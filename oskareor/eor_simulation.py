@@ -1,5 +1,8 @@
 """The EoR simulation model is for functions that interact with the 21cmFAST python wrapper."""
 
+# FIXME: Remove pylint disabling for eor_sim file
+# pylint: disable=unused-import,unused-argument
+
 # System imports
 import os
 
@@ -64,11 +67,11 @@ class Simulator:
     def __init__(
         self,
         template,
+        *override_p21c_templates,
         toml_file="",
         z_ref=5.5,
         n_steps=1024,
         step_size_mpc=2,
-        *override_p21c_templates,
         **override_simulation_inputs,
     ):
         # Define simulation input parameters and save to .toml file

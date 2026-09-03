@@ -67,36 +67,54 @@ class SimulationReformatter:
             "Rotationally symmetric centered gaussian plane with FWHM = d(t)/3.",
             lambda p: omath.gaussian(p["r"], var=omath.STDEV(p["d"][2] / 3) ** 2, amp=p["T_max"]),
             (100, 100, 100),
+            20,
+            5,
+            (1, 1, 1),
         ),
         "flat": (
             {"plane", "constant", "const", "c", "f"},
             "Constant temperature for every pixel.",
             lambda p: p["T_max"],
             (100, 100, 100),
+            20,
+            5,
+            (1, 1, 1),
         ),
         "random": (
             {"rand", "r"},
             "Random values for every cell from 0 to the defined scale (T_max).",
             lambda p: p["T_max"] * np.random.rand(),
             (100, 100, 100),
+            20,
+            5,
+            (1, 1, 1),
         ),
         "sinusoid": (
             {"sinc", "interference", "fringe", "i", "intf", "s"},
             "Rotationally symmetric centered sinc function with freq = 1/d(t).",
             lambda p: np.abs(omath.sinc(p["r"], f=1 / p["d"][2], amp=p["T_max"])),
             (100, 100, 100),
+            20,
+            5,
+            (1, 1, 1),
         ),
         "point": (
             {"delta", "source", "p"},
             "A point source in the direct centre of the field.",
             lambda p: (p["T_max"] if (p["i"] == p["d"][0] // 2 and p["j"] == p["d"][1] // 2) else 0),
             (100, 100, 100),
+            20,
+            5,
+            (1, 1, 1),
         ),
         "dark": (
             {"clear", "empty", "d"},
             "A completely clear sky.",
             lambda p: 0,
             (100, 100, 100),
+            20,
+            5,
+            (1, 1, 1),
         ),
         "coeval1": (
             {"coeval 1", "1", "yuxiang1", "yuxiang 1", "y1", "c1"},
@@ -106,6 +124,9 @@ class SimulationReformatter:
             "the box will repeat beyond 400 px from the centre.",
             lambda p: p["data"][*p["central"]],
             (400, 400, 400),
+            1,
+            6.9169,
+            (1.5, 1.5, 1.5),
         ),
         "coeval2": (
             {"coeval 2", "2", "yuxiang2", "yuxiang 2", "y2", "c2"},
@@ -115,12 +136,18 @@ class SimulationReformatter:
             "the box will repeat beyond 400 px from the centre.",
             lambda p: p["data"][*p["central"]],
             (400, 400, 400),
+            1,
+            7.9157,
+            (1.5, 1.5, 1.5),
         ),
         "flat400": (
             {"coeval flat", "flat coeval", "flat_coeval", "coeval_flat", "fc", "cf", "f400"},
             "A flat field box preselected to match the dimensions of both template coeval boxes d = (400, 400, 400).\n",
             lambda p: p["T_max"],
             (400, 400, 400),
+            1,
+            6.9169,
+            (1.5, 1.5, 1.5),
         ),
         "flat512": (
             {"large flat", "flat large", "flat_large", "large_flat", "fl", "lf", "f512"},
@@ -128,12 +155,18 @@ class SimulationReformatter:
             + "(i.e. the flat field correction used for the science).\n",
             lambda p: p["T_max"],
             (512, 512, 1024),
+            1,
+            5.5,
+            (2, 2, 2),
         ),
         "column": (
             {"col", "small", "coeval small", "small coeval", "los", "small field"},
             "A small field section of a sky model but with a comparatively large frequency dimension.",
             lambda p: p["data"][*p["central"]],
             (10, 10, 100),
+            1,
+            6.9169,
+            (1.5, 1.5, 1.5),
         ),
         "slice": (
             {
@@ -150,6 +183,9 @@ class SimulationReformatter:
             "A large field but with no depth or evolution in frequency.",
             lambda p: p["data"][*p["central"]],
             (400, 400, 1),
+            1,
+            6.9169,
+            (1.5, 1.5, 1.5),
         ),
     }
 
@@ -164,7 +200,18 @@ class SimulationReformatter:
         """
 
         return ohelp.display_options(
-            SimulationReformatter.TEMPLATE_PRESETS,
+            SimulationReformatter.TEMPLATE_PRESETS
+            | {
+                "key": (
+                    {"aliases", "or", "synonyms"},
+                    "Description",
+                    "Generation function (see documentation for mock_values)",
+                    "Box dimensions",
+                    "Default scale",
+                    "Reference Redshift",
+                    "Voxel dimensions (cMpc)",
+                ),
+            },
             print_options=print_presets,
             selection=filter_preset,
         )
@@ -172,7 +219,7 @@ class SimulationReformatter:
     @staticmethod
     def mock_values(
         preset: str,
-        scale: float = 10,
+        scale: float = None,
         d: tuple = None,
         special=None,
         oskar_parent_dir: str = "~",
@@ -198,6 +245,9 @@ class SimulationReformatter:
 
             if d is None:
                 d = selection[preset][3]
+
+            if scale is None:
+                scale = selection[preset][4]
 
         else:
             func = special
@@ -302,6 +352,7 @@ class SimulationReformatter:
 
         # Define cosmology with H0=100h
         cosmology = eorcosmo(
+            h0=file.get("cosmo_params").attrs["hlittle"],
             omega_m_0=file.get("cosmo_params").attrs["OMm"],
             omega_b_0=file.get("cosmo_params").attrs["OMb"],
         )
@@ -485,20 +536,7 @@ class SimulationReformatter:
         for x in range(d[0]):
             for y in range(d[1]):
 
-                print(
-                    "\rRegridding spaxel # (",
-                    x,
-                    ",",
-                    y,
-                    ")",
-                    "of",
-                    "(",
-                    d[0],
-                    ",",
-                    d[1],
-                    ")",
-                    end="",
-                )
+                print("\rRegridding spaxel # (", x, ",", y, ")", "of", "(", d[0], ",", d[1], ")", end="")
 
                 # Set the values as being in the middle of each bin
                 freq_values = np.cumsum(voxels[x, y, :, 2]) - voxels[x, y, :, 2] / 2
@@ -585,9 +623,6 @@ class SimulationReformatter:
 
         print("Configuring datacube for OSKAR file format ...")
 
-        # Configure d variable
-        d = np.shape(values)
-
         # Configure OSM path
         osm_output_exp = ofmg.expand_path(osm_output)
 
@@ -625,7 +660,7 @@ class SimulationReformatter:
 
         # Find minimum (Refrence Frequency) Values
         csv_raw_minm = np.vectorize(lambda x: np.format_float_positional(x / 1e6, 3, False) + "e6")(
-            np.array([freqsum]).min(-1)
+            np.array([freqsum[:, :, -1]])
         )
         print("\rRecording data to .osm file ... 40%", end="")
 
@@ -837,6 +872,7 @@ class SimulationReformatter:
         ref_time=omath.REF_TIME,
         ref_location=omath.SKA_REF_LOC,
         observation_length=omath.OBS_LEN_4HR,
+        template=None,
     ):
         """Generate a set of .osm files for an OSKAR sky model based on a Mpc**3 simulation output.
 
@@ -845,18 +881,26 @@ class SimulationReformatter:
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
         :param require_regrid: If true then always reformat frequency bins, if false, reformat only when max frequency resolution is met.
         :param max_freq_res: Maximum allowable voxel frequency resolution.
-        :param v: If all voxels are the same, provides the initial voxel dimensions in h^-1 Mpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
+        :param v: If all voxels are the same, provides the initial voxel dimensions in cMpc in dimensions (x, y, t), and auto-generates the voxel configuration array.
         :param osm_output: The relative path to save the osm file to.
         :param cosmology: The specific cosmology parameters in the form of a custom eorcosmo object.
         :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
         :param ref_time: An astropy.time.Time object stating the desired mid-observation time.
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
+        :param template: If not none, override the z_ref and v parameters with the corresponding template values.
 
         :return: The dynamically defined settings dictionary.
         """
 
         print("Initialising ...")
+
+        # Set template parameters
+        if template is not None:
+            selection = SimulationReformatter.display_template_presets(False, template)
+            preset = list(selection.keys())[0]
+            z_ref = selection[preset][5]
+            v = selection[preset][6]
 
         # Configure d variable
         d = np.shape(values)

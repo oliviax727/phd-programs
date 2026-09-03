@@ -596,10 +596,9 @@ class LoadDefaults:
                     template_preset_loop, oskar_parent_dir=oskar_parent_dir
                 )
             else:
-                if time:
-                    template_value = (simref.mock_values_timed if time else simref.mock_values)(
-                        template_preset_loop, scale=20, oskar_parent_dir=oskar_parent_dir
-                    )
+                template_value = (simref.mock_values_timed if time else simref.mock_values)(
+                    template_preset_loop, oskar_parent_dir=oskar_parent_dir
+                )
 
             (simref.generate_osm_from_simulation_timed if time else simref.generate_osm_from_simulation)(
                 template_value,
@@ -621,6 +620,7 @@ class LoadDefaults:
                     if "ini" in update_which_files
                     else ""
                 ),
+                template=template_preset_loop,
             )
 
     @staticmethod
