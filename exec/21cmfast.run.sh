@@ -1,17 +1,17 @@
 #!/bin/bash -l
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=700GB
+#SBATCH --mem=750GB
 #SBATCH --time=4-00:00:00
 #SBATCH --job-name=owalters-p21c
 #SBATCH --account=oz113
 #SBATCH --output=/fred/oz113/owalters/slurm.out
-#SBATCH --tmp=20GB
+#SBATCH --tmp=1TB
 
 echo "Initialising ..."
 
 # Create Temporary Directory
-export P21C_TEMP_DIR="/aphid/scratch-3month/gpc-p21c-olivia"
+export P21C_TEMP_DIR="${JOBFS}/gpc-p21c-olivia"
 export P21C_OUT_DIR="/fred/oz113/owalters/phd-programs"
 
 echo "Writing cache data to: ${P21C_TEMP_DIR}"

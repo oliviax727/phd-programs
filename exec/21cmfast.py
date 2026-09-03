@@ -44,7 +44,6 @@ inputs = p21c.InputParameters.from_template(
     random_seed=20250303,
     HII_DIM=512,
     PERTURB_ON_HIGH_RES=True,
-    # PHOTON_CONS_TYPE="z-photoncons", - Will produce a box w/wo photocons
     LOWRES_CELL_SIZE_MPC=2,
     N_THREADS=8,
     USE_CMB_HEATING=True,

@@ -3,7 +3,7 @@
 # Mathematics and calculations
 # Performance Handling
 from timeit import default_timer as timer
-from typing import Any, Callable
+from typing import Any, Callable, TypedDict
 
 import h5py
 import numpy as np
@@ -150,6 +150,10 @@ class OSKARHelper:
 
         return np.array(coeval_template.get("BrightnessTemp")["brightness_temp"])
 
+    class OptionDict(TypedDict, closed=False):
+        aliases: str
+        description: str
+
     @staticmethod
     def select_option(options: dict, selection: str) -> dict:
         """Select an option from an option dictionary.
@@ -173,7 +177,7 @@ class OSKARHelper:
     def display_options(options: dict, selection: str = "", print_options: bool = True) -> dict:
         """Select and/or display option(s) from an option dictionary.
 
-        :param options (dict): The option dictionary. Dictionary must have a value structure of (option synonyms, description, *other).
+        :param options (dict): The option dictionary. See the OptionDict type for what minimal information is required.
         :param selection (str): The option to select. If empty return the whole option dictionary.
         :param print_options (bool): If true print the help for the option dictionary. If false return dictionary only.
 

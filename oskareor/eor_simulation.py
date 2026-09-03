@@ -26,7 +26,6 @@ class Simulator:
         "random_seed": 20250303,
         "HII_DIM": 512,
         "PERTURB_ON_HIGH_RES": True,
-        "PHOTON_CONS_TYPE": "z-photoncons",
         "LOWRES_CELL_SIZE_MPC": 2,
         "N_THREADS": 8,
         "USE_CMB_HEATING": True,
@@ -39,12 +38,19 @@ class Simulator:
         "M_TURN": 8.46,
     }
 
+    DEFAULT_LIGHTCONE_QUANTITES = ("brightness_temp", "density", "ionisation_rate_G12", "kinetic_temperature")
+
     TEMPLATE_PRESETS = {
         "fiducial": (
             {"basic", "simple", "starter", "f", "s", "b"},
             "A simple fiducial model using a modified version of Park19 and the Gpc py21cmfast, templates.",
-            {},
-        )
+            DEFAULT_SIMULATION_INPUTS,
+        ),
+        "photoncons": (
+            {"basic", "simple", "starter", "f", "s", "b"},
+            "A simple fiducial model using a modified version of Park19 and the Gpc py21cmfast, templates.",
+            DEFAULT_SIMULATION_INPUTS | {"PHOTON_CONS_TYPE": "z-photoncons"},
+        ),
     }
 
     @staticmethod
@@ -135,13 +141,17 @@ class Simulator:
         """
         return Simulator(["Park19", "large"], **self.DEFAULT_SIMULATION_INPUTS)
 
-    def run(self, temp_dir, output_file, backup_dir=""):
-        """Run the 21cmFast lightcone simulation. Requires a lot of memory and time.
+    def run(self, temp_dir, output_file, quantities=None, backup_dir=""):
+        """Run the 21cmFast lightcone simulation. WARNING! Requires a lot of memory and time!
 
         :param temp_dir: The operating directory to save temporary simulation data.
         :param output_file: The h5 file to output simulation data.
+        :param quantities: The global quantities that should be simulated in-detail, by default this will be the `DEFAULT_LIGHTCONE_QUANTITES` object.
         :param backup_dir: If not empty, the directory to save the temporary directory to.
         """
+        if quantities is None:
+            quantities = self.DEFAULT_LIGHTCONE_QUANTITES
+
         cache = p21c.OutputCache(temp_dir)
 
         print("Running 21cmFast ...")
