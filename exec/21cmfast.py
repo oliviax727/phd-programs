@@ -5,7 +5,7 @@
 import sys
 import os
 
-sys.path.append("/home/olivia/Desktop/Programs/phd-programs/")
+sys.path.append("/fred/oz113/owalters/phd-programs/")
 from oskareor.eor_simulation import Simulator  # pylint: disable=wrong-import-position
 
 print("Getting environment variables ...")
