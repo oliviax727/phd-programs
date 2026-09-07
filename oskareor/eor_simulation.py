@@ -48,6 +48,8 @@ class Simulator:
         "density",
         "ionisation_rate_G12",
         "kinetic_temperature",
+        "los_velocity",
+        "tau_21",
     )
 
     TEMPLATE_PRESETS: SimulationOptions = {
@@ -110,6 +112,7 @@ class Simulator:
         z_ref=None,
         n_steps=None,
         step_size_mpc=None,
+        quantities=None,
         **override_simulation_inputs,
     ):
         """Create a Simulator wrapper object.
@@ -119,6 +122,7 @@ class Simulator:
         :param z_ref: Refrence redshift, defaults to 5.5.
         :param n_steps: Number of voxels in the line-of-sight dimension, defaults to 1024.
         :param step_size_mpc: Size of each line-of-sight dimension voxel, defaults to 2.
+        :param quantities: The global quantities that should be simulated in-detail, by default this will be the `DEFAULT_LIGHTCONE_QUANTITES` object.
         """
 
         # Get oskareor template, default is fiducial
@@ -138,6 +142,9 @@ class Simulator:
 
         if p21c_templates is None:
             p21c_templates = self.template[self.template_name]["p21c_templates"]
+        
+        if quantities is None:
+            quantities = self.DEFAULT_LIGHTCONE_QUANTITES
 
         print(p21c_templates, (self.template[self.template_name]["inputs"] | override_simulation_inputs))
         # Define simulation input parameters
@@ -171,7 +178,7 @@ class Simulator:
         print("Creating the cache directory ...")
 
         # Create the lightcone
-        self.lcn = p21c.RectilinearLightconer(lc_distances=self.lc_dist, quantities=("brightness_temp", "density"))
+        self.lcn = p21c.RectilinearLightconer(lc_distances=self.lc_dist, quantites=quantites)
 
         # Create empty output data
         self.toml_file = self.file_name = self.output_file = self.backup_file = ""
@@ -201,17 +208,13 @@ class Simulator:
         """
         return Simulator(["Park19", "large"], **self.DEFAULT_SIMULATION_INPUTS)
 
-    def run(self, temp_dir, out_dir, quantities=None):
+    def run(self, temp_dir, out_dir):
         """Run the 21cmFast lightcone simulation. WARNING! Requires a lot of memory and time!
 
         :param temp_dir: The operating directory to save temporary simulation data.
         :param output_dir: The directory to output simulation data.
-        :param quantities: The global quantities that should be simulated in-detail, by default this will be the `DEFAULT_LIGHTCONE_QUANTITES` object.
-        :param backup_dir: If not empty, the directory to save the temporary directory to.
         """
-        if quantities is None:
-            quantities = self.DEFAULT_LIGHTCONE_QUANTITES
-
+         
         cache = p21c.OutputCache(temp_dir)
 
         # Saving inputs to cache

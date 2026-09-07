@@ -16,6 +16,4 @@ TEMPLATE = os.environ["P21C_TEMPLATE"]
 
 sim = Simulator(oskareor_template=TEMPLATE)
 
-qtys = ("brightness_temp", "density", "ionisation_rate_G12", "kinetic_temperature")
-
-sim.run(TEMP_DIR, OUT_DIR, qtys)
+sim.run(TEMP_DIR, OUT_DIR)
