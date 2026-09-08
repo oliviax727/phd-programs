@@ -1,0 +1,47 @@
+Creating mock brightness temperatures for the template: coeval2
+Time elapsed: 519.771 seconds.
+Time elapsed: 578.170 seconds.
+
+Creating mock brightness temperatures for the template: sinusoid
+Time elapsed: 20.869 seconds.
+Time elapsed: 10.294 seconds.
+
+Creating mock brightness temperatures for the template: flat
+Time elapsed: 6.615 seconds.
+Time elapsed: 10.230 seconds.
+
+Creating mock brightness temperatures for the template: column
+Time elapsed: 0.114 seconds.
+Time elapsed: 0.278 seconds.
+
+Creating mock brightness temperatures for the template: point
+Time elapsed: 6.649 seconds.
+Time elapsed: 9.976 seconds.
+
+Creating mock brightness temperatures for the template: flat512
+Time elapsed: 1797.958 seconds.
+Time elapsed: 1927.128 seconds.
+
+Creating mock brightness temperatures for the template: random
+Time elapsed: 7.242 seconds.
+Time elapsed: 10.293 seconds.
+
+Creating mock brightness temperatures for the template: dark
+Time elapsed: 6.639 seconds.
+Time elapsed: 10.045 seconds.
+
+Creating mock brightness temperatures for the template: coeval1
+Time elapsed: 522.454 seconds.
+Time elapsed: 578.757 seconds.
+
+Creating mock brightness temperatures for the template: gaussian
+Time elapsed: 11.940 seconds.
+Time elapsed: 10.222 seconds.
+
+Creating mock brightness temperatures for the template: slice
+Time elapsed: 1.327 seconds.
+Time elapsed: 8.014 seconds.
+
+Creating mock brightness temperatures for the template: flat400
+Time elapsed: 430.093 seconds.
+Time elapsed: 579.310 seconds.
