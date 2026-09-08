@@ -43,7 +43,7 @@ class Simulator:
         "M_TURN": 8.46,
     }
 
-    DEFAULT_LIGHTCONE_QUANTITES = (
+    DEFAULT_LIGHTCONE_QUANTITIES = (
         "brightness_temp",
         "density",
         "ionisation_rate_G12",
@@ -55,9 +55,7 @@ class Simulator:
     TEMPLATE_PRESETS: SimulationOptions = {
         "test": {
             "aliases": {"t", "test"},
-            "description": (
-                "A simple fiducial model using a modified version of Park19 " + "and the Gpc py21cmfast, templates."
-            ),
+            "description": ("A simple test model using a modified version of Park19."),
             "inputs": DEFAULT_SIMULATION_INPUTS | {"HII_DIM": 128, "PERTURB_ON_HIGH_RES": False},
             "z_ref": 5.5,
             "n_steps": 128,
@@ -67,7 +65,7 @@ class Simulator:
         "fiducial": {
             "aliases": {"basic", "simple", "starter", "f", "s", "b"},
             "description": (
-                "A simple fiducial model using a modified version of Park19 " + "and the Gpc py21cmfast, templates."
+                "A simple fiducial model using a modified version of Park19 and the Gpc py21cmfast, templates."
             ),
             "inputs": DEFAULT_SIMULATION_INPUTS,
             "z_ref": 5.5,
@@ -77,13 +75,44 @@ class Simulator:
         },
         "photoncons": {
             "aliases": {"pc", "phcons"},
-            "description": (
-                "A simple fiducial model using a modified version of Park19 " + "and the Gpc py21cmfast, templates."
-            ),
+            "description": ("The fiducial model but with photon conservation turned on.."),
             "inputs": DEFAULT_SIMULATION_INPUTS | {"PHOTON_CONS_TYPE": "z-photoncons"},
             "z_ref": 5.5,
             "n_steps": 1024,
             "step_size_mpc": 2,
+            "p21c_templates": ["Park19", "large"],
+        },
+        "q25": {
+            "aliases": {"qin", "qin 25", "qin+25"},
+            "description": (
+                "A version of the fiducial model designed to emulate the box size and resolution used in "
+                + " Qin et al. 2025"
+            ),
+            "inputs": DEFAULT_SIMULATION_INPUTS
+            | {"PHOTON_CONS_TYPE": "z-photoncons", "HII_DIM": 250, "LOWRES_CELL_SIZE_MPC": 1.953125},
+            "z_ref": 5.5,
+            "n_steps": 1024,
+            "step_size_mpc": 1.953125,
+            "p21c_templates": ["Park19", "large"],
+        },
+        "q25-nospin": {
+            "aliases": {"qin-nospin", "qin 25 nospin", "qin+25-nospin", "q25ns"},
+            "description": (
+                "A version of the fiducial model designed to emulate the box size and resolution used in "
+                + " Qin et al. 2025. But with no spin temperature calculations."
+            ),
+            "inputs": DEFAULT_SIMULATION_INPUTS
+            | {
+                "PHOTON_CONS_TYPE": "z-photoncons",
+                "HII_DIM": 250,
+                "LOWRES_CELL_SIZE_MPC": 1.953125,
+                "USE_CMB_HEATING": False,
+                "USE_LYA_HEATING": False,
+                "USE_TS_FLUCT": False,
+            },
+            "z_ref": 5.5,
+            "n_steps": 1024,
+            "step_size_mpc": 1.953125,
             "p21c_templates": ["Park19", "large"],
         },
     }
@@ -122,7 +151,7 @@ class Simulator:
         :param z_ref: Refrence redshift, defaults to 5.5.
         :param n_steps: Number of voxels in the line-of-sight dimension, defaults to 1024.
         :param step_size_mpc: Size of each line-of-sight dimension voxel, defaults to 2.
-        :param quantities: The global quantities that should be simulated in-detail, by default this will be the `DEFAULT_LIGHTCONE_QUANTITES` object.
+        :param quantities: The global quantities that should be simulated in-detail, by default this will be the `DEFAULT_LIGHTCONE_QUANTITIES` object.
         """
 
         # Get oskareor template, default is fiducial
@@ -142,9 +171,9 @@ class Simulator:
 
         if p21c_templates is None:
             p21c_templates = self.template[self.template_name]["p21c_templates"]
-        
+
         if quantities is None:
-            quantities = self.DEFAULT_LIGHTCONE_QUANTITES
+            quantities = self.DEFAULT_LIGHTCONE_QUANTITIES
 
         print(p21c_templates, (self.template[self.template_name]["inputs"] | override_simulation_inputs))
         # Define simulation input parameters
@@ -178,7 +207,7 @@ class Simulator:
         print("Creating the cache directory ...")
 
         # Create the lightcone
-        self.lcn = p21c.RectilinearLightconer(lc_distances=self.lc_dist, quantites=quantites)
+        self.lcn = p21c.RectilinearLightconer(lc_distances=self.lc_dist, quantities=quantities)
 
         # Create empty output data
         self.toml_file = self.file_name = self.output_file = self.backup_file = ""
@@ -214,7 +243,7 @@ class Simulator:
         :param temp_dir: The operating directory to save temporary simulation data.
         :param output_dir: The directory to output simulation data.
         """
-         
+
         cache = p21c.OutputCache(temp_dir)
 
         # Saving inputs to cache
