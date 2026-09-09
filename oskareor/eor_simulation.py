@@ -23,7 +23,8 @@ class Simulator:
         z_ref: float
         n_steps: int
         step_size_mpc: float
-        p21c_templates: list[str]
+        p21c_templates: set[str]
+        quantities: set[str]
 
     SimulationOptions = ohelp.OptionDict[SimulationOptionValue]
 
@@ -43,14 +44,16 @@ class Simulator:
         "M_TURN": 8.46,
     }
 
-    DEFAULT_LIGHTCONE_QUANTITIES = (
+    DEFAULT_LIGHTCONE_QUANTITIES = {
         "brightness_temp",
         "density",
         "ionisation_rate_G12",
         "kinetic_temperature",
         "los_velocity",
         "tau_21",
-    )
+    }
+
+    DEFAULT_P21C_TEMPLATES = {"Park19", "large"}
 
     TEMPLATE_PRESETS: SimulationOptions = {
         "test": {
@@ -60,7 +63,8 @@ class Simulator:
             "z_ref": 5.5,
             "n_steps": 128,
             "step_size_mpc": 1,
-            "p21c_templates": ["Park19", "small"],
+            "p21c_templates": (DEFAULT_P21C_TEMPLATES - {"large"}) | {"small"},
+            "quantities": DEFAULT_LIGHTCONE_QUANTITIES,
         },
         "fiducial": {
             "aliases": {"basic", "simple", "starter", "f", "s", "b"},
@@ -71,7 +75,8 @@ class Simulator:
             "z_ref": 5.5,
             "n_steps": 1024,
             "step_size_mpc": 2,
-            "p21c_templates": ["Park19", "large"],
+            "p21c_templates": DEFAULT_P21C_TEMPLATES,
+            "quantities": DEFAULT_LIGHTCONE_QUANTITIES,
         },
         "photoncons": {
             "aliases": {"pc", "phcons"},
@@ -80,7 +85,8 @@ class Simulator:
             "z_ref": 5.5,
             "n_steps": 1024,
             "step_size_mpc": 2,
-            "p21c_templates": ["Park19", "large"],
+            "p21c_templates": DEFAULT_P21C_TEMPLATES,
+            "quantities": DEFAULT_LIGHTCONE_QUANTITIES,
         },
         "q25": {
             "aliases": {"qin", "qin 25", "qin+25"},
@@ -93,7 +99,8 @@ class Simulator:
             "z_ref": 5.5,
             "n_steps": 1024,
             "step_size_mpc": 1.953125,
-            "p21c_templates": ["Park19", "large"],
+            "p21c_templates": DEFAULT_P21C_TEMPLATES,
+            "quantities": DEFAULT_LIGHTCONE_QUANTITIES,
         },
         "q25-nospin": {
             "aliases": {"qin-nospin", "qin 25 nospin", "qin+25-nospin", "q25ns"},
@@ -113,7 +120,8 @@ class Simulator:
             "z_ref": 5.5,
             "n_steps": 1024,
             "step_size_mpc": 1.953125,
-            "p21c_templates": ["Park19", "large"],
+            "p21c_templates": DEFAULT_P21C_TEMPLATES,
+            "quantities": DEFAULT_LIGHTCONE_QUANTITIES - {"tau_21"},
         },
     }
 
@@ -173,9 +181,8 @@ class Simulator:
             p21c_templates = self.template[self.template_name]["p21c_templates"]
 
         if quantities is None:
-            quantities = self.DEFAULT_LIGHTCONE_QUANTITIES
+            quantities = self.template[self.template_name]["quantities"]
 
-        print(p21c_templates, (self.template[self.template_name]["inputs"] | override_simulation_inputs))
         # Define simulation input parameters
         self.inputs = p21c.InputParameters.from_template(
             p21c_templates, **(self.template[self.template_name]["inputs"] | override_simulation_inputs)
@@ -235,7 +242,7 @@ class Simulator:
 
         This assumes a constant f_esc. Pursuing a non-constant f_esc will be optional later on.
         """
-        return Simulator(["Park19", "large"], **self.DEFAULT_SIMULATION_INPUTS)
+        return Simulator()
 
     def run(self, temp_dir, out_dir):
         """Run the 21cmFast lightcone simulation. WARNING! Requires a lot of memory and time!

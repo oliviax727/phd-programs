@@ -11,11 +11,11 @@ from oskareor.eor_simulation import Simulator  # pylint: disable=wrong-import-po
 
 print("Getting environment variables ...")
 
-for template in ["q25", "q25-nospin"]:
+for template in ["q25-nospin"]:
     print("Simulating template:", template)
 
     sim = Simulator(oskareor_template=template)
 
-    sim.run("/tmp/", "oskareor.data/simulations/project1/")
+    sim.run("/tmp/", "/home/olivia/oskareor.data/simulations/project1/")
 
     del sim
