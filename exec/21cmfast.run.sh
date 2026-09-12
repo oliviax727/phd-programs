@@ -1,12 +1,12 @@
 #!/bin/bash -l
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=350GB
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=600GB
 #SBATCH --time=2-00:00:00
 #SBATCH --job-name=owalters-p21c
 #SBATCH --account=oz113
 #SBATCH --output=/fred/oz113/owalters/slurm.out
-#SBATCH --tmp=500GB
+#SBATCH --tmp=1TB
 
 echo "Initialising ..."
 
