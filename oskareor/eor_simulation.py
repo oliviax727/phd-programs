@@ -101,6 +101,7 @@ class Simulator:
             "n_steps": 1024,
             "step_size_mpc": 1.953125,
             "p21c_templates": DEFAULT_P21C_TEMPLATES,
+        },
         "q25-nospin": {
             "aliases": {"qin-nospin", "qin 25 nospin", "qin+25-nospin", "q25ns"},
             "description": (
