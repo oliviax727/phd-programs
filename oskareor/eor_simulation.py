@@ -34,24 +34,9 @@ class Simulator:
         "PERTURB_ON_HIGH_RES": True,
         "LOWRES_CELL_SIZE_MPC": 2,
         "N_THREADS": 8,
-        "USE_CMB_HEATING": True,
-        "USE_LYA_HEATING": True,
-        "F_STAR10": -1.42,
-        "ALPHA_STAR": 0.51,
-        "F_ESC10": -1.08,
-        "ALPHA_ESC": -0.46,
-        "t_STAR": 0.34,
-        "M_TURN": 8.46,
     }
 
-    DEFAULT_LIGHTCONE_QUANTITIES = {
-        "brightness_temp",
-        "density",
-        "ionisation_rate_G12",
-        "kinetic_temperature",
-        "los_velocity",
-        "tau_21",
-    }
+    DEFAULT_LIGHTCONE_QUANTITIES = {"brightness_temp", "density"}
 
     DEFAULT_P21C_TEMPLATES = {"Park19", "large"}
 
@@ -95,13 +80,27 @@ class Simulator:
                 + " Qin et al. 2025"
             ),
             "inputs": DEFAULT_SIMULATION_INPUTS
-            | {"PHOTON_CONS_TYPE": "z-photoncons", "HII_DIM": 250, "LOWRES_CELL_SIZE_MPC": 1.953125},
+            | {"PHOTON_CONS_TYPE": "z-photoncons", "HII_DIM": 250, "LOWRES_CELL_SIZE_MPC": 1.953125}
+            | {
+                "USE_CMB_HEATING": True,
+                "USE_LYA_HEATING": True,
+                "F_STAR10": -1.42,
+                "ALPHA_STAR": 0.51,
+                "F_ESC10": -1.08,
+                "ALPHA_ESC": -0.46,
+                "t_STAR": 0.34,
+                "M_TURN": 8.46,
+            },
+            "quantities": DEFAULT_LIGHTCONE_QUANTITIES | {
+                "ionisation_rate_G12",
+                "kinetic_temperature",
+                "los_velocity",
+                "tau_21",
+            },
             "z_ref": 5.5,
             "n_steps": 1024,
             "step_size_mpc": 1.953125,
             "p21c_templates": DEFAULT_P21C_TEMPLATES,
-            "quantities": DEFAULT_LIGHTCONE_QUANTITIES,
-        },
         "q25-nospin": {
             "aliases": {"qin-nospin", "qin 25 nospin", "qin+25-nospin", "q25ns"},
             "description": (
@@ -116,6 +115,12 @@ class Simulator:
                 "USE_CMB_HEATING": False,
                 "USE_LYA_HEATING": False,
                 "USE_TS_FLUCT": False,
+                "F_STAR10": -1.42,
+                "ALPHA_STAR": 0.51,
+                "F_ESC10": -1.08,
+                "ALPHA_ESC": -0.46,
+                "t_STAR": 0.34,
+                "M_TURN": 8.46,
             },
             "z_ref": 5.5,
             "n_steps": 1024,
