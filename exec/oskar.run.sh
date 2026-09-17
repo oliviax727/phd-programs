@@ -17,4 +17,7 @@ source .venv/bin/activate
 # shellcheck disable=SC1091
 source /software/projects/mwaeor/ohrw/install-scripts/oskar-install.sh
 
+export OSKAR_MODEL="$1"
+export OSKAR_H5_LOCATION="/scratch/mwaeor/ohrw/oskareor.data/simulations/project1/${OSKAR_MODEL}_lightcone_simulation.h5"
+
 srun -N 1 -n 1 --exclusive ./exec/oskar.py

@@ -338,13 +338,10 @@ class SimulationReformatter:
     mock_values_timed = FT(mock_values, "Generated mock simulation values.").execute
 
     @staticmethod
-    def convert_h5_coeval_to_csv(h5_location, save_data=False, outdir="", name="out_h5_data"):
-        """Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
+    def extract_h5_coeval_data(h5_location):
+        """Extract h5 data from 21cmFastv4 coeval simulations.
 
         :param h5_location: The file location of the h5 data.
-        :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
-        :param outdir: The directory to output both CSV and text information.
-        :param name: The file name template to be saved to.
 
         :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
@@ -368,92 +365,63 @@ class SimulationReformatter:
         z_mid = file.attrs["redshift"]
         z_ref = cosmology.dz_to_z(cosmology.z_to_dz(z_mid) - u.Mpc * box_len / 2)
 
-        if save_data:
-            np.savetxt(outdir + "/" + name + ".csv", bt_data, delimiter=", ")
-            np.savetxt(
-                outdir + "/" + name + ".txt",
-                np.array([bt_data.shape, z_ref, vox, cosmology]),
-                delimiter=", ",
-            )
-
         return bt_data, bt_data.shape, z_ref, vox, cosmology
 
     @staticmethod
-    def convert_h5_lightcone_to_csv(h5_location, save_data=False, outdir="", name="out_h5_data"):
-        """Extract h5 data from Yuxiang Qin's lightcone simulations and either return the data objects or save to a seperate CSV.
+    def extract_h5_lightcone_data(h5_location):
+        """Extract h5 data from 21cmFastv4 lightcone simulations.
 
         :param h5_location: The file location of the h5 data.
-        :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
-        :param outdir: The directory to output both CSV and text information.
-        :param name: The file name template to be saved to.
         :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
 
         file = h5py.File(h5_location, "r")
 
         # Get BT data
-        bt_data = np.array(file.get("lightcones/brightness_temp"))
+        bt_data = np.array(file["lightcones"]["brightness_temp"])
 
         # Define cosmology with H0=100h
         cosmology = eorcosmo(
-            h0=file.get("cosmo_params").attrs["hlittle"],
+            h0=file.get("cosmo_params").attrs["hlittle"] * 100,
             omega_m_0=file.get("cosmo_params").attrs["OMm"],
             omega_b_0=file.get("cosmo_params").attrs["OMb"],
         )
 
         # Get Box and Voxel dimensions
-        box_len = file.get("user_params").attrs["BOX_LEN"] * file.get("cosmo_params").attrs["hlittle"]
-        rs = np.array(list(file.get("node_redshifts")))
+        box_len = file.get("user_params").attrs["HII_DIM"]
+        dzs = np.array(file["lightcone_distances"])
+
         vox = (
             np.array(
                 [
                     box_len,
                     box_len,
-                    abs(cosmology.z_to_dz(rs[0]) - cosmology.z_to_dz(rs[-1])).to_value(u.Mpc),
+                    abs(dzs[0] - dzs[-1]),
                 ]
             )
-            / bt_data.shape
-        )
+        ) / bt_data.shape
 
         # Transform intitial redshift
-        z_ref = np.min(rs)
-
-        if save_data:
-            np.savetxt(outdir + "/" + name + ".csv", bt_data, delimiter=", ")
-            np.savetxt(
-                outdir + "/" + name + ".txt",
-                np.array([bt_data.shape, z_ref, vox, cosmology]),
-                delimiter=", ",
-            )
+        z_ref = cosmology.dz_to_z(np.min(dzs))
 
         return bt_data, bt_data.shape, z_ref, vox, cosmology
 
     @staticmethod
-    def convert_h5_to_csv(
+    def extract_h5_data(
         h5_location: str,
-        save_data: bool = False,
-        outdir: str = "",
-        name: str = "out_h5_data",
         coeval: bool = True,
     ):
-        """Extract h5 data from Yuxiang Qin's simulations and either return the data objects or save to a seperate CSV.
+        """Extract h5 data from 21cmFastv4 simulations.
 
         :param h5_location: The file location of the h5 data.
-        :param save_data: If true, output data to a CSV and text file, specified by the outdir parameter.
-        :param outdir: The directory to output both CSV and text information.
-        :param name: The file name template to be saved to.
         :param coeval: whether or not the box is coeval or lightcone.
         :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
         """
 
         if coeval:
-            return SimulationReformatter.convert_h5_coeval_to_csv(
-                h5_location=h5_location, save_data=save_data, outdir=outdir, name=name
-            )
+            return SimulationReformatter.extract_h5_coeval_data(h5_location)
 
-        return SimulationReformatter.convert_h5_lightcone_to_csv(
-            h5_location=h5_location, save_data=save_data, outdir=outdir, name=name
-        )
+        return SimulationReformatter.extract_h5_lightcone_data(h5_location)
 
     @staticmethod
     def transform_datacube_units(
@@ -1025,7 +993,7 @@ class SimulationReformatter:
         observation_length=omath.OBS_LEN_4HR,
         save_dynamic_settings="",
     ):
-        """Combines both the convert_h5_to_csv and generate_osm_from_simulation functions.
+        """Combines both the extract_h5_data and generate_osm_from_simulation functions.
 
         :param file: Location of the h5 file.
         :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
@@ -1040,7 +1008,7 @@ class SimulationReformatter:
         :return dynamic_settings: The dynamically defined settings dictionary.
         """
 
-        values, z_ref, vox, cosmology = SimulationReformatter.convert_h5_to_csv(file, coeval=coeval)
+        values, z_ref, vox, cosmology = SimulationReformatter.extract_h5_data(file, coeval=coeval)
 
         if osm_output == "":
             osm_output = file.split("/")[-1][:-3] + "_osm.osm"
