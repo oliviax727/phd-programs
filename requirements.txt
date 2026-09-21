@@ -19,6 +19,7 @@ python-casacore>=3.6,<4
 pylint-fixme-info
 scikit-learn
 sphinx
+21cmSense
 
 # Special non-compulsory libraries
 # 21cmFAST>4
