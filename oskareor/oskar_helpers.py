@@ -86,7 +86,7 @@ class OSKARHelper:
             "channel_bandwidth_hz": 5e4,
             "time_average_sec": 10.0,
             "uv_filter_max": 1000,
-            "uv_filter_units": "Wavelengths",
+            "uv_filter_units": "Metres",
         },
         "sky": {"oskar_sky_model/file": "BTA/sky_model.osm"},
     }
