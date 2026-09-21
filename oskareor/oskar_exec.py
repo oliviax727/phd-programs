@@ -554,7 +554,7 @@ class BTAnalysisPipeline:
             convert_uvfits=convert_uvfits,
         )
 
-    run_oskar_on_model_timed = FT(run_oskar_on_model, "Ran OSKAR on a given model.").execute_and_time
+    run_oskar_on_model_timed = FT(run_oskar_on_model, "Ran OSKAR on a given model.").execute
 
 
 class LoadDefaults:

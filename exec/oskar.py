@@ -18,11 +18,10 @@ SETONIX_DATA_DIR_SCRATCH = "/scratch/mwaeor/ohrw/"
 
 MODEL = os.environ["OSKAR_MODEL"]
 H5_LOCATION = os.environ["OSKAR_H5_LOCATION"]
-DATA_DIR = SETONIX_DATA_DIR_SCRATCH + "/oskareor.data/oskar.data/" + "/" + MODEL + "/"
+DATA_DIR = SETONIX_DATA_DIR_SCRATCH + "/oskareor.data/oskar.data" + "/" + MODEL + "/"
 
-btap.run_oskar_on_model_timed(
+btap.run_oskar_on_model(
     file=H5_LOCATION,
-    oskar_parent_dir=SETONIX_DATA_DIR_SCRATCH,
     outpath=(
         DATA_DIR + MODEL + ohelp.TEMPLATE_FILE_TYPE_EXTENSIONS["ms"],
         DATA_DIR + MODEL + ohelp.TEMPLATE_FILE_TYPE_EXTENSIONS["vis"],
@@ -35,4 +34,5 @@ btap.run_oskar_on_model_timed(
     load_osm=False,
     oskar_parent_dir=SETONIX_DATA_DIR_SCRATCH,
     convert_uvfits=True,
+    coeval=False
 )

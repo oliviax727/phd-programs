@@ -365,7 +365,7 @@ class SimulationReformatter:
         z_mid = file.attrs["redshift"]
         z_ref = cosmology.dz_to_z(cosmology.z_to_dz(z_mid) - u.Mpc * box_len / 2)
 
-        return bt_data, bt_data.shape, z_ref, vox, cosmology
+        return bt_data, z_ref, vox, cosmology
 
     @staticmethod
     def extract_h5_lightcone_data(h5_location):
@@ -382,13 +382,13 @@ class SimulationReformatter:
 
         # Define cosmology with H0=100h
         cosmology = eorcosmo(
-            h0=file.get("cosmo_params").attrs["hlittle"] * 100,
-            omega_m_0=file.get("cosmo_params").attrs["OMm"],
-            omega_b_0=file.get("cosmo_params").attrs["OMb"],
+            h0=file['InputParameters']['cosmo_params'].attrs['hlittle'] * 100,
+            omega_m_0=file['InputParameters']['cosmo_params'].attrs['OMm'],
+            omega_b_0=file['InputParameters']['cosmo_params'].attrs['OMb'],
         )
 
         # Get Box and Voxel dimensions
-        box_len = file.get("user_params").attrs["HII_DIM"]
+        box_len = file['InputParameters']['simulation_options'].attrs['HII_DIM']
         dzs = np.array(file["lightcone_distances"])
 
         vox = (
@@ -402,9 +402,9 @@ class SimulationReformatter:
         ) / bt_data.shape
 
         # Transform intitial redshift
-        z_ref = cosmology.dz_to_z(np.min(dzs))
+        z_ref = cosmology.dz_to_z(np.min(dzs) * u.Mpc)
 
-        return bt_data, bt_data.shape, z_ref, vox, cosmology
+        return bt_data, z_ref, vox, cosmology
 
     @staticmethod
     def extract_h5_data(
