@@ -394,7 +394,7 @@ class BTAnalysisPipeline:
         oskar_mode="singularity",
         oskar_telescope_model="",
         template_preset="",
-        coeval=True,
+        coeval=False,
         load_osm=False,
         ref_time=omath.REF_TIME,
         ref_location=omath.SKA_REF_LOC,

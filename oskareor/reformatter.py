@@ -348,8 +348,8 @@ class SimulationReformatter:
 
         file = h5py.File(h5_location, "r")
 
-        # Get BT data
-        bt_data = np.array(file.get("BrightnessTemp")["brightness_temp"])
+        # Get BT data, convert mK to K
+        bt_data = np.array(file.get("BrightnessTemp")["brightness_temp"]) / 1000
 
         # Get Box and Voxel dimensions
         box_len = file.get("user_params").attrs["BOX_LEN"]  # * file.get('cosmo_params').attrs['hlittle']
@@ -377,18 +377,18 @@ class SimulationReformatter:
 
         file = h5py.File(h5_location, "r")
 
-        # Get BT data
-        bt_data = np.array(file["lightcones"]["brightness_temp"])
+        # Get BT data, convert mK to K
+        bt_data = np.array(file["lightcones"]["brightness_temp"]) / 1000
 
         # Define cosmology with H0=100h
         cosmology = eorcosmo(
-            h0=file['InputParameters']['cosmo_params'].attrs['hlittle'] * 100,
-            omega_m_0=file['InputParameters']['cosmo_params'].attrs['OMm'],
-            omega_b_0=file['InputParameters']['cosmo_params'].attrs['OMb'],
+            h0=file["InputParameters"]["cosmo_params"].attrs["hlittle"] * 100,
+            omega_m_0=file["InputParameters"]["cosmo_params"].attrs["OMm"],
+            omega_b_0=file["InputParameters"]["cosmo_params"].attrs["OMb"],
         )
 
         # Get Box and Voxel dimensions
-        box_len = file['InputParameters']['simulation_options'].attrs['HII_DIM']
+        box_len = file["InputParameters"]["simulation_options"].attrs["HII_DIM"]
         dzs = np.array(file["lightcone_distances"])
 
         vox = (
@@ -409,7 +409,7 @@ class SimulationReformatter:
     @staticmethod
     def extract_h5_data(
         h5_location: str,
-        coeval: bool = True,
+        coeval: bool = False,
     ):
         """Extract h5 data from 21cmFastv4 simulations.
 
@@ -419,8 +419,10 @@ class SimulationReformatter:
         """
 
         if coeval:
+            print("H5 data is a coeval box.")
             return SimulationReformatter.extract_h5_coeval_data(h5_location)
 
+        print("H5 data is a lightcone box.")
         return SimulationReformatter.extract_h5_lightcone_data(h5_location)
 
     @staticmethod
@@ -684,7 +686,8 @@ class SimulationReformatter:
                         x,
                         separator=",",
                         formatter={"float": (lambda x: np.format_float_scientific(x, 4, False))},
-                        max_line_width=np.inf,
+                        max_line_width=np.iinfo(int).max,
+                        threshold=np.iinfo(int).max,
                     )
                 ),
                 axis=-1,
@@ -890,7 +893,7 @@ class SimulationReformatter:
         v=(1.5, 1.5, 1.5),
         osm_output="reformat/osm_output/osm_output.osm",
         cosmology=eorcosmo(),
-        save_dynamic_settings="",
+        save_dynamic_settings="reformat/osm_output/settings.ini",
         ref_time=omath.REF_TIME,
         ref_location=omath.SKA_REF_LOC,
         observation_length=omath.OBS_LEN_4HR,
@@ -929,7 +932,7 @@ class SimulationReformatter:
 
         # Set default voxel array according to v
         if voxels is None:
-            print("Creating mock voxels ...")
+            print(f"No pre-defined voxel array exists. Creating voxels using v = {v} ...")
             voxels = np.full((*d, 3), v, dtype=np.float64)
 
         # Transform datacube
@@ -985,9 +988,9 @@ class SimulationReformatter:
         file,
         phase_ref_point=omath.ZENITH_530,
         require_regrid=True,
-        max_freq_res=100e6,
+        max_freq_res=100 * u.MHz,
         osm_output="reformat/osm_output/osm_output.osm",
-        coeval=True,
+        coeval=False,
         ref_time=omath.REF_TIME,
         ref_location=omath.SKA_REF_LOC,
         observation_length=omath.OBS_LEN_4HR,
@@ -1004,15 +1007,18 @@ class SimulationReformatter:
         :param ref_location: An astropy.coordinates.EarthLocation object stating the location of the telescope on Earth.
         :param observation_length: An astropy.time.TimeDelta object that gives the length of the observation.
         :param save_dynamic_settings: If non-empty, save the dynamic settings to an .ini file given by the path entered.
+        :param coeval: If the h5 box is coeval or lightcone based.
 
         :return dynamic_settings: The dynamically defined settings dictionary.
         """
 
+        print("Extracting H5 data ...")
         values, z_ref, vox, cosmology = SimulationReformatter.extract_h5_data(file, coeval=coeval)
 
         if osm_output == "":
             osm_output = file.split("/")[-1][:-3] + "_osm.osm"
 
+        print("Generating from simulated data ...")
         return SimulationReformatter.generate_osm_from_simulation(
             values,
             z_ref=z_ref,
@@ -1046,6 +1052,7 @@ class SimulationReformatter:
         .. NB: The OSM file must be sorted according to the same order that it would've been constructed in i.e. frequency (descending), declination (ascending), right ascension (ascending). With frequency coming in the form of a list delimited by commas, and columns delimited by spaces.
 
         Example entry of OSM file (first six lines are shown):
+
         ```
         Format = RaD DecD I ReferenceFrequency LineWidth
         # Entries Key:
@@ -1054,6 +1061,7 @@ class SimulationReformatter:
         359.929040 -27.063173 175.233e6 075.096e3 [1.4669e+03,1.5097e+03,1.5869e+03]
         359.929040 -27.049131 177.431e6 077.294e3 [1.3042e+03,1.7997e+03,1.5813e+03]
         ```
+
         (this file would represent a datacube of shape (1,2,3))
 
         :param osm_file: The OSM file to analyse.
