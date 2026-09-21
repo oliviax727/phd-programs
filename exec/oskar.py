@@ -34,5 +34,6 @@ btap.run_oskar_on_model(
     load_osm=False,
     oskar_parent_dir=SETONIX_DATA_DIR_SCRATCH,
     convert_uvfits=True,
-    coeval=False
+    coeval=False,
+    clean=False,
 )

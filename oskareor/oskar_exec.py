@@ -121,7 +121,8 @@ class BTAnalysisPipeline:
         oskar_mode="python",
         use_imager=True,
         convert_uvfits=True,
-        uvfits_out="BTA/uvw_out.uvfits",
+        uvfits_out="uvw_out.uvfits",
+        temp_parent_dir=None,
     ):
         """Run oskar on each of the OSM sky models found in a fits directory, should already be formatted according to the output of the SimulationReformatter object.
 
@@ -134,19 +135,24 @@ class BTAnalysisPipeline:
         :param use_imager: Whether or not to generate a dirty image with oskar_imager.
         :param convert_uvfits: Whether or not to generate a uvfits file.
         :param uvfits_out: The file to output the uvfits.
+        :param temp_parent_dir: The parent directory to setup the temporary operation directory. If None it will be located in the current working directory.
         """
+
+        # Get temp dir location
+        if temp_parent_dir is None:
+            temp_parent_dir = os.getcwd()
+
+        temp_parent_dir = ofmg.expand_path(temp_parent_dir)
 
         # TODO: Provide options for all four execution modes.
         # Get ms file directory
         ms_dir = interferometer_settings[1]["interferometer"]["ms_filename"]
 
         # Create the output files
-        subprocess.run(["mkdir", "-p", "BTA/oskar_output"], check=True)
+        subprocess.run(["mkdir", "-p", temp_parent_dir + "BTA/oskar_output"], check=True)
         subprocess.run(["mkdir", "-p", ms_dir], check=True)
 
         print("Setting up OSKAR for " + osm_file)
-
-        cwd = os.getcwd()
 
         # Set up settings path/dict
         settings = [None, None]
@@ -189,10 +195,10 @@ class BTAnalysisPipeline:
                     "exec",
                     "--nv",
                     "--bind",
-                    cwd,
+                    temp_parent_dir,
                     "--cleanenv",
                     "--home",
-                    cwd,
+                    temp_parent_dir,
                     oskar_exec,
                     "oskar_sim_interferometer",
                     settings[0],
@@ -211,10 +217,10 @@ class BTAnalysisPipeline:
                         "exec",
                         "--nv",
                         "--bind",
-                        cwd,
+                        temp_parent_dir,
                         "--cleanenv",
                         "--home",
-                        cwd,
+                        temp_parent_dir,
                         oskar_exec,
                         "oskar_imager",
                         settings[1],
@@ -235,6 +241,7 @@ class BTAnalysisPipeline:
         interferometer_settings_override="",
         imager_settings_override="",
         template=False,
+        temp_parent_dir=None,
     ):
         """Sets up the operating directory from which all anaysis will be done.
 
@@ -243,55 +250,61 @@ class BTAnalysisPipeline:
         :param interferometer_settings_override: The file location of the OSKAR imager settings file. Leave blank if no override.
         :param imager_settings_override: The file location of the OSKAR interferometer settings template file. Leave blank if no override.
         :param template: If true, handle and return no h5 data.
+        :param temp_parent_dir: The parent directory to setup the temporary operation directory. If None it will be located in the current working directory.
 
-        :return (h5_file, interf_override_ini, imager_override_ini, telescope_model, cwd): The new location of the h5, imager ini, and interterometer template ini files, as well as the telescope model location.
+        :return (h5_file, interf_override_ini, imager_override_ini, telescope_model, temp dir): The new location of the h5, imager ini, and interterometer template ini files, as well as the telescope model location, and the temporary working directory.
         """
 
-        cwd = os.getcwd()
+        if temp_parent_dir is None:
+            temp_parent_dir = os.getcwd()
+
+        temp_parent_dir = ofmg.expand_path(temp_parent_dir)
 
         # Define default return value
-        default_return = ["", "", "", "BTA/telescope_model.tm", cwd]
+        default_return = ["", "", "", "", temp_parent_dir + "/BTA"]
 
         # Create directory, delete contents of existing BTA directory
-        subprocess.run(["rm", "-rf", "BTA"], check=True)
-        subprocess.run(["mkdir", "-p", "BTA"], check=True)
+        subprocess.run(["rm", "-rf", default_return[4]], check=True)
+        subprocess.run(["mkdir", "-p", default_return[4]], check=True)
 
         # Move h5 file and INIs to directory
         if not template and h5_file != "":
-            subprocess.run(["cp", ofmg.expand_path(h5_file), "BTA/analysis.h5"], check=True)
-            default_return[0] = "BTA/analysis.h5"
+            subprocess.run(["cp", ofmg.expand_path(h5_file), default_return[4] + "BTA/analysis.h5"], check=True)
+            default_return[0] = default_return[4] + "/analysis.h5"
 
         if interferometer_settings_override != "":
             subprocess.run(
                 [
                     "cp",
                     ofmg.expand_path(interferometer_settings_override),
-                    "BTA/interferometer_override.ini",
+                    default_return[4] + "/interferometer_override.ini",
                 ],
                 check=True,
             )
-            default_return[1] = "BTA/interferometer_override.ini"
+            default_return[1] = default_return[4] + "/interferometer_override.ini"
 
         if imager_settings_override != "":
             subprocess.run(
                 [
                     "cp",
                     ofmg.expand_path(imager_settings_override),
-                    "BTA/imager_override.ini",
+                    default_return[4] + "/imager_override.ini",
                 ],
                 check=True,
             )
-            default_return[2] = "BTA/imager_override.ini"
+            default_return[2] = default_return[4] + "/imager_override.ini"
 
         subprocess.run(
             [
                 "cp",
                 "-r",
                 ofmg.expand_path(oskar_telescope_model),
-                "BTA/telescope_model.tm",
+                default_return[4] + "/telescope_model.tm",
             ],
             check=True,
         )
+
+        default_return[3] = default_return[4] + "/telescope_model.tm"
 
         return default_return
 
@@ -302,7 +315,8 @@ class BTAnalysisPipeline:
         clean=True,
         settings=None,
         convert_uvfits=True,
-        uvfits_loc="BTA/uvw_out.uvfits",
+        uvfits_loc="uvw_out.uvfits",
+        temp_parent_dir=None,
     ):
         """Finishes and cleans up the mess created by the BTA class.
 
@@ -312,7 +326,14 @@ class BTAnalysisPipeline:
         :param settings: The settings used to run OSKAR, so that the function knows where to find the outputs.
         :param convert_uvfits: Whether or not to generate a uvfits file.
         :param uvfits_loc: The location of the uvfits file.
+        :param temp_parent_dir: The parent directory to setup the temporary operation directory. If None it will be located in the current working directory.
         """
+
+        # Get Parent Dir
+        if temp_parent_dir is None:
+            temp_parent_dir = os.getcwd()
+
+        temp_parent_dir = ofmg.expand_path(temp_parent_dir)
 
         # Keep pylint happy
         if settings is None:
@@ -357,7 +378,7 @@ class BTAnalysisPipeline:
 
         finally:
             if clean:
-                subprocess.run(["rm", "-rf", "BTA"], check=True)
+                subprocess.run(["rm", "-rf", temp_parent_dir + "BTA"], check=True)
 
     @staticmethod
     def run_oskar_on_model(
@@ -382,6 +403,7 @@ class BTAnalysisPipeline:
         oskar_parent_dir="~",
         convert_uvfits=True,
         box_dim=None,
+        temp_parent_dir=None,
     ):
         """Full pipeline function for transforming a h5 simulation box output into a FITS datacube.
 
@@ -405,7 +427,14 @@ class BTAnalysisPipeline:
         :param oskar_parent_dir: The directory containing the oskareor.data folder (default is the home folder).
         :param convert_uvfits: Whether or not to generate a uvfits file.
         :param box_dim: The dimensions of the given h5 box. If a value is provided use it as an override.
+        :param temp_parent_dir: The parent directory to setup the temporary operation directory. If None it will be located in the current working directory.
         """
+
+        # Get Parent Dir
+        if temp_parent_dir is None:
+            temp_parent_dir = os.getcwd()
+
+        temp_parent_dir = ofmg.expand_path(temp_parent_dir)
 
         # Set defaults
         if oskar_exec == "":
@@ -420,18 +449,19 @@ class BTAnalysisPipeline:
             template_preset = file.split("/")[-1][:-4]
 
         print("Setting up BTA directory ...")
-        h5_file, interf_override_ini, imager_override_ini, _, _ = BTAnalysisPipeline.setup_bta_dir(
+        h5_file, interf_override_ini, imager_override_ini, _, bta_dir = BTAnalysisPipeline.setup_bta_dir(
             oskar_telescope_model=oskar_telescope_model,
             h5_file=file,
             interferometer_settings_override=interferometer_settings_override,
             imager_settings_override=imager_settings_override,
             template=template_flag,
+            temp_parent_dir=temp_parent_dir,
         )
 
         # Create output file locations
         h5_id = file.split("/")[-1][:-3] if not template_flag else template_preset
-        osm_output = ofmg.expand_path("BTA/sky_model.osm")
-        ini_output = ofmg.expand_path("BTA/" + h5_id + "_general_settings.ini")
+        osm_output = ofmg.expand_path(bta_dir + "/sky_model.osm")
+        ini_output = ofmg.expand_path(bta_dir + "/" + h5_id + "_general_settings.ini")
 
         # Set the default dynamic settings array
         dynamic_settings = ohelp.DEFAULT_GENERAL_SETTINGS
@@ -542,6 +572,7 @@ class BTAnalysisPipeline:
             oskar_mode=oskar_mode,
             use_imager=use_imager,
             convert_uvfits=convert_uvfits,
+            temp_parent_dir=temp_parent_dir,
         )
 
         # If clean is true remove all data relating to execution
@@ -552,6 +583,7 @@ class BTAnalysisPipeline:
             clean=clean,
             settings=dynamic_settings,
             convert_uvfits=convert_uvfits,
+            temp_parent_dir=temp_parent_dir,
         )
 
     run_oskar_on_model_timed = FT(run_oskar_on_model, "Ran OSKAR on a given model.").execute
