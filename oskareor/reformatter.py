@@ -27,6 +27,9 @@ from oskareor.skalow_calc import FileManager as ofmg
 from oskareor.skalow_calc import SKAMath as omath
 from oskareor.skalow_calc import SKAString as ostr
 
+# Proprietary software
+from pyuvdata import UVData
+
 
 class SimulationReformatter:
     """The reformatter class contains functions relating to translating simulation data to OSKAR output data.
@@ -1170,15 +1173,69 @@ class SimulationReformatter:
     convert_osm_file_to_arrays_timed = FT(convert_osm_file_to_arrays, "Converted OSM to arrays.").execute
 
     @staticmethod
+    def convert_values_to_visibilities(
+        values,
+        baselines,
+        voxels=None,
+        cumulative_voxels=None,
+        phase_ref_point=omath.ZENITH_530,
+        f_ref=200 * u.MHz,
+    ):
+        """Convert stokes I flux values to visibility data using a discrete fourier transform.
+
+        :param values: The simulation datacube, in units of Jy.
+        :param baselines: The array of pre-existing UV baselines.
+        :param values: The simulation datacube.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element (rad, rad, Hz).
+        :param cumulative_voxels: A jagged array consisting of the cumulative summation of components from the voxel array (deg, deg, Hz).
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param f_ref: Refrence frequency, the ending frequency of the model.
+
+        :return vis_data: The visibility data array per baseline and frequency.
+        """
+
+        return baselines
+
+    @staticmethod
+    def extract_baseline_data(uv_data):
+        """Extracts baseline information out of a UVData object.
+
+        :param uv_data: A UVData object containing baseline data.
+        :return: A list of baselines corresponding to the u and v directions.
+        """
+
+        return []
+
+    @staticmethod
+    def inject_visibility_data(uv_data, vis_data):
+        """Injects an existing UVData object with new visibility data.
+
+        :param uv_data: A UVData object containing baseline data.
+        :param vis_data: Visibility data corresponding to each baseline and frequency.
+        :return uv_data: A clone of the input UVData object but with visibilities replaced with new data.
+        """
+        return uv_data
+
+    @staticmethod
     def save_to_uvfits(
         uvfits_file,
+        base_file,
         values,
         voxels=None,
         cumulative_voxels=None,
         phase_ref_point=omath.ZENITH_530,
         f_ref=200 * u.MHz,
-        base_file="",
     ):
+        """Saves the reformatted data to a UVFits file.
+
+        :param uvfits_file: The UVFits file to save to.
+        :param base_file: The UVFits file to pull already existing telescope information from.
+        :param values: The simulation datacube, in units of Jy.
+        :param voxels: An array describing a series of voxel dimensions corresponding to each sky model datacube voxel element (rad, rad, Hz).
+        :param cumulative_voxels: A jagged array consisting of the cumulative summation of components from the voxel array (deg, deg, Hz).
+        :param phase_ref_point: An astropy.coordinates.SkyCoord object stating the central sky refrence point.
+        :param f_ref: Refrence frequency, the ending frequency of the model.
+        """
 
         # SETUP
         # Cumulative sums are more important than voxel bins now
@@ -1189,3 +1246,23 @@ class SimulationReformatter:
             cumulative_voxels = SimulationReformatter.calculate_cumulative_voxels(
                 voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point
             )
+
+        # Read base data
+        uv_data = UVData()
+        uv_data.read_uvfits(base_file)
+
+        # Extract baselines
+        baselines = SimulationReformatter.extract_baseline_data(uv_data=uv_data)
+
+        # Calculate the complex visibilities
+        visibilities = SimulationReformatter.convert_values_to_visibilities(
+            values, baselines, cumulative_voxels=cumulative_voxels
+        )
+
+        # Inject the new visibility data
+        new_uv_data = SimulationReformatter.inject_visibility_data(uv_data, visibilities)
+
+        # Save new object to destination
+        new_uv_data.write_uvfits(uvfits_file)
+
+    save_to_uvfits_timed = FT(convert_osm_file_to_arrays, "Converted data to a UVFits file.").execute
