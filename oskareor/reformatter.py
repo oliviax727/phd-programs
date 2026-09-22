@@ -1168,3 +1168,24 @@ class SimulationReformatter:
         return output_data
 
     convert_osm_file_to_arrays_timed = FT(convert_osm_file_to_arrays, "Converted OSM to arrays.").execute
+
+    @staticmethod
+    def save_to_uvfits(
+        uvfits_file,
+        values,
+        voxels=None,
+        cumulative_voxels=None,
+        phase_ref_point=omath.ZENITH_530,
+        f_ref=200 * u.MHz,
+        base_file="",
+    ):
+
+        # SETUP
+        # Cumulative sums are more important than voxel bins now
+        ras, dcs, freqsum = (None, None, None)  # Keep Pylint Happy
+        if cumulative_voxels is None and voxels is None:
+            raise ValueError("Either an array of voxels or cumulative voxes must be provided!")
+        elif cumulative_voxels is None:
+            cumulative_voxels = SimulationReformatter.calculate_cumulative_voxels(
+                voxels=voxels, f_ref=f_ref, phase_ref_point=phase_ref_point
+            )
