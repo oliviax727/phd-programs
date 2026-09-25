@@ -346,7 +346,7 @@ class SimulationReformatter:
 
         :param h5_location: The file location of the h5 data.
 
-        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, the voxel sizes as an array, and the simulation box cosmology.
         """
 
         file = h5py.File(h5_location, "r")
@@ -368,14 +368,17 @@ class SimulationReformatter:
         z_mid = file.attrs["redshift"]
         z_ref = cosmology.dz_to_z(cosmology.z_to_dz(z_mid) - u.Mpc * box_len / 2)
 
-        return bt_data, z_ref, vox, cosmology
+        # Set default voxel array according to v
+        voxels = np.full((*bt_data.shape, 3), vox, dtype=np.float64)
+
+        return bt_data, z_ref, vox, voxels, cosmology
 
     @staticmethod
     def extract_h5_lightcone_data(h5_location):
         """Extract h5 data from 21cmFastv4 lightcone simulations.
 
         :param h5_location: The file location of the h5 data.
-        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, the voxel sizes as an array, and the simulation box cosmology.
         """
 
         file = h5py.File(h5_location, "r")
@@ -407,7 +410,10 @@ class SimulationReformatter:
         # Transform intitial redshift
         z_ref = cosmology.dz_to_z(np.min(dzs) * u.Mpc)
 
-        return bt_data, z_ref, vox, cosmology
+        # Set default voxel array according to v
+        voxels = np.full((*bt_data.shape, 3), vox, dtype=np.float64)
+
+        return bt_data, z_ref, vox, voxels, cosmology
 
     @staticmethod
     def extract_h5_data(
@@ -418,7 +424,7 @@ class SimulationReformatter:
 
         :param h5_location: The file location of the h5 data.
         :param coeval: whether or not the box is coeval or lightcone.
-        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, and the simulation box cosmology.
+        :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, the voxel sizes as an array, and the simulation box cosmology.
         """
 
         if coeval:
@@ -1016,7 +1022,7 @@ class SimulationReformatter:
         """
 
         print("Extracting H5 data ...")
-        values, z_ref, vox, cosmology = SimulationReformatter.extract_h5_data(file, coeval=coeval)
+        values, z_ref, v, voxels, cosmology = SimulationReformatter.extract_h5_data(file, coeval=coeval)
 
         if osm_output == "":
             osm_output = file.split("/")[-1][:-3] + "_osm.osm"
@@ -1027,7 +1033,8 @@ class SimulationReformatter:
             z_ref=z_ref,
             require_regrid=require_regrid,
             max_freq_res=max_freq_res,
-            v=vox,
+            v=v,
+            voxels=voxels,
             osm_output=osm_output,
             cosmology=cosmology,
             phase_ref_point=phase_ref_point,
