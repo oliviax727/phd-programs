@@ -388,24 +388,16 @@ class SimulationReformatter:
 
         # Define cosmology with H0=100h
         cosmology = eorcosmo(
-            h0=file["InputParameters"]["cosmo_params"].attrs["hlittle"] * 100,
+            h0=file["InputParameters"]["cosmo_params"].attrs["hlittle"] * 100 * u.km / u.s / u.Mpc,
             omega_m_0=file["InputParameters"]["cosmo_params"].attrs["OMm"],
             omega_b_0=file["InputParameters"]["cosmo_params"].attrs["OMb"],
         )
 
         # Get Box and Voxel dimensions
-        box_len = file["InputParameters"]["simulation_options"].attrs["HII_DIM"]
+        vox_len = file["InputParameters"]["simulation_options"].attrs["LOWRES_CELL_SIZE_MPC"]
         dzs = np.array(file["lightcone_distances"])
 
-        vox = (
-            np.array(
-                [
-                    box_len,
-                    box_len,
-                    abs(dzs[0] - dzs[-1]),
-                ]
-            )
-        ) / bt_data.shape
+        vox = (vox_len, vox_len, abs(dzs[0] - dzs[-1]) / bt_data.shape[2])
 
         # Transform intitial redshift
         z_ref = cosmology.dz_to_z(np.min(dzs) * u.Mpc)
