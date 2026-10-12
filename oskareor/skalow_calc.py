@@ -185,6 +185,7 @@ class EoRCosmology:
         self.omega_m_0 = omega_m_0
         self.omega_b_0 = omega_b_0
         self.cosmo = fmodel(H0=h0, Om0=omega_m_0, Ob0=omega_b_0)  # Flat ΛCDM model
+        self.little_h = self.h0.to_value(u.km / u.s / u.Mpc) / 100
 
     # Redshift to comoving distance
     def z_to_dz(self, z: float) -> Quantity:
