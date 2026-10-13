@@ -56,6 +56,7 @@ class SKAMath:
     FREQ_21CM: Quantity = 1.420405751768e9 * u.Hz
     WLEN_21CM: Quantity = (c.c / FREQ_21CM).to(u.cm)
     SIGMA_F: Quantity = (np.sqrt(c.k_B / (1.008 * c.u * WLEN_21CM**2))).to(u.Hz * u.K**-0.5)
+    STATION_DIAMETER_SKA: Quantity = 38 * u.m
 
     # Unitless quantities
     SIGMA_F_FLOAT: float = SIGMA_F.to_value(u.Hz * u.K ** (-1 / 2))
@@ -208,6 +209,12 @@ class EoRCosmology:
     def f_to_z(f: Quantity, f0: Quantity = 1.420e9 * u.Hz) -> Quantity:
         """Convert frequency to redshift. By default it assumes that the start frequency is the 21 cm line."""
         return (f0 / f) - 1
+    
+    # FoV at z
+    @staticmethod
+    def fov_at_z(z: float) -> Quantity:
+        """Calculates the field of view at a redshift z using the Airy Disk 1st minimum."""
+        return (u.rad * 1.22 * c.c / EoRCosmology.z_to_f(z) / SKAMath.STATION_DIAMETER_SKA).to(u.deg)
 
 
 class FileManager:
