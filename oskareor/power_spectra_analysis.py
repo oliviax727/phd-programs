@@ -5,8 +5,9 @@ import os
 import subprocess
 
 # Mathematics and calculations
-import astropy.units as u
+from astropy import units as u, constants as c
 import numpy as np
+from pyuvdata import UVData
 
 # Astropy Extras
 from astropy.units import Quantity
@@ -20,6 +21,7 @@ class Chunker:
 
     # Print channel centres, widths, and start/end points and append to an accumulator list
 
+    @staticmethod
     def chunk_array(data, voxels, cosmo=None, n_chunks=32, show_chunks=False, z_ref=5.5):
         """Split a large 3-dimensional datacube into a series of overlapping, evenly distributed, and fixed-size chunks for analysis in a power spectra.
 
@@ -99,6 +101,7 @@ class Chunker:
         else:
             return chunk_values, chunk_voxels
 
+    @staticmethod
     def generate_chunks(n_channels, voxel_depth=2, cosmo=None, n_chunks=32, show_chunks=False, z_ref=5.5):
         """A simpler method that does not split an array but instead returns the chunk bins in channels.
 
@@ -177,29 +180,137 @@ class Chunker:
 class ChipsManager:
     """Runs and evaluates the CHIPS program"""
 
-    def extract_uvfits_chunk(uvfits_file, chunk_boundaries):
+    DEFAULT_TEMP_FILE = os.getcwd() + "/PSA/chunk_data.uvfits"
+
+    @staticmethod
+    def extract_uvfits_chunk(uvfits_file, chunk_boundaries, outfile="./PSA/chunk_data.uvfits"):
         """Retrieves the UVFits file and then isolates the data to a specific chunk.
 
+        .. NB: Channel cropping indexes from zero and isolates the data in a similar way to numpy array indexing, where the start channel is included but the end channel is not e.g. for `chunk_boundaries = (i, c, f)`, the saved data contains channels i to f-1 (inclusive to both ends).
+
         :param uvfits_file: The UVFits file location to convert.
-        :param chunk_boundaries: A tuple containing the start and end channels to crop to i.e. channels i to f - 1.
+        :param chunk_boundaries: A tuple containing the start, central, and end channels to crop to.
         """
 
-    def run_chips(uvfits_file, operating_parent_dir="."):
+        # Read the UV Fits file
+        uvd = UVData()
+        uvd.read_uvfits(ofmg.expand_path(uvfits_file))
+
+        # Extract chunk data
+        i, _, f = chunk_boundaries
+
+        # Create a copy of the object
+        uvd.select(freq_chans=np.arange(i, f))
+
+        # Write the object to the new file
+        uvd.write_uvfits(outfile)
+
+    @staticmethod
+    def run_chips(uvfits_file, temp_parent_dir=".", n_channels=64, k_perp_bins=64, u_max=500.0):
         """Runs the CHIPS program, assumes the CHIPS directory has been created and the files are split.
 
         :param uvfits_file: The UVFits file location to run the full CHIPS program on.
         """
 
-    def run_chips_on_model(uvfits_file, temp_parent_dir="."):
+        os.environ["OUTPUTDIR"] = ofmg.expand_path(temp_parent_dir)
+        os.environ["INPUTDIR"] = ofmg.expand_path(temp_parent_dir)
+
+        subprocess.run(
+            [
+                "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska",
+                ofmg.expand_path(uvfits_file),
+                "side",
+                15.0,
+                c.c.si.value,
+            ],
+            check=True,
+        )
+
+        subprocess.run(
+            [
+                "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska",
+                "side",
+                n_channels,
+                0,
+                "'yy'",
+                "side",
+                1,
+            ],
+            check=True,
+        )
+        # side $nchan $kperp 'yy' $umax. chips.out 0 1
+        subprocess.run(
+            [
+                "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska",
+                "side",
+                n_channels,
+                k_perp_bins,
+                "'yy'",
+                u_max,
+                "chips.out",
+                0,
+                1,
+            ],
+            check=True,
+        )
+
+    @staticmethod
+    def extract_and_save_2dps(outdir, temp_parent_dir="."):
+        """Extracts the CHIPS output of a chunk, combines the data, and then saves it to a .npz file for later useage."""
+
+        # FIXME: Move chips output to safe location
+
+    @staticmethod
+    def run_chips_on_model(
+        uvfits_file,
+        temp_parent_dir=".",
+        outdir=".",
+        voxel_depth=2,
+        n_channels=64,
+        n_chunks=32,
+        k_perp_bins=64,
+        u_max=500.0,
+    ):
         """Runs the entirety of the CHIPS model."""
 
-        # Create the directory
-        subprocess.run(["mkdir", "-p", temp_parent_dir + "/BTA/oskar_output"], check=True)
+        print("Creating the output directory ./PSA ...")
+
+        # Create the directory and/or clear it
+        subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA/chips_output"], check=True)
+        subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chips_output"], check=True)
+
+        print("Generating chunks ...")
+
+        # Create an array of chunks
+        chunk_bins = Chunker.generate_chunks(
+            n_channels=n_channels, voxel_depth=voxel_depth, n_chunks=n_chunks, show_chunks=False
+        )
+
+        # Create the temporary UVFits file location for CHIPS to analyse
+        uvfits_loc = temp_parent_dir + ChipsManager.DEFAULT_TEMP_FILE
+
+        for i, chunk_bounds in enumerate(chunk_bins):
+            print(f"Extracting and evaluating chunk: {i} of {n_chunks}")
+
+            ChipsManager.extract_uvfits_chunk(
+                uvfits_file=uvfits_file, chunk_boundaries=chunk_bounds, outfile=uvfits_loc
+            )
+
+            ChipsManager.run_chips(
+                uvfits_loc,
+                temp_parent_dir=temp_parent_dir + "/PSA/chips_output/",
+                n_channels=n_channels,
+                k_perp_bins=k_perp_bins,
+                u_max=u_max,
+            )
+
+            ChipsManager.extract_and_save_2dps(outdir, temp_parent_dir + "/PSA/chips_output")
 
 
 class PSTools:
     """The PSTools class contains any and all methods to analyse the power spectra of data either pre- or post- observation."""
 
+    @staticmethod
     def cubic_power_spectra(data, voxels, cosmo):
         """Calculate the cubic/3-dimensional power spectra for a given volume of data. Assumes that the voxel data is uniform.
 
@@ -238,6 +349,7 @@ class PSTools:
 
         return power, [kx, ky, kz]
 
+    @staticmethod
     def cylindrical_power_spectrum(power, ki, bins=[64, 32]):
         """Calculate the cylindrical power spectra for a given volume of data. Assumes that the voxel data is uniform.
 
@@ -283,6 +395,7 @@ class PSTools:
 
         return power_2d, k_perp_edges, k_para_edges
 
+    @staticmethod
     def dimensionless_power_spectrum(power, k_perp_edges, k_para_edges, bins=32, cosmo=None, z_centre=5.5):
         """Calculate the dimensionless, linear power spectra for a given 2DPS. Assumes that the voxel data is uniform.
 
