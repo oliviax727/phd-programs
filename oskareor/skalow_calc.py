@@ -171,6 +171,35 @@ class SKAMath:
 
         return (ra, dec)
 
+    @staticmethod
+    def blackman_harris_window(n, N):
+        """Three-term Blackman-Harris Windowing function."""
+        a0 = 0.4243801
+        a1 = 0.4973406
+        a2 = 0.0782793
+
+        return a0 - a1 * np.cos(2 * np.pi * n / N) + a2 * np.cos(4 * np.pi * n / N)
+
+    @staticmethod
+    def foreground_wedge_gradient(cosmo, z_centre=5.5):
+        """Evaluates the gradient of the foreground wedge."""
+        dz = cosmo.z_to_dz(z_centre)
+        fov = cosmo.fov_at_z(z_centre)
+        Hz = cosmo.cosmo.efunc(z_centre) * cosmo.h0
+
+        mz = (np.sin(fov) * dz * Hz / (c.c * (1 + z_centre))).to_value(u.dimensionless_unscaled)
+
+        return mz
+
+    @staticmethod
+    def foreground_wedge(k_perp, k_para, cosmo, z_centre=5.5):
+        """Filter for discriminating out k-modes in the foreground. Assumes units of cMpc."""
+
+        mz = SKAMath.foreground_wedge_gradient(cosmo=cosmo, z_centre=z_centre)
+        k_compare = mz * k_perp
+
+        return (k_para >= k_compare).astype(int), mz
+
 
 class EoRCosmology:
     """Defines a specific cosmological model for other classes to refer to. Assumes a flat universe.
@@ -182,7 +211,7 @@ class EoRCosmology:
     """
 
     def __init__(self, h0: Quantity = 67.66 * u.km / u.s / u.Mpc, omega_m_0: float = 0.31, omega_b_0: float = 0.048):
-        self.h0 = h0.to(u.km / u.s / u.Mpc) # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
+        self.h0 = h0.to(u.km / u.s / u.Mpc)  # Set Hubble Constant to 100 h, with h being dimensionless hubble parameter
         self.omega_m_0 = omega_m_0
         self.omega_b_0 = omega_b_0
         self.cosmo = fmodel(H0=h0, Om0=omega_m_0, Ob0=omega_b_0)  # Flat ΛCDM model
@@ -209,7 +238,7 @@ class EoRCosmology:
     def f_to_z(f: Quantity, f0: Quantity = 1.420e9 * u.Hz) -> Quantity:
         """Convert frequency to redshift. By default it assumes that the start frequency is the 21 cm line."""
         return (f0 / f) - 1
-    
+
     # FoV at z
     @staticmethod
     def fov_at_z(z: float) -> Quantity:
@@ -352,6 +381,11 @@ class SKAString:
     def generate(start: np.number = 0, step: np.number = 1, num: int = 1) -> np.ndarray:
         """Create an array of linearly-increasing consecutive entries with a defined start, step size, and step count. Similar to np.linspace and np.arrange."""
         return start + np.arange(0, num) * step
+
+    @staticmethod
+    def mean_bins(arr):
+        """Calculate the arithmetic mean between each point in an array."""
+        return (arr[1:] + arr[:-1]) / 2
 
 
 # TODO: Type-guard everything
