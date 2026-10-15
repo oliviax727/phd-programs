@@ -734,10 +734,10 @@ class SimulationReformatter:
             osm.seek(0)
 
             # Add header lines
-            osm.write("Format = RaD DecD ReferenceFrequency FrequencyIncrement StokesI\n")
+            osm.write("Format = RaD DecD FrequencyIncrement ReferenceFrequency StokesI\n")
             osm.write("# Entries Key:\n")
-            osm.write("#00.000000 +00.000000 000.000e6 000.000e3 [0.0000+e00,...]\n")
-            osm.write("# RA       Dec        Freq0     Freq+      Stokes I\n")
+            osm.write("#00.000000 +00.000000 000.000e3 000.000e6 [0.0000+e00,...]\n")
+            osm.write("# RA       Dec        Freq+     Freq0      Stokes I\n")
 
             osm.write(data)
         print("\rRecording data to .osm file ... Done!", end="")

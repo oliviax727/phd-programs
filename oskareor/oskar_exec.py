@@ -149,7 +149,7 @@ class BTAnalysisPipeline:
         ms_dir = interferometer_settings[1]["interferometer"]["ms_filename"]
 
         # Create the output files
-        subprocess.run(["mkdir", "-p", temp_parent_dir + "BTA/oskar_output"], check=True)
+        subprocess.run(["mkdir", "-p", temp_parent_dir + "/BTA/oskar_output"], check=True)
         subprocess.run(["mkdir", "-p", ms_dir], check=True)
 
         print("Setting up OSKAR for " + osm_file)
@@ -378,7 +378,7 @@ class BTAnalysisPipeline:
 
         finally:
             if clean:
-                subprocess.run(["rm", "-rf", temp_parent_dir + "BTA"], check=True)
+                subprocess.run(["rm", "-rf", temp_parent_dir + "/BTA"], check=True)
 
     @staticmethod
     def run_oskar_on_model(
