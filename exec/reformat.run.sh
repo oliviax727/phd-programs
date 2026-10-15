@@ -2,7 +2,6 @@
 #SBATCH --job-name=ohrw-oskareor-reformat
 #SBATCH --output=/scratch/mwaeor/ohrw/slurm.out
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=16
 #SBATCH --ntasks=1
 #SBATCH --time=24:00:00
 #SBATCH --partition=mwa

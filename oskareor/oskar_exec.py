@@ -269,7 +269,7 @@ class BTAnalysisPipeline:
 
         # Move h5 file and INIs to directory
         if not template and h5_file != "":
-            subprocess.run(["cp", ofmg.expand_path(h5_file), default_return[4] + "BTA/analysis.h5"], check=True)
+            subprocess.run(["cp", ofmg.expand_path(h5_file), default_return[4] + "/analysis.h5"], check=True)
             default_return[0] = default_return[4] + "/analysis.h5"
 
         if interferometer_settings_override != "":
