@@ -206,7 +206,7 @@ class ChipsManager:
         uvd.write_uvfits(outfile)
 
     @staticmethod
-    def run_chips(uvfits_file, temp_parent_dir=".", n_channels=64, k_perp_bins=64, u_max=500.0):
+    def run_chips(uvfits_file, temp_parent_dir=".", n_channels=64, k_perp_bins=64, u_max=1000.0):
         """Runs the CHIPS program, assumes the CHIPS directory has been created and the files are split.
 
         :param uvfits_file: The UVFits file location to run the full CHIPS program on.
@@ -238,7 +238,7 @@ class ChipsManager:
             ],
             check=True,
         )
-        # side $nchan $kperp 'yy' $umax. chips.out 0 1
+
         subprocess.run(
             [
                 "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska",

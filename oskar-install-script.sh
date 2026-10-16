@@ -1,7 +1,7 @@
 #!/bin/bash
 # RUN VIA SOURCE!!
 
-cd "$(dirname "$0")" && {
+{
     
     salloc --account=mwaeor-gpu --partition=gpu-dev --time=01:00:00 --gres=gpu:4
     

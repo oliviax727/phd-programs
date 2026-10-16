@@ -172,33 +172,13 @@ class SKAMath:
         return (ra, dec)
 
     @staticmethod
-    def blackman_harris_window(n, N):
+    def blackman_harris_window(n: float | int, N: float | int) -> float:
         """Three-term Blackman-Harris Windowing function."""
         a0 = 0.4243801
         a1 = 0.4973406
         a2 = 0.0782793
 
         return a0 - a1 * np.cos(2 * np.pi * n / N) + a2 * np.cos(4 * np.pi * n / N)
-
-    @staticmethod
-    def foreground_wedge_gradient(cosmo, z_centre=5.5):
-        """Evaluates the gradient of the foreground wedge."""
-        dz = cosmo.z_to_dz(z_centre)
-        fov = cosmo.fov_at_z(z_centre)
-        Hz = cosmo.cosmo.efunc(z_centre) * cosmo.h0
-
-        mz = (np.sin(fov) * dz * Hz / (c.c * (1 + z_centre))).to_value(u.dimensionless_unscaled)
-
-        return mz
-
-    @staticmethod
-    def foreground_wedge(k_perp, k_para, cosmo, z_centre=5.5):
-        """Filter for discriminating out k-modes in the foreground. Assumes units of cMpc."""
-
-        mz = SKAMath.foreground_wedge_gradient(cosmo=cosmo, z_centre=z_centre)
-        k_compare = mz * k_perp
-
-        return (k_para >= k_compare).astype(int), mz
 
 
 class EoRCosmology:
@@ -244,6 +224,30 @@ class EoRCosmology:
     def fov_at_z(z: float) -> Quantity:
         """Calculates the field of view at a redshift z using the Airy Disk 1st minimum."""
         return (u.rad * 1.22 * c.c / EoRCosmology.z_to_f(z) / SKAMath.STATION_DIAMETER_SKA).to(u.deg)
+
+    # Foreground wedge gradient at z
+    def foreground_wedge_gradient(self, z: float = 5.5) -> Quantity:
+        """Evaluates the gradient of the foreground wedge."""
+        dz = self.z_to_dz(z)
+        fov = self.fov_at_z(z)
+        Hz = self.cosmo.efunc(z) * self.h0
+
+        mz = (np.sin(fov) * dz * Hz / (c.c * (1 + z))).to(u.dimensionless_unscaled)
+
+        return mz
+
+    # Foreground wedge at z
+    def foreground_wedge(self, k_perp, k_para, z=5.5):
+        """Filter for discriminating out k-modes in the foreground. Assumes units of cMpc."""
+
+        mz = self.foreground_wedge_gradient(z)
+        k_compare = mz * k_perp
+
+        return (k_para >= k_compare).astype(int), mz
+
+    @staticmethod
+    def baseline_meters():
+        """Convert a distance in units of wavelength"""
 
 
 class FileManager:
