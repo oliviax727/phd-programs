@@ -301,7 +301,7 @@ class ChipsManager:
                 temp_parent_dir=temp_parent_dir + "/PSA/chips_output/",
                 n_channels=n_channels,
                 k_perp_bins=k_perp_bins,
-                u_max=1000,
+                u_max=u_max,
             )
 
             ChipsManager.extract_and_save_2dps(outdir, temp_parent_dir + "/PSA/chips_output")
@@ -440,6 +440,21 @@ class PSTools:
         power_1d = np.divide(power_agg, modal_agg)
 
         return power_1d, k_edges
+
+    def eval_power_spectrum(chunk, cvox):
+        """Evaluate the power spectrum for a single redshift chunk.
+
+        :param chunk: The array of chunk brightness temperature values.
+        :param cvox: The array of chunk voxel dimensions.
+
+        :return (ps2d, k_perp, k_para, ps1d, k): The 2D power spectra with its k_perp and k_para bins, as well as the 1D dimensionless power spectra with its k bins.
+        """
+
+        ps2d, k_perp, k_para = PSTools.cylindrical_power_spectrum(*PSTools.cubic_power_spectra(chunk, cvox))
+
+        ps1d, k = PSTools.dimensionless_power_spectrum(ps2d, k_perp, k_para)
+
+        return ps2d, k_perp, k_para, ps1d, k
 
 
 class PSAnalysisPipeline:
