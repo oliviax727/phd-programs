@@ -269,7 +269,7 @@ class ChipsManager:
         n_channels=64,
         n_chunks=32,
         k_perp_bins=64,
-        u_max=500.0,
+        u_max=1000,
     ):
         """Runs the entirety of the CHIPS model."""
 
@@ -301,7 +301,7 @@ class ChipsManager:
                 temp_parent_dir=temp_parent_dir + "/PSA/chips_output/",
                 n_channels=n_channels,
                 k_perp_bins=k_perp_bins,
-                u_max=u_max,
+                u_max=1000,
             )
 
             ChipsManager.extract_and_save_2dps(outdir, temp_parent_dir + "/PSA/chips_output")

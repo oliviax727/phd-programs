@@ -209,13 +209,13 @@ class EoRCosmology:
 
     # Redshift to frequency in GHz
     @staticmethod
-    def z_to_f(z: Quantity, f0: Quantity = 1.420e9 * u.Hz) -> Quantity:
+    def z_to_f(z: Quantity, f0: Quantity = SKAMath.FREQ_21CM) -> Quantity:
         """Convert redshift to frequency. By default it assumes that the start frequency is the 21 cm line."""
         return f0 / (z + 1)
 
     # Frequency in GHz to redshift
     @staticmethod
-    def f_to_z(f: Quantity, f0: Quantity = 1.420e9 * u.Hz) -> Quantity:
+    def f_to_z(f: Quantity, f0: Quantity = SKAMath.FREQ_21CM) -> Quantity:
         """Convert frequency to redshift. By default it assumes that the start frequency is the 21 cm line."""
         return (f0 / f) - 1
 
@@ -237,17 +237,23 @@ class EoRCosmology:
         return mz
 
     # Foreground wedge at z
-    def foreground_wedge(self, k_perp, k_para, z=5.5):
+    def foreground_wedge(self, k_perp: np.ndarray, k_para: np.ndarray, z: float = 5.5) -> tuple[np.ndarray, Quantity]:
         """Filter for discriminating out k-modes in the foreground. Assumes units of cMpc."""
 
-        mz = self.foreground_wedge_gradient(z)
+        mz = self.foreground_wedge_gradient(z).value
         k_compare = mz * k_perp
 
         return (k_para >= k_compare).astype(int), mz
 
     @staticmethod
-    def baseline_meters():
-        """Convert a distance in units of wavelength"""
+    def baseline_meters(d: float, z: float) -> Quantity:
+        """Convert a distance in units of wavelength to metres."""
+        return (d * c.c / EoRCosmology.z_to_f(z)).to(u.m)
+
+    @staticmethod
+    def baseline_wavelengths(d: Quantity, z: float) -> float:
+        """Convert a distance in units of metres to wavelengths."""
+        return (d * EoRCosmology.z_to_f(z) / c.c).to_value(u.dimensionless_unscaled)
 
 
 class FileManager:
