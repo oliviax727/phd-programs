@@ -1,10 +1,7 @@
 #!/bin/bash
 # RUN VIA SOURCE!!
 
-{
-    
-    salloc --account=mwaeor-gpu --partition=gpu-dev --time=01:00:00 --gres=gpu:4
-    
+{   
     # shellcheck disable=SC1091,SC2154
     source "${software}"/install-scripts/oskar-install.sh
     
