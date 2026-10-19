@@ -24,7 +24,10 @@ sphinx
 #--extra-index-url https://artefact.skao.int/repository/pypi-internal/simple
 #ska-ost-array-config==4.3.1
 
-# Special non-compulsory libraries
+# CHIPS Wrappers
+#chips_wrappers @ git+https://github.com/JLBLine/CHIPS_wrappers.git # Original Version
+chips_wrappers @ git+https://github.com/oliviax727/CHIPS_wrappers.git # my fork
+
+# Special non-compulsory libraries (dependant on the part of the process being used
 # 21cmFAST>4
 # oskarpy @ git+https://github.com/OxfordSKA/OSKAR.git@master#subdirectory=python
-chips_wrappers @ git+https://github.com/JLBLine/CHIPS_wrappers.git

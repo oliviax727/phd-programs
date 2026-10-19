@@ -8,6 +8,7 @@ import subprocess
 from astropy import units as u, constants as c
 import numpy as np
 from pyuvdata import UVData
+from chips_wrappers.ps_methods.chips_data import ChipsDataProducts as ChipsData
 
 # Astropy Extras
 from astropy.units import Quantity
@@ -220,7 +221,7 @@ class ChipsManager:
                 "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska",
                 ofmg.expand_path(uvfits_file),
                 "side",
-                15.0,
+                15.0,  # Size of the primary beam in fourier space
                 c.c.si.value,
             ],
             check=True,
@@ -231,10 +232,10 @@ class ChipsManager:
                 "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska",
                 "side",
                 n_channels,
-                0,
+                0,  # Indexing start value
                 "'yy'",
                 "side",
-                1,
+                1,  # Band number - legacy from MWA
             ],
             check=True,
         )
@@ -248,17 +249,19 @@ class ChipsManager:
                 "'yy'",
                 u_max,
                 "chips.out",
-                0,
-                1,
+                0,  # Bias mode, 0 means evaluate whole band
+                1,  # Band number - legacy from MWA
             ],
             check=True,
         )
 
     @staticmethod
     def extract_and_save_2dps(outdir, temp_parent_dir="."):
-        """Extracts the CHIPS output of a chunk, combines the data, and then saves it to a .npz file for later useage."""
+        """Extracts the CHIPS output of a chunk, combines the data, and then saves it to a .npz file for later useage. Uses the `CHIPS_WRAPPERS` `ChipsDataProducts` object for posterity."""
 
-        # FIXME: Move chips output to safe location
+        cdp = ChipsData()
+
+        cdp._read_in_data_and_convert("yy", "chips.out", False, outdir)
 
     @staticmethod
     def run_chips_on_model(
@@ -305,6 +308,14 @@ class ChipsManager:
             )
 
             ChipsManager.extract_and_save_2dps(outdir, temp_parent_dir + "/PSA/chips_output")
+
+    @staticmethod
+    def extract_and_load_2dps(npz_file):
+        """Reads chunk data saved to an `.npz` file and returns the array as if it was ran through `PSTools.cylindrical_power_spectrum`."""
+
+        npz = npz = np.load(npz_file)
+
+        return npz["twoD_power"] * npz["weights"], npz["k_perp"], npz["k_parr"]
 
 
 class PSTools:
@@ -393,34 +404,34 @@ class PSTools:
 
         power_2d = np.divide(power_agg, modal_agg)
 
-        return power_2d, k_perp_edges, k_para_edges
+        return power_2d, ostr.mean_bins(k_perp_edges), ostr.mean_bins(k_para_edges)
 
     @staticmethod
-    def dimensionless_power_spectrum(power, k_perp_edges, k_para_edges, bins=32, cosmo=None, z_centre=5.5):
+    def dimensionless_power_spectrum(power, k_perp, k_para, bins=32, cosmo=None, z_centre=5.5):
         """Calculate the dimensionless, linear power spectra for a given 2DPS. Assumes that the voxel data is uniform.
 
         :param power: The 2-dimensional power spectra in mK^2 h^3 Mpc^-3.
-        :param k_perp_edges: The edges of all of the k modes in the perpendicular dimension.
-        :param k_perp_edges: The edges of all of the k modes in the parallel dimension.
+        :param k_perp: The bin centres of the k modes in the perpendicular dimension.
+        :param k_para: The bin centres of the k modes in the parallel dimension.
         :param bins: The number of k bins to use.
         :param cosmo: The EoRCosmology object for calculating the foreground wedge. If None, then no wedge is applied.
         :param z_centre: The central redshift value of the chunk.
 
-        :returns (power_1d, k_edges): The dimensionless power spectra, the edges of the k bins.
+        :returns (power_1d, k_edges): The dimensionless power spectra in mK^2, the edges of the k bins.
         """
 
         # Extract k-grid
-        k_perp, k_para = np.meshgrid(ostr.mean_bins(k_perp_edges), ostr.mean_bins(k_para_edges), indexing="ij")
+        kpe, kpa = np.meshgrid(k_perp, k_para, indexing="ij")
 
         # Apply the foreground wedge
         if cosmo is not None:
-            fw, _ = omath.foreground_wedge(k_perp, k_para, cosmo=cosmo, z_centre=z_centre)
+            fw, _ = omath.foreground_wedge(kpe, kpa, cosmo=cosmo, z_centre=z_centre)
             pdwg = power * fw
         else:
             pdwg = power
 
         # Get the k modes
-        k = np.hypot(k_perp, k_para)
+        k = np.hypot(kpe, kpa)
 
         # Calculate k-range max values using the 2 cMpc cell size
         k_max = k.max()  # np.sqrt(2) * cosmology.little_h * np.pi / 2
@@ -439,7 +450,7 @@ class PSTools:
 
         power_1d = np.divide(power_agg, modal_agg)
 
-        return power_1d, k_edges
+        return power_1d, ostr.mean_bins(k_edges)
 
     def eval_power_spectrum(chunk, cvox):
         """Evaluate the power spectrum for a single redshift chunk.
