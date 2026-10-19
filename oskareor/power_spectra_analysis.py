@@ -11,9 +11,48 @@ from pyuvdata import UVData
 
 # Astropy Extras
 from astropy.units import Quantity
+from chips_wrappers.ps_methods.chips_data import ChipsDataProducts
 
 # Local imports
 from oskareor.skalow_calc import FileManager as ofmg, SKAMath as omath, SKAString as ostr, EoRCosmology as Cosmo
+
+
+class WrapperArguments:
+    """Argparse object for `chips_wrappers` to use."""
+
+    def __init__(self):
+        self.N_kperp = None
+        self.N_chan = None
+        self.lowerfreq = None
+        self.chan_width = None
+        self.umax = None
+        self.omega_matter = None
+        self.omega_baryon = None
+        self.omega_lambda = None
+        self.hubble = None
+        self.Neta = None
+        self.wedge_factor = -1.0
+        self.basedir = None
+        self.RTS_outputs = False
+        self.max_1D_kmode = 20
+        self.kperp_max = 20
+        self.kperp_min = 0
+        self.kparra_min = 0
+        self.plot_wedge_cut_2D = False
+        self.plot_type = "2D"
+        self.max_power = 1e13
+        self.min_power = 1e3
+        self.num_k_edges = 31
+        self.ktot_bin_edges = False
+        self.low_k_edge = 1e-3
+        self.high_k_edge = 30
+        self.density_correction = 2.6505481727808022
+        self.verbose = True
+
+        self.omega_matter = 0.272
+        self.omega_baryon = 0.046
+        self.omega_lambda = 0.7
+        self.hubble = 70.4
 
 
 class Chunker:
@@ -258,7 +297,7 @@ class ChipsManager:
     def extract_and_save_2dps(outdir, temp_parent_dir="."):
         """Extracts the CHIPS output of a chunk, combines the data, and then saves it to a .npz file for later useage. Uses the `CHIPS_WRAPPERS` `ChipsDataProducts` object for posterity."""
 
-        crosspower = self._open_and_reshape(filename)
+        cdp = ChipsDataProducts(None)
 
         cdp._read_in_data_and_convert("yy", "chips.out", False, outdir)
 
