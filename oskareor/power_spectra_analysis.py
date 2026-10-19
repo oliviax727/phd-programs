@@ -12,47 +12,10 @@ from pyuvdata import UVData
 # Astropy Extras
 from astropy.units import Quantity
 from chips_wrappers.ps_methods.chips_data import ChipsDataProducts
+from chips_wrappers.setup.make_args import FakeArgs
 
 # Local imports
 from oskareor.skalow_calc import FileManager as ofmg, SKAMath as omath, SKAString as ostr, EoRCosmology as Cosmo
-
-
-class WrapperArguments:
-    """Argparse object for `chips_wrappers` to use."""
-
-    def __init__(self):
-        self.N_kperp = None
-        self.N_chan = None
-        self.lowerfreq = None
-        self.chan_width = None
-        self.umax = None
-        self.omega_matter = None
-        self.omega_baryon = None
-        self.omega_lambda = None
-        self.hubble = None
-        self.Neta = None
-        self.wedge_factor = -1.0
-        self.basedir = None
-        self.RTS_outputs = False
-        self.max_1D_kmode = 20
-        self.kperp_max = 20
-        self.kperp_min = 0
-        self.kparra_min = 0
-        self.plot_wedge_cut_2D = False
-        self.plot_type = "2D"
-        self.max_power = 1e13
-        self.min_power = 1e3
-        self.num_k_edges = 31
-        self.ktot_bin_edges = False
-        self.low_k_edge = 1e-3
-        self.high_k_edge = 30
-        self.density_correction = 2.6505481727808022
-        self.verbose = True
-
-        self.omega_matter = 0.272
-        self.omega_baryon = 0.046
-        self.omega_lambda = 0.7
-        self.hubble = 70.4
 
 
 class Chunker:
@@ -294,10 +257,36 @@ class ChipsManager:
         )
 
     @staticmethod
-    def extract_and_save_2dps(outdir, temp_parent_dir="."):
+    def extract_and_save_2dps(
+        outdir,
+        temp_parent_dir=".",
+        n_channels=64,
+        k_perp_bins=64,
+        u_max=1000,
+        f_ref=220e6,
+        f_chn=140e3,
+    ):
         """Extracts the CHIPS output of a chunk, combines the data, and then saves it to a .npz file for later useage. Uses the `CHIPS_WRAPPERS` `ChipsDataProducts` object for posterity."""
 
-        cdp = ChipsDataProducts(None)
+        args = FakeArgs()
+        args.basedir = temp_parent_dir
+        args.plot_type = "2D"
+        args.chips_tag = "chips.out"
+        args.polarisation = "YY"
+        args.N_chan = n_channels
+        args.N_kperp = k_perp_bins
+        args.umax = u_max
+        args.max_power = 1e11
+        args.min_power = 1e5
+        args.no_noise = True
+        args.cosmo = Cosmo().cosmo
+
+        # Defaults
+        args.lowerfreq = f_ref
+        args.chan_width = f_chn
+        args.Neta = args.N_chan // 2
+
+        cdp = ChipsDataProducts(args)
 
         cdp._read_in_data_and_convert("yy", "chips.out", False, outdir)
 
@@ -306,8 +295,8 @@ class ChipsManager:
         uvfits_file,
         temp_parent_dir=".",
         outdir=".",
-        voxel_depth=2,
-        n_channels=64,
+        z_range=[5.5, 13.5],
+        n_channels=1024,
         n_chunks=32,
         k_perp_bins=64,
         u_max=1000,
@@ -323,15 +312,17 @@ class ChipsManager:
         print("Generating chunks ...")
 
         # Create an array of chunks
-        chunk_bins = Chunker.generate_chunks(
-            n_channels=n_channels, voxel_depth=voxel_depth, n_chunks=n_chunks, show_chunks=False
-        )
+        chunk_bins = Chunker.generate_chunks(n_channels=n_channels, n_chunks=n_chunks, show_chunks=False)
 
         # Create the temporary UVFits file location for CHIPS to analyse
         uvfits_loc = temp_parent_dir + ChipsManager.DEFAULT_TEMP_FILE
 
         for i, chunk_bounds in enumerate(chunk_bins):
             print(f"Extracting and evaluating chunk: {i} of {n_chunks}")
+
+            f_tot = Cosmo.z_to_f(z_range[1]) - Cosmo.z_to_f(z_range[0])
+            f_chn = f_tot / n_channels
+            f_ref = Cosmo.z_to_f(z_range[0]) - chunk_bounds[0] * f_chn
 
             ChipsManager.extract_uvfits_chunk(
                 uvfits_file=uvfits_file, chunk_boundaries=chunk_bounds, outfile=uvfits_loc
@@ -340,12 +331,20 @@ class ChipsManager:
             ChipsManager.run_chips(
                 uvfits_loc,
                 temp_parent_dir=temp_parent_dir + "/PSA/chips_output/",
-                n_channels=n_channels,
+                n_channels=chunk_bounds[1] - chunk_bounds[0],
                 k_perp_bins=k_perp_bins,
                 u_max=u_max,
             )
 
-            ChipsManager.extract_and_save_2dps(outdir, temp_parent_dir + "/PSA/chips_output")
+            ChipsManager.extract_and_save_2dps(
+                outdir,
+                temp_parent_dir=temp_parent_dir + "/PSA/chips_output/",
+                n_channels=chunk_bounds[1] - chunk_bounds[0],
+                k_perp_bins=k_perp_bins,
+                u_max=u_max,
+                f_ref=f_ref,
+                f_chn=f_chn,
+            )
 
     @staticmethod
     def extract_and_load_2dps(npz_file):
