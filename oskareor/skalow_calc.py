@@ -180,6 +180,32 @@ class SKAMath:
 
         return a0 - a1 * np.cos(2 * np.pi * n / N) + a2 * np.cos(4 * np.pi * n / N)
 
+    @staticmethod
+    def inner_product(f: np.ndarray, g: np.ndarray, x: np.ndarray = None) -> float:
+        """Calculates the inner product of two discrete real-valued functions. Assumes that the array of f(x) and g(x) values lie on the same basis."""
+        return np.trapz(f * g, x)
+
+    @staticmethod
+    def function_inner_product(fx: np.ndarray, gx: np.ndarray, fy: np.ndarray, gy: np.ndarray) -> float:
+        """Calculates the inner product of any two discrete real-valued functions."""
+
+        f_dot_g = float("NaN")
+
+        # If fx and gx are the same then this becomes trivial, if not then combine x and interpolate y first
+        if np.array_equal(fx, gx):
+            f_dot_g = SKAMath.inner_product(fy, gy, fx)
+        else:
+            lo, hi = max(fx.min(), gx.min()), min(fx.max(), gx.max())
+            x = np.union1d(fx, gx)
+            x = x[(x >= lo) & (x <= hi)]  # Isolate to within overap of both functions
+
+            f = np.interp(x, fx, fy)
+            g = np.interp(x, gx, gy)
+
+            f_dot_g = SKAMath.inner_product(f, g, x)
+
+        return f_dot_g
+
 
 class EoRCosmology:
     """Defines a specific cosmological model for other classes to refer to. Assumes a flat universe.
