@@ -1,4 +1,5 @@
 # OSKAR run output
+PSA
 BTA
 backup
 nohup.txt
@@ -9,6 +10,9 @@ eric_test_osm
 oskar_run_stage/output/*
 oskar_run_stage/test_*.ini
 oskar_run_stage/test_*_osm
+
+# CHIPS run stage
+chips_run_stage
 
 # Outfiles
 *.nv

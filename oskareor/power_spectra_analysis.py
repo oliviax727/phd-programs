@@ -8,7 +8,6 @@ import subprocess
 from astropy import units as u, constants as c
 import numpy as np
 from pyuvdata import UVData
-from chips_wrappers.ps_methods.chips_data import ChipsDataProducts as ChipsData
 
 # Astropy Extras
 from astropy.units import Quantity
@@ -259,7 +258,7 @@ class ChipsManager:
     def extract_and_save_2dps(outdir, temp_parent_dir="."):
         """Extracts the CHIPS output of a chunk, combines the data, and then saves it to a .npz file for later useage. Uses the `CHIPS_WRAPPERS` `ChipsDataProducts` object for posterity."""
 
-        cdp = ChipsData()
+        crosspower = self._open_and_reshape(filename)
 
         cdp._read_in_data_and_convert("yy", "chips.out", False, outdir)
 
