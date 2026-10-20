@@ -147,8 +147,7 @@ class Chunker:
                         cosmo.dz_to_z(dz_ref + f * dz_inc),
                     ]
                 )
-            else:
-                z = np.array([-1.0, -1.0, -1.0])
+                chunk_z_bins.append(z)
 
             if show_chunks:
                 print(
@@ -164,9 +163,9 @@ class Chunker:
                 )
 
             chunk_bounds.append(np.array([i, c, f]))
-            chunk_z_bins.append(z)
 
         chunk_bounds = np.array(chunk_bounds)
+
         if cosmo is not None:
             chunk_z_bins = np.array(chunk_z_bins)
 
