@@ -3,11 +3,13 @@
 #SBATCH --output=/scratch/mwaeor/ohrw/chips.out
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=40
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH --partition=mwa-gpu
 #SBATCH --account=mwaeor-gpu
 #SBATCH --export=NONE
 #SBATCH --gres=gpu:8
+
+cd /scratch/mwaeor/ohrw/phd_programs || exit
 
 module use /software/projects/mwaeor/setonix/2024.05/modules/zen3/gcc/12.2.0
 # shellcheck disable=SC1091
@@ -15,57 +17,6 @@ source /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/env_variables_gar
 module load cfitsio/4.4.0
 
 mkdir -p /scratch/mwaeor/ohrw/chips_run_stage/
+mkdir -p /scratch/mwaeor/ohrw/oskareor.data/oskar.data/fiducial/ps2ds
 
-export OUTPUTDIR='/scratch/mwaeor/ohrw/chips_run_stage/'
-export INPUTDIR='/scratch/mwaeor/ohrw/chips_run_stage/'
-
-cd $INPUTDIR || exit
-
-rm -rf ../chips_run_stage/*
-: > ../chips.out
-
-mkdir -p ../2dps_png_templates
-rm -rf ../2dps_png_templates/*
-
-mkdir -p ../2dps_npz_templates
-rm -rf ../2dps_npz_templates/*
-
-chips_files=(/scratch/mwaeor/ohrw/active_uvfits/*)
-
-nchan=400
-kperp=100
-umax=500
-c=299792458
-
-for template_file in "${chips_files[@]}"; do
-
-    template_name="$(awk -v s="${template_file}" 'BEGIN { start = 39; end = index(s, "_uvw_plane.uvfits") - start; print substr(s, start, end) }')"
-
-    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska "${template_file}" side 15. $c.
-
-    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska side $nchan 0 'yy' side 1
-
-    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska side $nchan $kperp 'yy' $umax. chips.out 0 1
-
-    # shellcheck disable=SC1091
-    source /software/projects/mwaeor/ohrw/.venv/bin/activate
-
-    plotchips_all.py \
-        --basedir . \
-        --plot_type 2D \
-        --chips_tag chips.out \
-        --polarisation YY \
-        --N_chan $nchan \
-        --N_kperp $kperp \
-        --umax $umax \
-        --max_power 1e11 \
-        --min_power 1e5 \
-        --no_noise \
-        >> chips.log
-
-    deactivate
-
-    cp ./chips2D_yy_chips.out_crosspower.png ../2dps_png_templates/"${template_name}".png
-    cp ./2D_coords_and_power.npz ../2dps_npz_templates/"${template_name}".npz
-
-done
+./exec/chips.py

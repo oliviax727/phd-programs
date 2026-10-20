@@ -259,6 +259,7 @@ class ChipsManager:
     @staticmethod
     def extract_and_save_2dps(
         outdir,
+        cosmo=None,
         temp_parent_dir=".",
         n_channels=64,
         k_perp_bins=64,
@@ -268,18 +269,20 @@ class ChipsManager:
     ):
         """Extracts the CHIPS output of a chunk, combines the data, and then saves it to a .npz file for later useage. Uses the `CHIPS_WRAPPERS` `ChipsDataProducts` object for posterity."""
 
+        if cosmo is None:
+            cosmo = Cosmo()
+
         args = FakeArgs()
         args.basedir = temp_parent_dir
-        args.plot_type = "2D"
         args.chips_tag = "chips.out"
         args.polarisation = "YY"
         args.N_chan = n_channels
         args.N_kperp = k_perp_bins
         args.umax = u_max
-        args.max_power = 1e11
-        args.min_power = 1e5
-        args.no_noise = True
-        args.cosmo = Cosmo().cosmo
+        args.omega_matter = cosmo.omega_m_0
+        args.omega_baryon = cosmo.omega_b_0
+        args.omega_lambda = 1 - cosmo.omega_m_0
+        args.hubble = cosmo.little_h * 100
 
         # Defaults
         args.lowerfreq = f_ref
@@ -337,7 +340,7 @@ class ChipsManager:
             )
 
             ChipsManager.extract_and_save_2dps(
-                outdir,
+                outdir + f"fiducial_ps2d_data_chunk_{i}.npz",
                 temp_parent_dir=temp_parent_dir + "/PSA/chips_output/",
                 n_channels=chunk_bounds[1] - chunk_bounds[0],
                 k_perp_bins=k_perp_bins,
