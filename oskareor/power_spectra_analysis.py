@@ -317,7 +317,7 @@ class ChipsManager:
         chunk_bins = Chunker.generate_chunks(n_channels=n_channels, n_chunks=n_chunks, show_chunks=False)
 
         # Create the temporary UVFits file location for CHIPS to analyse
-        uvfits_loc = temp_parent_dir + ChipsManager.DEFAULT_TEMP_FILE
+        uvfits_loc = temp_parent_dir + "/PSA/chips_output/chunk.uvfits"
 
         for i, chunk_bounds in enumerate(chunk_bins):
             print(f"Extracting and evaluating chunk: {i} of {n_chunks}")
