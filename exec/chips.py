@@ -22,7 +22,7 @@ outdir = SETONIX_DATA_DIR_SCRATCH + "oskareor.data/oskar.data/fiducial/ps2ds"
 
 args = sys.argv
 
-match int(args[0]):
+match int(args[1]):
     case 0:
         print("Standard option selected")
         cmgr.run_chips_on_model(uvfits_loc, temp_parent_dir, outdir)
@@ -34,7 +34,7 @@ match int(args[0]):
     case 2:
         print("Extraction option selected")
 
-        [f_chn, f_ref, index] = args[1:4]
+        [f_chn, f_ref, index] = args[2:5]
 
         cmgr.extract_and_save_2dps(
             outdir + f"fiducial_ps2d_data_chunk_{int(index)}.npz",
