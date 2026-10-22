@@ -29,7 +29,7 @@ match int(args[1]):
 
     case 1:
         print("Chunking option selected")
-        cmgr.extract_uvfits_chunks(uvfits_loc, temp_parent_dir, outdir)
+        cmgr.extract_uvfits_chunks(uvfits_loc, temp_parent_dir)
 
     case 2:
         print("Extraction option selected")
