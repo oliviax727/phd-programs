@@ -308,16 +308,13 @@ class ChipsManager:
         print("Creating the output directory ./PSA ...")
 
         # Create the directory and/or clear it
-        subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA/chips_output"], check=True)
-        subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chips_output"], check=True)
+        subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA/chunks"], check=True)
+        subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chunks"], check=True)
 
         print("Generating chunks ...")
 
         # Create an array of chunks
         chunk_bins = Chunker.generate_chunks(n_channels=n_channels, n_chunks=n_chunks, show_chunks=False)
-
-        # Create the temporary UVFits file location for CHIPS to analyse
-        uvfits_loc = temp_parent_dir + "/PSA/chips_output/chunk.uvfits"
 
         for i, chunk_bounds in enumerate(chunk_bins):
             print(f"Extracting and evaluating chunk: {i} of {n_chunks}")
@@ -326,13 +323,16 @@ class ChipsManager:
             f_chn = f_tot / n_channels
             f_ref = Cosmo.z_to_f(z_range[0]) - chunk_bounds[0] * f_chn
 
+            # Create the temporary UVFits file location for CHIPS to analyse
+            uvfits_loc = temp_parent_dir + f"/PSA/chunks/chunk{i}.uvfits"
+
             ChipsManager.extract_uvfits_chunk(
                 uvfits_file=uvfits_file, chunk_boundaries=chunk_bounds, outfile=uvfits_loc
             )
 
             ChipsManager.run_chips(
                 uvfits_loc,
-                temp_parent_dir=temp_parent_dir + "/PSA/chips_output/",
+                temp_parent_dir=temp_parent_dir + "/PSA/",
                 n_channels=chunk_bounds[1] - chunk_bounds[0],
                 k_perp_bins=k_perp_bins,
                 u_max=u_max,
@@ -340,12 +340,46 @@ class ChipsManager:
 
             ChipsManager.extract_and_save_2dps(
                 outdir + f"fiducial_ps2d_data_chunk_{i}.npz",
-                temp_parent_dir=temp_parent_dir + "/PSA/chips_output/",
+                temp_parent_dir=temp_parent_dir + "/PSA/",
                 n_channels=chunk_bounds[1] - chunk_bounds[0],
                 k_perp_bins=k_perp_bins,
                 u_max=u_max,
                 f_ref=f_ref,
                 f_chn=f_chn,
+            )
+
+    def extract_uvfits_chunks(
+        uvfits_file,
+        temp_parent_dir=".",
+        z_range=[5.5, 13.5],
+        n_channels=1024,
+        n_chunks=32,
+    ):
+        """Creates a series of UVFits chunk files to later evaluate."""
+
+        print("Creating the output directory ./PSA ...")
+
+        # Create the directory and/or clear it
+        subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA/chips_output"], check=True)
+        subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chips_output"], check=True)
+
+        print("Generating chunks ...")
+
+        # Create an array of chunks
+        chunk_bins = Chunker.generate_chunks(n_channels=n_channels, n_chunks=n_chunks, show_chunks=False)
+
+        for i, chunk_bounds in enumerate(chunk_bins):
+            print(f"Extracting and evaluating chunk: {i} of {n_chunks}")
+
+            f_tot = Cosmo.z_to_f(z_range[1]) - Cosmo.z_to_f(z_range[0])
+            f_chn = f_tot / n_channels
+            f_ref = Cosmo.z_to_f(z_range[0]) - chunk_bounds[0] * f_chn
+
+            # Create the temporary UVFits file location for CHIPS to analyse
+            uvfits_loc = temp_parent_dir + f"/PSA/chunks/chunk_{f_chn}_{f_ref}_{i}_temp.uvfits"
+
+            ChipsManager.extract_uvfits_chunk(
+                uvfits_file=uvfits_file, chunk_boundaries=chunk_bounds, outfile=uvfits_loc
             )
 
     @staticmethod
