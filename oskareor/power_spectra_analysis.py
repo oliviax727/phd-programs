@@ -221,8 +221,8 @@ class ChipsManager:
                 "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska",
                 ofmg.expand_path(uvfits_file),
                 "side",
-                15.0,  # Size of the primary beam in fourier space
-                c.c.si.value,
+                "15.0",  # Size of the primary beam in fourier space
+                str(c.c.si.value),
             ],
             check=True,
         )
@@ -231,11 +231,11 @@ class ChipsManager:
             [
                 "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska",
                 "side",
-                n_channels,
-                0,  # Indexing start value
+                str(n_channels),
+                "0",  # Indexing start value
                 "'yy'",
                 "side",
-                1,  # Band number - legacy from MWA
+                "1",  # Band number - legacy from MWA
             ],
             check=True,
         )
@@ -244,13 +244,13 @@ class ChipsManager:
             [
                 "/software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska",
                 "side",
-                n_channels,
-                k_perp_bins,
+                str(n_channels),
+                str(k_perp_bins),
                 "'yy'",
-                u_max,
+                str(u_max),
                 "chips.out",
-                0,  # Bias mode, 0 means evaluate whole band
-                1,  # Band number - legacy from MWA
+                "0",  # Bias mode, 0 means evaluate whole band
+                "1",  # Band number - legacy from MWA
             ],
             check=True,
         )
