@@ -11,13 +11,13 @@
 
 #cd /scratch/mwaeor/ohrw/phd-programs || exit
 
-module use /software/projects/mwaeor/setonix/2024.05/modules/zen3/gcc/12.2.0
+#module use /software/projects/mwaeor/setonix/2024.05/modules/zen3/gcc/12.2.0
 # shellcheck disable=SC1091
-source /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/env_variables_garrawarla.sh
-module load cfitsio/4.4.0
+#source /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/env_variables_garrawarla.sh
+#module load cfitsio/4.4.0
 
 # Run python file in mode 1 if CHUNK_DATA_FLAG flag is set
-if [[ -n "${CHUNK_DATA_FLAG}" ]]; then
+if [[ "$1" == "1" ]]; then
     rm -rf /scratch/mwaeor/ohrw/chips_run_stage
 
     mkdir -p /scratch/mwaeor/ohrw/chips_run_stage
