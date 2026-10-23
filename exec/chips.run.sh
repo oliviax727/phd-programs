@@ -16,13 +16,13 @@ module use /software/projects/mwaeor/setonix/2024.05/modules/zen3/gcc/12.2.0
 source /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/env_variables_garrawarla.sh
 module load cfitsio/4.4.0
 
-rm -rf /scratch/mwaeor/ohrw/chips_run_stage
-
-mkdir -p /scratch/mwaeor/ohrw/chips_run_stage
-mkdir -p /scratch/mwaeor/ohrw/oskareor.data/oskar.data/fiducial/ps2ds
-
 # Run python file in mode 1 if CHUNK_DATA_FLAG flag is set
 if [[ -n "${CHUNK_DATA_FLAG}" ]]; then
+    rm -rf /scratch/mwaeor/ohrw/chips_run_stage
+
+    mkdir -p /scratch/mwaeor/ohrw/chips_run_stage
+    mkdir -p /scratch/mwaeor/ohrw/oskareor.data/oskar.data/fiducial/ps2ds
+    
     ./exec/chips.py 1
 fi
 
