@@ -9,7 +9,7 @@
 #SBATCH --export=NONE
 #SBATCH --gres=gpu:8
 
-cd /scratch/mwaeor/ohrw/phd-programs || exit
+#cd /scratch/mwaeor/ohrw/phd-programs || exit
 
 module use /software/projects/mwaeor/setonix/2024.05/modules/zen3/gcc/12.2.0
 # shellcheck disable=SC1091
@@ -22,7 +22,7 @@ if [[ -n "${CHUNK_DATA_FLAG}" ]]; then
 
     mkdir -p /scratch/mwaeor/ohrw/chips_run_stage
     mkdir -p /scratch/mwaeor/ohrw/oskareor.data/oskar.data/fiducial/ps2ds
-    
+
     ./exec/chips.py 1
 fi
 
