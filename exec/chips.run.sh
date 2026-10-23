@@ -21,8 +21,10 @@ rm -rf /scratch/mwaeor/ohrw/chips_run_stage
 mkdir -p /scratch/mwaeor/ohrw/chips_run_stage
 mkdir -p /scratch/mwaeor/ohrw/oskareor.data/oskar.data/fiducial/ps2ds
 
-# Run python file in mode 1
-./exec/chips.py 1
+# Run python file in mode 1 if CHUNK_DATA_FLAG flag is set
+if [[ -n "${CHUNK_DATA_FLAG}" ]]; then
+    ./exec/chips.py 1
+fi
 
 chunks=(/scratch/mwaeor/ohrw/chips_run_stage/PSA/chunks/*)
 
