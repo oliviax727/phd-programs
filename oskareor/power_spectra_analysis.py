@@ -386,16 +386,16 @@ class ChipsManager:
     def extract_and_load_2dps(npz_file):
         """Reads chunk data saved to an `.npz` file and returns the array as if it was ran through `PSTools.cylindrical_power_spectrum`."""
 
-        npz = npz = np.load(npz_file)
+        npz = np.load(ofmg.expand_path(npz_file))
 
-        return npz["twoD_power"] * npz["weights"], npz["k_perp"], npz["k_parr"]
+        return (npz["twoD_power"] * npz["weights"]).T, npz["k_perp"], npz["k_parr"]
 
 
 class PSTools:
     """The PSTools class contains any and all methods to analyse the power spectra of data either pre- or post- observation."""
 
     @staticmethod
-    def cubic_power_spectra(data, voxels, cosmo):
+    def cubic_power_spectra(data, voxels, cosmo=None):
         """Calculate the cubic/3-dimensional power spectra for a given volume of data. Assumes that the voxel data is uniform.
 
         :param data: A 3-dimensional array of brightness temperature values in Kelvin.
@@ -405,7 +405,11 @@ class PSTools:
         :returns (power, [kx, ky, kz]): The 3-dimensional power spectra of the data in The 3-dimensional power spectra of the data in mK^2 h^3 Mpc^-3 and the corresponding k-modes in three dimensions.
         """
 
-        # apply the Blackman-Harris window in the frequency domain
+        # Default to the basic cosmology
+        if cosmo is None:
+            cosmo = Cosmo()
+
+        # Apply the Blackman-Harris window in the frequency domain
         tdat = np.copy(data)
         for i in range(data.shape[2]):
             # Add half to centre the window
@@ -523,7 +527,7 @@ class PSTools:
 
         power_1d = np.divide(power_agg, modal_agg)
 
-        return power_1d, ostr.mean_bins(k_edges)
+        return power_1d[:-1], ostr.mean_bins(k_edges)
 
     def eval_power_spectrum(chunk, cvox):
         """Evaluate the power spectrum for a single redshift chunk.
