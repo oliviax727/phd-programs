@@ -16,7 +16,7 @@ SETONIX_DATA_DIR_SCRATCH = "/scratch/mwaeor/ohrw/"
 
 uvfits_loc = SETONIX_DATA_DIR_SCRATCH + "oskareor.data/oskar.data/fiducial/fiducial_uvw_plane.uvfits"
 temp_parent_dir = SETONIX_DATA_DIR_SCRATCH + "chips_run_stage"
-outdir = SETONIX_DATA_DIR_SCRATCH + "oskareor.data/oskar.data/fiducial/ps2ds"
+outdir = SETONIX_DATA_DIR_SCRATCH + "oskareor.data/oskar.data/fiducial/ps2ds/"
 
 # Arguments
 
