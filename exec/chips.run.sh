@@ -9,12 +9,12 @@
 #SBATCH --export=NONE
 #SBATCH --gres=gpu:8
 
-#cd /scratch/mwaeor/ohrw/phd-programs || exit
+cd /scratch/mwaeor/ohrw/phd-programs || exit
 
-#module use /software/projects/mwaeor/setonix/2024.05/modules/zen3/gcc/12.2.0
+module use /software/projects/mwaeor/setonix/2024.05/modules/zen3/gcc/12.2.0
 # shellcheck disable=SC1091
-#source /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/env_variables_garrawarla.sh
-#module load cfitsio/4.4.0
+source /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/env_variables_garrawarla.sh
+module load cfitsio/4.4.0
 
 # Run python file in mode 1 if CHUNK_DATA_FLAG flag is set
 if [[ "$1" == "1" ]]; then
@@ -36,6 +36,7 @@ c=299792458
 for chunk_file in "${chunks[@]}"; do
     # Run CHIPS
     echo "Running CHIPS ..."
+
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska "${chunk_file}" side 15.0 $c
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska side $nchan 0 'yy' side 1
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska side $nchan $kperp 'yy' $umax chips.out 0 1
