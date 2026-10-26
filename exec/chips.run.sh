@@ -33,16 +33,21 @@ kperp=64
 umax=1000
 c=299792458
 
+export OUTPUTDIR='/scratch/mwaeor/ohrw/chips_run_stage/PSA'
+export INPUTDIR='/scratch/mwaeor/ohrw/chips_run_stage/PSA'
+
+
 for chunk_file in "${chunks[@]}"; do
     # Run CHIPS
-    echo "Running CHIPS ..."
+    echo "Running CHIPS on $chunk_file"
+    cd $INPUTDIR || exit
 
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska "${chunk_file}" side 15.0 $c
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska side $nchan 0 'yy' side 1
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska side $nchan $kperp 'yy' $umax chips.out 0 1
 
     # Extract chunk file data
-    echo "CHIPS Finished, extracting chunk data ..."
+    echo "CHIPS Finished processing ${chunk_file}, extracting chunk data ..."
     chunk="$(basename -- "${chunk_file}")"
 
     IFS='_' read -ra DATA <<< "${chunk}"
@@ -50,8 +55,11 @@ for chunk_file in "${chunks[@]}"; do
     f_ref="${DATA[2]}"
     index="${DATA[3]}"
 
+    cd /scratch/mwaeor/ohrw/phd-programs || exit
+
     # Run python file in mode 2
     ./exec/chips.py 2 "${f_chn}" "${f_ref}" "${index}"
 
     echo "Chunk data extracted for ${index}"
 done
+

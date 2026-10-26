@@ -272,7 +272,7 @@ class ChipsManager:
             cosmo = Cosmo()
 
         args = FakeArgs()
-        args.basedir = temp_parent_dir
+        args.basedir = ofmg.expand_path(temp_parent_dir)
         args.chips_tag = "chips.out"
         args.polarisation = "YY"
         args.N_chan = n_channels
@@ -290,7 +290,7 @@ class ChipsManager:
 
         cdp = ChipsDataProducts(args)
 
-        cdp._read_in_data_and_convert("yy", "chips.out", False, outdir)
+        cdp._read_in_data_and_convert("yy", "chips.out", False, ofmg.expand_path(outdir))
 
     @staticmethod
     def run_chips_on_model(
