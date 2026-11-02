@@ -213,8 +213,8 @@ class ChipsManager:
         :param uvfits_file: The UVFits file location to run the full CHIPS program on.
         """
 
-        os.environ["OUTPUTDIR"] = ofmg.expand_path(temp_parent_dir)
-        os.environ["INPUTDIR"] = ofmg.expand_path(temp_parent_dir)
+        os.environ["OUTPUTDIR"] = ofmg.expand_path(temp_parent_dir + "/PSA/chips_output/")
+        os.environ["INPUTDIR"] = ofmg.expand_path(temp_parent_dir + "/PSA/chips_output/")
 
         subprocess.run(
             [
@@ -272,7 +272,7 @@ class ChipsManager:
             cosmo = Cosmo()
 
         args = FakeArgs()
-        args.basedir = ofmg.expand_path(temp_parent_dir)
+        args.basedir = ofmg.expand_path(temp_parent_dir + "/PSA/chips_output")
         args.chips_tag = "chips.out"
         args.polarisation = "YY"
         args.N_chan = n_channels
@@ -308,8 +308,8 @@ class ChipsManager:
         print("Creating the output directory ./PSA ...")
 
         # Create the directory and/or clear it
-        subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA/chunks"], check=True)
-        subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chunks"], check=True)
+        subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA"], check=True)
+        subprocess.run(["mkdir", "-p", temp_parent_dir + r"/PSA/{chips_output,chunks}"], check=True)
 
         print("Generating chunks ...")
 
@@ -332,7 +332,7 @@ class ChipsManager:
 
             ChipsManager.run_chips(
                 uvfits_loc,
-                temp_parent_dir=temp_parent_dir + "/PSA/",
+                temp_parent_dir=temp_parent_dir,
                 n_channels=chunk_bounds[1] - chunk_bounds[0],
                 k_perp_bins=k_perp_bins,
                 u_max=u_max,
@@ -340,7 +340,7 @@ class ChipsManager:
 
             ChipsManager.extract_and_save_2dps(
                 outdir + f"fiducial_ps2d_data_chunk_{i}.npz",
-                temp_parent_dir=temp_parent_dir + "/PSA/",
+                temp_parent_dir=temp_parent_dir,
                 n_channels=chunk_bounds[1] - chunk_bounds[0],
                 k_perp_bins=k_perp_bins,
                 u_max=u_max,
@@ -360,8 +360,8 @@ class ChipsManager:
         print("Creating the output directory ./PSA ...")
 
         # Create the directory and/or clear it
-        subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA/chips_output"], check=True)
-        subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chips_output"], check=True)
+        subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA"], check=True)
+        subprocess.run(["mkdir", "-p", temp_parent_dir + r"/PSA/{chips_output,chunks}"], check=True)
 
         print("Generating chunks ...")
 
@@ -388,7 +388,7 @@ class ChipsManager:
 
         npz = np.load(ofmg.expand_path(npz_file))
 
-        return (npz["twoD_power"] * npz["weights"]).T, npz["k_perp"], npz["k_parr"]
+        return npz["twoD_power"].T, npz["k_perp"], npz["k_parr"]
 
 
 class PSTools:
@@ -484,15 +484,18 @@ class PSTools:
         return power_2d, ostr.mean_bins(k_perp_edges), ostr.mean_bins(k_para_edges)
 
     @staticmethod
-    def dimensionless_power_spectrum(power, k_perp, k_para, bins=32, cosmo=None, z_centre=5.5):
+    def dimensionless_power_spectrum(
+        power, k_perp, k_para, bins=32, cosmo=None, z_centre=5.5, exclude_wedge_modes=False
+    ):
         """Calculate the dimensionless, linear power spectra for a given 2DPS. Assumes that the voxel data is uniform.
 
         :param power: The 2-dimensional power spectra in mK^2 h^3 Mpc^-3.
         :param k_perp: The bin centres of the k modes in the perpendicular dimension.
         :param k_para: The bin centres of the k modes in the parallel dimension.
         :param bins: The number of k bins to use.
-        :param cosmo: The EoRCosmology object for calculating the foreground wedge. If None, then no wedge is applied.
+        :param cosmo: The EoRCosmology object for calculating the foreground wedge.
         :param z_centre: The central redshift value of the chunk.
+        :param exclude_wedge_modes: If true, exclude all modes inside the foreground wedge.
 
         :returns (power_1d, k_edges): The dimensionless power spectra in mK^2, the edges of the k bins.
         """
@@ -502,6 +505,9 @@ class PSTools:
 
         # Apply the foreground wedge
         if cosmo is not None:
+            cosmo = Cosmo()
+
+        if exclude_wedge_modes:
             fw, _ = omath.foreground_wedge(kpe, kpa, cosmo=cosmo, z_centre=z_centre)
             pdwg = power * fw
         else:

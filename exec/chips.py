@@ -15,7 +15,7 @@ SETONIX_DATA_DIR_SCRATCH = "/scratch/mwaeor/ohrw/"
 # Locations
 
 uvfits_loc = SETONIX_DATA_DIR_SCRATCH + "oskareor.data/oskar.data/fiducial/fiducial_uvw_plane.uvfits"
-temp_parent_dir = SETONIX_DATA_DIR_SCRATCH + "chips_run_stage"
+temp_parent_dir = SETONIX_DATA_DIR_SCRATCH
 outdir = SETONIX_DATA_DIR_SCRATCH + "oskareor.data/oskar.data/fiducial/ps2ds/"
 
 # Arguments
@@ -38,7 +38,7 @@ match int(args[1]):
 
         cmgr.extract_and_save_2dps(
             outdir + f"fiducial_ps2d_data_chunk_{int(index)}.npz",
-            temp_parent_dir=temp_parent_dir + "/PSA/",
+            temp_parent_dir=temp_parent_dir,
             f_ref=float(f_ref),
             f_chn=float(f_chn),
         )

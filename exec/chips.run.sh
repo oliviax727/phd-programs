@@ -18,23 +18,21 @@ module load cfitsio/4.4.0
 
 # Run python file in mode 1 if CHUNK_DATA_FLAG flag is set
 if [[ "$1" == "1" ]]; then
-    rm -rf /scratch/mwaeor/ohrw/chips_run_stage
-
-    mkdir -p /scratch/mwaeor/ohrw/chips_run_stage
+    # Remake ps2ds dir
     mkdir -p /scratch/mwaeor/ohrw/oskareor.data/oskar.data/fiducial/ps2ds
 
     ./exec/chips.py 1
 fi
 
-chunks=(/scratch/mwaeor/ohrw/chips_run_stage/PSA/chunks/*)
+chunks=(/scratch/mwaeor/ohrw/PSA/chunks/*)
 
 nchan=64
 kperp=64
 umax=1000
 c=299792458
 
-export OUTPUTDIR='/scratch/mwaeor/ohrw/chips_run_stage/PSA/'
-export INPUTDIR='/scratch/mwaeor/ohrw/chips_run_stage/PSA/'
+export OUTPUTDIR='/scratch/mwaeor/ohrw/PSA/chips_output'
+export INPUTDIR='/scratch/mwaeor/ohrw/PSA/chips_output'
 
 for chunk_file in "${chunks[@]}"; do
     # Run CHIPS
