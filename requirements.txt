@@ -16,10 +16,10 @@ black>=26,<27
 pylint-venv>=3,<4
 pyuvdata>=3.1,<4
 numba>=0.60,<0.63
-python-casacore>=3.6,<4
-pylint-fixme-info
-scikit-learn
-sphinx
+#python-casacore>=3.6,<4
+#pylint-fixme-info
+#scikit-learn
+#sphinx
 #21cmSense
 #--extra-index-url https://artefact.skao.int/repository/pypi-internal/simple
 #ska-ost-array-config==4.3.1
