@@ -378,8 +378,7 @@ class ChipsManager:
             f_ref = Cosmo.z_to_f(z_range[0]) - chunk_bounds[0] * f_chn
 
             # Create the temporary UVFits file location for CHIPS to analyse
-            uvfits_loc = temp_parent_dir +
-                f"/PSA/chunks/chunk_{f_chn.to_value(u.Hz)}_{f_ref.to_value(u.Hz)}_{i}_temp.uvfits"
+            uvfits_loc = temp_parent_dir + f"/PSA/chunks/chunk_{f_chn.to_value(u.Hz)}_{f_ref.to_value(u.Hz)}_{i}_temp.uvfits"
 
             ChipsManager.extract_uvfits_chunk(
                 uvfits_file=uvfits_file, chunk_boundaries=chunk_bounds, outfile=uvfits_loc
