@@ -340,7 +340,7 @@ class ChipsManager:
             )
 
             ChipsManager.extract_and_save_2dps(
-                outdir + f"fiducial_ps2d_data_chunk_{i}.npz",
+                outdir + f"ps2d_data_chunk_{i}.npz",
                 temp_parent_dir=temp_parent_dir,
                 n_channels=chunk_bounds[1] - chunk_bounds[0],
                 k_perp_bins=k_perp_bins,

@@ -36,8 +36,15 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+# Make the output directory
+if [[ "${is_template}" == "1" ]]; then
+    mkdir -p "/scratch/mwaeor/ohrw/oskareor.data/2dps_npz_templates/${preset_name}_ps2ds/"
+elif [[ "${is_template}" == "0" ]]; then
+    mkdir -p "/scratch/mwaeor/ohrw/oskareor.data/oskar.data/${preset_name}/ps2ds/"
+fi
+
 # Run python file in mode 1 or 3 if the chunk option is set
-if [[ "${make_chunks}" -eq 0 ]]; then
+if [[ "${make_chunks}" == "0" ]]; then
     ./exec/chips.py "$((is_template * 2 + 1))" "${preset_name}"
 fi
 

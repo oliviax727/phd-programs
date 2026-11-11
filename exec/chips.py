@@ -68,7 +68,7 @@ match int(args[1]):
     case 4:
         template = args[2]
         print(f"Template {template} selected")
-        outdir = SETONIX_DATA_DIR_SCRATCH + f"oskareor.data/ps2ds/{template}_ps2ds/"
+        outdir = SETONIX_DATA_DIR_SCRATCH + f"oskareor.data/2dps_npz_templates/{template}_ps2ds/"
 
         print("Extraction option selected")
 
