@@ -184,24 +184,27 @@ class ChipsManager:
     DEFAULT_TEMP_FILE = os.getcwd() + "/PSA/chunk_data.uvfits"
 
     @staticmethod
-    def extract_uvfits_chunk(uvfits_file, chunk_boundaries, outfile="./PSA/chunk_data.uvfits"):
+    def extract_uvfits_chunk(uvfits_file, chunk_boundaries, outfile="./PSA/chunk_data.uvfits", file_is_chunk=False):
         """Retrieves the UVFits file and then isolates the data to a specific chunk.
 
         .. NB: Channel cropping indexes from zero and isolates the data in a similar way to numpy array indexing, where the start channel is included but the end channel is not e.g. for `chunk_boundaries = (i, c, f)`, the saved data contains channels i to f-1 (inclusive to both ends).
 
         :param uvfits_file: The UVFits file location to convert.
         :param chunk_boundaries: A tuple containing the start, central, and end channels to crop to.
+        :param outfile: The file to output the sliced chunk to.
+        :param file_is_chunk: If true, treat the file as an already completed chunk.
         """
 
         # Read the UV Fits file
         uvd = UVData()
         uvd.read_uvfits(ofmg.expand_path(uvfits_file))
 
-        # Extract chunk data
-        i, _, f = chunk_boundaries
+        if not file_is_chunk:
+            # Extract chunk data
+            i, _, f = chunk_boundaries
 
-        # Create a copy of the object
-        uvd.select(freq_chans=np.arange(i, f))
+            # Create a copy of the object
+            uvd.select(freq_chans=np.arange(i, f))
 
         # Write the object to the new file
         uvd.write_uvfits(ofmg.expand_path(outfile))
@@ -355,6 +358,7 @@ class ChipsManager:
         z_range=[5.5, 13.5],
         n_channels=1024,
         n_chunks=32,
+        file_is_chunk=False,
     ):
         """Creates a series of UVFits chunk files to later evaluate."""
 
@@ -382,8 +386,12 @@ class ChipsManager:
                 temp_parent_dir + f"/PSA/chunks/chunk_{f_chn.to_value(u.Hz)}_{f_ref.to_value(u.Hz)}_{i}_temp.uvfits"
             )
 
+            # Extract the UVFits chunk
             ChipsManager.extract_uvfits_chunk(
-                uvfits_file=uvfits_file, chunk_boundaries=chunk_bounds, outfile=uvfits_loc
+                uvfits_file=uvfits_file,
+                chunk_boundaries=chunk_bounds,
+                outfile=uvfits_loc,
+                file_is_chunk=file_is_chunk,
             )
 
     @staticmethod

@@ -19,6 +19,8 @@ module load cfitsio/4.4.0
 make_chunks=0
 is_template=0
 preset_name="fiducial"
+nchan=64
+kperp=64
 
 # Extract arguments
 while [ $# -gt 0 ]; do
@@ -28,6 +30,14 @@ while [ $# -gt 0 ]; do
         ;;
         -t)
         is_template=1
+        ;;
+        --kperp)
+        kperp=$2
+        shift
+        ;;
+        --nchan)
+        nchan=$2
+        shift
         ;;
         *)
         preset_name="$1"
@@ -50,8 +60,6 @@ fi
 
 chunks=(/scratch/mwaeor/ohrw/PSA/chunks/*)
 
-nchan=64
-kperp=64
 umax=1000
 c=299792458
 
