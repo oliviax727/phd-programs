@@ -29,7 +29,7 @@ while [ $# -gt 0 ]; do
         -t)
         is_template=1
         ;;
-        \?)
+        *)
         preset_name="$1"
         ;;
     esac
