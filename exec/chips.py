@@ -48,11 +48,19 @@ match int(args[1]):
 
         [f_chn, f_ref, index] = args[3:6]
 
+        if len(args) > 6:
+            nchan = args[6]
+            kperp = args[7]
+        else:
+            nchan = kperp = 64
+
         cmgr.extract_and_save_2dps(
             outdir + f"{sim}_ps2d_data_chunk_{int(index)}.npz",
             temp_parent_dir=temp_parent_dir,
             f_ref=float(f_ref),
             f_chn=float(f_chn),
+            nchan=int(nchan),
+            kperp=int(kperp),
         )
 
     # Chunk a template
@@ -62,7 +70,7 @@ match int(args[1]):
         uvfits_loc = SETONIX_DATA_DIR_SCRATCH + f"oskareor.data/uvfits_templates/{template}_uvw_plane.uvfits"
 
         print("Chunking option selected")
-        cmgr.extract_uvfits_chunks(uvfits_loc, temp_parent_dir)
+        cmgr.extract_uvfits_chunks(uvfits_loc, temp_parent_dir, file_is_chunk=True)
 
     # Extract a template
     case 4:
@@ -74,11 +82,19 @@ match int(args[1]):
 
         [f_chn, f_ref, index] = args[3:6]
 
+        if len(args) > 6:
+            nchan = args[6]
+            kperp = args[7]
+        else:
+            nchan = kperp = 64
+
         cmgr.extract_and_save_2dps(
             outdir + f"{template}_ps2d_data_chunk_{int(index)}.npz",
             temp_parent_dir=temp_parent_dir,
             f_ref=float(f_ref),
             f_chn=float(f_chn),
+            nchan=int(nchan),
+            kperp=int(kperp),
         )
 
     # No option

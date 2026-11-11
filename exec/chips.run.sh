@@ -72,8 +72,8 @@ for chunk_file in "${chunks[@]}"; do
     cd $INPUTDIR || exit
 
     /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/gridvisska "${chunk_file}" side 15.0 $c
-    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska side $nchan 0 'yy' side 1
-    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska side $nchan $kperp 'yy' $umax chips.out 0 1
+    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/prepare_ska side "$nchan" 0 'yy' side 1
+    /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/lssa_fg_ska side "$nchan" "$kperp" 'yy' $umax chips.out 0 1
 
     # Extract chunk file data
     echo "CHIPS Finished processing ${chunk_file}, extracting chunk data ..."
@@ -87,7 +87,7 @@ for chunk_file in "${chunks[@]}"; do
     cd /scratch/mwaeor/ohrw/phd-programs || exit
 
     # Run python file in mode 2 or 4
-    ./exec/chips.py "$((is_template * 2 + 2))" "${preset_name}" "${f_chn}" "${f_ref}" "${index}"
+    ./exec/chips.py "$((is_template * 2 + 2))" "${preset_name}" "${f_chn}" "${f_ref}" "${index}" "${nchan}" "${kperp}"
 
     echo "Chunk data extracted for ${index}"
 done
