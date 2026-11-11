@@ -31,8 +31,8 @@ kperp=64
 umax=1000
 c=299792458
 
-export OUTPUTDIR='/scratch/mwaeor/ohrw/PSA/chips_output'
-export INPUTDIR='/scratch/mwaeor/ohrw/PSA/chips_output'
+export OUTPUTDIR='/scratch/mwaeor/ohrw/PSA/chips_output/'
+export INPUTDIR='/scratch/mwaeor/ohrw/PSA/chips_output/'
 
 for chunk_file in "${chunks[@]}"; do
     # Run CHIPS
