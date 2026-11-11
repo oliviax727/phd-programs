@@ -16,12 +16,29 @@ module use /software/projects/mwaeor/setonix/2024.05/modules/zen3/gcc/12.2.0
 source /software/projects/mwaeor/ctrott/setonix/chips_2025_ska/env_variables_garrawarla.sh
 module load cfitsio/4.4.0
 
-# Run python file in mode 1 if CHUNK_DATA_FLAG flag is set
-if [[ "$1" == "1" ]]; then
-    # Remake ps2ds dir
-    mkdir -p /scratch/mwaeor/ohrw/oskareor.data/oskar.data/fiducial/ps2ds
+make_chunks=0
+is_template=0
+preset_name="fiducial"
 
-    ./exec/chips.py 1
+# Extract arguments
+while [ $# -gt 0 ]; do
+    case $1 in
+        -c)
+        make_chunks=0
+        ;;
+        -t)
+        is_template=1
+        ;;
+        \?)
+        preset_name="$1"
+        ;;
+    esac
+    shift
+done
+
+# Run python file in mode 1 or 3 if the chunk option is set
+if [[ "${make_chunks}" -eq 0 ]]; then
+    ./exec/chips.py "$((is_template * 2 + 1))" "${preset_name}"
 fi
 
 chunks=(/scratch/mwaeor/ohrw/PSA/chunks/*)
@@ -54,8 +71,8 @@ for chunk_file in "${chunks[@]}"; do
 
     cd /scratch/mwaeor/ohrw/phd-programs || exit
 
-    # Run python file in mode 2
-    ./exec/chips.py 2 "${f_chn}" "${f_ref}" "${index}"
+    # Run python file in mode 2 or 4
+    ./exec/chips.py "$((is_template * 2 + 2))" "${preset_name}" "${f_chn}" "${f_ref}" "${index}"
 
     echo "Chunk data extracted for ${index}"
 done

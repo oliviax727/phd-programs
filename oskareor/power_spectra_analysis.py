@@ -311,7 +311,7 @@ class ChipsManager:
         subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA"], check=True)
         subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chunks"], check=True)
         subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chips_output"], check=True)
-        
+
         print("Generating chunks ...")
 
         # Create an array of chunks
@@ -364,7 +364,7 @@ class ChipsManager:
         subprocess.run(["rm", "-rf", temp_parent_dir + "/PSA"], check=True)
         subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chunks"], check=True)
         subprocess.run(["mkdir", "-p", temp_parent_dir + "/PSA/chips_output"], check=True)
-        
+
         print("Generating chunks ...")
 
         # Create an array of chunks
@@ -378,7 +378,9 @@ class ChipsManager:
             f_ref = Cosmo.z_to_f(z_range[0]) - chunk_bounds[0] * f_chn
 
             # Create the temporary UVFits file location for CHIPS to analyse
-            uvfits_loc = temp_parent_dir + f"/PSA/chunks/chunk_{f_chn.to_value(u.Hz)}_{f_ref.to_value(u.Hz)}_{i}_temp.uvfits"
+            uvfits_loc = (
+                temp_parent_dir + f"/PSA/chunks/chunk_{f_chn.to_value(u.Hz)}_{f_ref.to_value(u.Hz)}_{i}_temp.uvfits"
+            )
 
             ChipsManager.extract_uvfits_chunk(
                 uvfits_file=uvfits_file, chunk_boundaries=chunk_bounds, outfile=uvfits_loc
@@ -506,11 +508,11 @@ class PSTools:
         kpe, kpa = np.meshgrid(k_perp, k_para, indexing="ij")
 
         # Apply the foreground wedge
-        if cosmo is not None:
+        if cosmo is None:
             cosmo = Cosmo()
 
         if exclude_wedge_modes:
-            fw, _ = omath.foreground_wedge(kpe, kpa, cosmo=cosmo, z_centre=z_centre)
+            fw, _ = cosmo.foreground_wedge(kpe, kpa, z=z_centre)
             pdwg = power * fw
         else:
             pdwg = power
