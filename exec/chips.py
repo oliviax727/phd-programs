@@ -59,8 +59,8 @@ match int(args[1]):
             temp_parent_dir=temp_parent_dir,
             f_ref=float(f_ref),
             f_chn=float(f_chn),
-            nchan=int(nchan),
-            kperp=int(kperp),
+            n_channels=int(nchan),
+            k_perp_bins=int(kperp),
         )
 
     # Chunk a template
@@ -93,8 +93,8 @@ match int(args[1]):
             temp_parent_dir=temp_parent_dir,
             f_ref=float(f_ref),
             f_chn=float(f_chn),
-            nchan=int(nchan),
-            kperp=int(kperp),
+            n_channels=int(nchan),
+            k_perp_bins=int(kperp),
         )
 
     # No option
