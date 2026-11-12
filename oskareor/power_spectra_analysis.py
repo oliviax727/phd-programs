@@ -184,7 +184,9 @@ class ChipsManager:
     DEFAULT_TEMP_FILE = os.getcwd() + "/PSA/chunk_data.uvfits"
 
     @staticmethod
-    def extract_uvfits_chunk(uvfits_file, chunk_boundaries, outfile="./PSA/chunk_data.uvfits", file_is_chunk=False):
+    def extract_uvfits_chunk(
+        uvfits_file, chunk_boundaries, outfile="./PSA/chunk_data.uvfits", file_is_chunk=False, max_channels=64
+    ):
         """Retrieves the UVFits file and then isolates the data to a specific chunk.
 
         .. NB: Channel cropping indexes from zero and isolates the data in a similar way to numpy array indexing, where the start channel is included but the end channel is not e.g. for `chunk_boundaries = (i, c, f)`, the saved data contains channels i to f-1 (inclusive to both ends).
@@ -193,18 +195,34 @@ class ChipsManager:
         :param chunk_boundaries: A tuple containing the start, central, and end channels to crop to.
         :param outfile: The file to output the sliced chunk to.
         :param file_is_chunk: If true, treat the file as an already completed chunk.
+        :param max_channels: The maximum allowed amount of channels that can be extracted.
         """
 
         # Read the UV Fits file
         uvd = UVData()
         uvd.read_uvfits(ofmg.expand_path(uvfits_file))
 
+        # Half max channel
+        r_chan = max_channels // 2
+
+        # Select a portion of the desired channels
         if not file_is_chunk:
             # Extract chunk data
             i, _, f = chunk_boundaries
 
-            # Create a copy of the object
-            uvd.select(freq_chans=np.arange(i, f))
+            if f - i > max_channels:
+                uvd.select(freq_chans=np.arange(c - r_chan, c + r_chan))
+            else:
+                uvd.select(freq_chans=np.arange(i, f))
+
+        else:
+            # Get number of existing channels
+            avail_chan = uvd.Nfreqs
+
+            # Restrict to that amount of channels
+            if avail_chan > max_channels:
+                midpoint = avail_chan // 2
+                uvd.select(freq_chans=np.arange(midpoint - r_chan, midpoint + r_chan))
 
         # Write the object to the new file
         uvd.write_uvfits(ofmg.expand_path(outfile))
@@ -392,6 +410,7 @@ class ChipsManager:
                 chunk_boundaries=chunk_bounds,
                 outfile=uvfits_loc,
                 file_is_chunk=file_is_chunk,
+                max_channels=n_channels,
             )
 
     @staticmethod
