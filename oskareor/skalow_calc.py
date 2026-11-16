@@ -17,6 +17,7 @@ from astropy.cosmology import FlatLambdaCDM as fmodel
 from astropy.cosmology import z_at_value as getz
 from astropy.time import Time, TimeDelta
 from astropy.units import Quantity
+from astropy.io import fits
 
 # Data handling and statistics
 from scipy.stats import circmean as circmean_radians
@@ -284,6 +285,22 @@ class EoRCosmology:
 
 class FileManager:
     """The FileManager class contains helper functions specifically relating to directory and file management, as well as the conversion of files."""
+
+    @staticmethod
+    def read_fits_to_array(file):
+        """Reads a FITS observation image file (outputted by OSKAR) and produces an array of pixel values.
+
+        :param file: The location of the FITS image file.
+
+        :return data: The fits image as a 3-dimensional numpy array.
+        """
+
+        data = np.zeros((512, 512, 1024))
+
+        with fits.open(file) as hdul:
+            data = hdul[0].data
+
+        return data
 
     @staticmethod
     def convert_ms_to_uvfits(ms_dir, uvfits_file):
