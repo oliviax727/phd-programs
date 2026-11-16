@@ -41,35 +41,6 @@ class SimulationReformatter:
     Sky coordinate locations are given in Degrees, whereas angular diameters are given in radians.
     """
 
-    @staticmethod
-    def brightness_temperature_to_flux(tb: float, fxy: float, dtheta: float, dphi: float) -> float:
-        """Given the temperature, frequency, and angular size in both sky directions, calculate the luminosity in Jy.
-
-        :param tb: The brightness temperature. Must be provided in Kelvin.
-        :param fxy: The frequency of emission. Must be provided in units of Hertz.
-        :param dtheta: The first specified angular diameter. Perpendicular to the first. Must be provided in units of Radians.
-        :param dphi: The second specified angular diameter. Perpendicular to the first. Must be provided in units of Radians.
-
-        :return fv: The flux corresponding to the brightness temperature. In units of Jansky.
-        """
-
-        # Calculate pixelated luminosity
-        fv = 2 * c.k_B.si.value * fxy**2 * tb * (dtheta * dphi) / c.c.si.value**2
-
-        return fv * 1e26  # Converts to Jansky
-
-    @staticmethod
-    def brightness_temperature_to_linewidth(tb: float) -> float:
-        """Takes the brightness temperature emission. Assumes that the kinetic gas temperature is coupled with the spin temperature and the brightness temperature (generally correct for z < 25).
-
-        :param tb: The brightness temperature. Must be provided in Kelvin.
-
-        :return linewidth: The flux corresponding to the brightness temperature. In units of Jansky.
-        """
-
-        # Calculate linewidth in Hz
-        return (tb**0.5) * omath.SIGMA_F_FLOAT
-
     class ReformatterOptionValue(ohelp.OptionDictValue):
         """Reformatter option dict value."""
 
@@ -511,7 +482,7 @@ class SimulationReformatter:
                     fxy = fq + df / 2
 
                     # Calculate pixelated luminosity
-                    fv = SimulationReformatter.brightness_temperature_to_flux(tb=tb, fxy=fxy, dtheta=dtheta, dphi=dphi)
+                    fv = omath.brightness_temperature_to_flux(tb=tb, fxy=fxy, dtheta=dtheta, dphi=dphi)
 
                     # Save values
                     voxels[x, y, t, 0] = dtheta
