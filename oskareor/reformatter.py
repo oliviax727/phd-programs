@@ -320,7 +320,7 @@ class SimulationReformatter:
         :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, the voxel sizes as an array, and the simulation box cosmology.
         """
 
-        file = h5py.File(h5_location, "r")
+        file = h5py.File(ofmg.expand_path(h5_location), "r")
 
         # Get BT data, convert mK to K
         bt_data = np.array(file.get("BrightnessTemp")["brightness_temp"]) / 1000
@@ -352,7 +352,7 @@ class SimulationReformatter:
         :return (values, d, z_ref, vox, cosmo): The numpy values array in Kelvin, the shape of the array, the refrence redshift, the voxel size in Mpc, the voxel sizes as an array, and the simulation box cosmology.
         """
 
-        file = h5py.File(h5_location, "r")
+        file = h5py.File(ofmg.expand_path(h5_location), "r")
 
         # Get BT data, convert mK to K
         bt_data = np.array(file["lightcones"]["brightness_temp"]) / 1000
@@ -539,7 +539,7 @@ class SimulationReformatter:
                 new_freq, freq_bandw = np.linspace(freq_values[0], freq_values[-1], d[2], retstep=True)
 
                 # Perform Regrid
-                new_flux = np.clip(bspline(new_freq), 0, None)
+                new_flux = bspline(new_freq)
 
                 # Create array of uniform bin sizes
                 freq_bins = np.ones(d[2]) * freq_bandw
