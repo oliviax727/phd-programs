@@ -652,18 +652,20 @@ class SimulationReformatter:
 
         # Convert Stokes I values to stringified array
         csv_raw_conc = np.expand_dims(
-            np.apply_along_axis(
-                (
-                    lambda x: np.array2string(
-                        x,
-                        separator=",",
-                        formatter={"float": (lambda x: np.format_float_scientific(x, 4, False))},
-                        max_line_width=np.iinfo(int).max,
-                        threshold=np.iinfo(int).max,
-                    )
-                ),
-                axis=-1,
-                arr=values,
+            np.array(
+                [
+                    [
+                        np.array2string(
+                            spectrum,
+                            separator=",",
+                            formatter={"float": (lambda x: np.format_float_scientific(x, 4, False))},
+                            max_line_width=np.iinfo(int).max,
+                            threshold=np.iinfo(int).max,
+                        )
+                        for spectrum in row
+                    ]
+                    for row in values
+                ]
             ),
             axis=0,
         )
