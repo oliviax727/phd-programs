@@ -26,7 +26,7 @@ kperp=64
 while [ $# -gt 0 ]; do
     case $1 in
         -c)
-        make_chunks=0
+        make_chunks=1
         ;;
         -t)
         is_template=1
@@ -54,7 +54,7 @@ elif [[ "${is_template}" == "0" ]]; then
 fi
 
 # Run python file in mode 1 or 3 if the chunk option is set
-if [[ "${make_chunks}" == "0" ]]; then
+if [[ "${make_chunks}" == "1" ]]; then
     ./exec/chips.py "$((is_template * 2 + 1))" "${preset_name}"
 fi
 
