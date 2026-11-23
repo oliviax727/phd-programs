@@ -136,9 +136,9 @@ major_ticks = np.concatenate(
 
 major_tick_labels = np.concatenate(
     [
-        r"$-10^" + major_tick_base[0].astype(int).astype(str) + r"$",
+        np.array([r"$-10^" + str(int(x)) + r"$" for x in major_tick_base[0]]),
         ["0"],
-        r"$10^" + major_tick_base[2].astype(int).astype(str) + r"$",
+        np.array([r"$10^" + str(int(x)) + r"$" for x in major_tick_base[2]]),
     ]
 )
 
