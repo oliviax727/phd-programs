@@ -263,7 +263,7 @@ fig.set_size_inches((12, 5))
 ax1.set_title(r"Pre-OSKAR 1D Dimensionless Power Spectrum")
 ax2.set_title(r"Post-OSKAR 1D Dimensionless Power Spectrum")
 
-plt.savefig("chips_1dps.png")
+plt.savefig("img/chips_1dps.png")
 
 # ===
 
@@ -314,4 +314,4 @@ title_ax.text(
 fig.supxlabel(r"$k_{\perp}$ ($\mathrm{h\,Mpc}^{-1}$)")
 fig.supylabel(r"$k_{\parallel}$ ($\mathrm{h\,Mpc}^{-1}$)")
 
-plt.savefig("chips_2dps.png")
+plt.savefig("img/chips_2dps.png")
