@@ -16,15 +16,36 @@ from oskareor.reformatter import SimulationReformatter as simref
 from oskareor.power_spectra_analysis import ChipsManager as chipsm, PSTools as pst
 from chips_wrappers.ps_methods.chips_data import ChipsDataProducts as ChipsDataProducts
 from chips_wrappers.setup.make_args import get_args, FakeArgs
-from oskareor.skalow_calc import FileManager as ofmg
+from oskareor.skalow_calc import FileManager as ofmg, SKAMath as omath
 
 # ===
 
-file = ofmg.expand_path("/scratch/mwaeor/ohrw/oskareor.data/simulations/project1/fiducial_lightcone_simulation.h5")
+path = ofmg.expand_path("/scratch/mwaeor/ohrw/oskareor.data/simulations/project1/fiducial_lightcone_simulation.h5")
 
-data, z_ref, v, voxels, cosmology = simref.extract_h5_data(file)
+data, z_ref, v, voxels, cosmology = simref.extract_h5_data(path)
 
 cosmology.h0 = 67.66 * u.km / u.s / u.Mpc
+
+# ===
+
+# Import the h5 File Data
+file = h5py.File(path)
+data = np.array(file["lightcones"]["brightness_temp"])
+dist = np.array(file["lightcone_distances"])
+inpd = file["InputParameters"]
+
+# ===
+
+# Cosmology data
+cosmo = cosmology
+btzs = cosmology.dz_to_z(dist * u.Mpc)
+print(btzs)
+
+frqs = 1.420e9 / (btzs + 1)
+print(frqs)
+
+strs = np.arctan(2 / dist)
+print(strs)
 
 # ===
 
@@ -51,7 +72,7 @@ print(data.max(), data.min())
 
 temps_unscaled = data.flatten()
 
-zero_point = temps.max()  # Define the zero point to force logarithmic bins
+zero_point = temps_unscaled.max()  # Define the zero point to force logarithmic bins
 temps = zero_point - temps_unscaled
 temps = temps[temps > 0]
 

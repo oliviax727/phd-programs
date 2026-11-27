@@ -97,7 +97,7 @@ print(data.max(), data.min())
 
 temps_unscaled = data.flatten()
 
-zero_point = temps.max()  # Define the zero point to force logarithmic bins
+zero_point = temps_unscaled.max()  # Define the zero point to force logarithmic bins
 temps = zero_point - temps_unscaled
 temps = temps[temps > 0]
 
