@@ -97,7 +97,7 @@ print(data.max(), data.min())
 
 temps_unscaled = data.flatten()
 
-zero_point = 40  # Define the zero point to force logarithmic bins
+zero_point = temps.max()  # Define the zero point to force logarithmic bins
 temps = zero_point - temps_unscaled
 temps = temps[temps > 0]
 
@@ -128,9 +128,9 @@ print(major_tick_base)
 
 major_ticks = np.concatenate(
     [
-        40 + 10 ** major_tick_base[0],
-        [40],
-        40 - 10 ** major_tick_base[2],
+        zero_point + 10 ** major_tick_base[0],
+        [zero_point],
+        zero_point - 10 ** major_tick_base[2],
     ]
 )
 
@@ -204,7 +204,7 @@ axl.set_title(r"Lightcone of the Fiducial Model at $0^{\circ}\,\mathrm{RA}$")
 im = axl.imshow(data[255, :, :], cmap="inferno")
 
 axl.set_xticks(*custom_image_ticks(btzs, np.arange(6, 14, 1)))
-# axl.set_yticks(*custom_image_ticks(np.arange(512)*2, np.arange(0, 1025, 128), scaling=(lambda x: x - 512)))
+axl.set_yticks(*custom_image_ticks(np.arange(512)*2, np.arange(0, 1025, 128), scaling=(lambda x: x - 512)))
 
 nrows, ncols = im.get_size()
 aspect_ratio = ncols / nrows

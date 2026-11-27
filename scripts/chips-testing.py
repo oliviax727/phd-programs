@@ -28,6 +28,35 @@ cosmology.h0 = 67.66 * u.km / u.s / u.Mpc
 
 # ===
 
+# Import the FITS data
+
+from astropy.io import fits
+
+print(data.shape)
+
+with fits.open("/scratch/mwaeor/ohrw/oskareor.data/oskar.data/fiducial/fiducial_datacube.fits") as hdul:
+    data = np.flip(np.moveaxis(hdul[0].data, 0, -1), -1)
+
+print(data.shape)
+
+# ===
+
+# Calculate BT's from stokes I data provided by fits file
+for i, (f, s) in enumerate(zip(frqs, strs)):
+    data[:, :, i] = (omath.flux_to_brightness_temperature(fv=data[:, :, i], fxy=f, dphi=s, dtheta=s) * 1000) - 27
+
+print(data.max(), data.min())
+
+# ===
+
+temps_unscaled = data.flatten()
+
+zero_point = temps.max()  # Define the zero point to force logarithmic bins
+temps = zero_point - temps_unscaled
+temps = temps[temps > 0]
+
+# ===
+
 # Print channel centres, widths, and start/end points and append to an accumulator list
 
 
